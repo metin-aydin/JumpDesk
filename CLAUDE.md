@@ -80,6 +80,10 @@ boşluk eklenmez.
 - macOS sürümü Developer ID ile imzalanır ve Apple onayından geçer; depo gizli değerleri `CSC_LINK` (base64 .p12),
   `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Eksikse macOS adımı ve dolayısıyla
   tüm yayın durur. Gizli değerleri kullanıcı kendisi girer (Claude girmez). PR'larda CI üç platformu imzasız paketler.
+- Apple onayı ve damgalama `build/notarize.cjs` (afterSign) ile yapılır: `notarytool submit --wait`, sonra
+  `stapler staple` 30 sn arayla 10 deneme (Apple'ın damga sunucusu onaydan hemen sonra 503 dönebiliyor).
+- Bir sürüm başarısız olursa taslak silinir ve etiket oluşmaz; sonraki birleştirme aynı numarayı alır. O sürümün notu
+  yeni PR'ın açıklamasına taşınmalıdır (not birleştirilen PR'dan okunur).
 - Sürüm `dev/next-version.mjs`: package.json sürümü son `v*` etiketinden büyükse o, değilse son etiketin yaması +1.
   Büyük/küçük sürüm için `development`'ta package.json `version` elle artırılır.
 - Sürüm notu = `development` → `main` PR'ının açıklaması (`.github/pull_request_template.md` şablonu; HTML

@@ -15,6 +15,7 @@ files:
 asarUnpack:
   - resources/**
 afterPack: build/after-pack.cjs
+afterSign: build/notarize.cjs
 win:
   executableName: jumpdesk
   icon: build/icon.png
@@ -27,8 +28,9 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 # macOS: Apple Silicon ve Intel için dmg (kurulum) ve zip (uygulama içi güncelleme, Squirrel.Mac). Developer ID
-# sertifikası CSC_LINK/CSC_KEY_PASSWORD, Apple onayı (notarization) APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID
-# ortam değişkenlerinden gelir; verilmezse imza ve onay atlanır (yalnız derlemeyi denemek için).
+# sertifikası CSC_LINK/CSC_KEY_PASSWORD ortam değişkenlerinden gelir. Apple onayını (notarization) ve damgalamayı
+# build/notarize.cjs yapar (APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID); electron-builder'ın kendi onayı kapalı.
+# Değerler verilmezse imza ve onay atlanır (yalnız derlemeyi denemek için).
 mac:
   target:
     - target: dmg
@@ -39,6 +41,7 @@ mac:
   category: public.app-category.developer-tools
   hardenedRuntime: true
   entitlementsInherit: build/entitlements.mac.plist
+  notarize: false
   extendInfo:
     - NSDocumentsFolderUsageDescription: JumpDesk saves and opens export files in your Documents folder.
     - NSDownloadsFolderUsageDescription: JumpDesk saves downloaded server files to your Downloads folder.
