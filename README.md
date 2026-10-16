@@ -15,7 +15,7 @@
 
 JumpDesk turns your JumpServer assets into a desktop workspace: browse the server tree, open SSH, SFTP and RDP
 sessions in tabs and split views, run snippets, follow logs with highlights and alarms, and ask an AI for a command
-when you need one. It works with JumpServer v4 (Community edition) on Linux and Windows.
+when you need one. It works with JumpServer v4 (Community edition) on Linux, Windows and macOS.
 
 > JumpDesk is an independent project and is not affiliated with the JumpServer team.
 
@@ -37,7 +37,8 @@ when you need one. It works with JumpServer v4 (Community edition) on Linux and 
   OpenAI, Google Gemini, Azure OpenAI and OpenAI-compatible servers (Ollama, LM Studio, vLLM). Only the question and the
   server type are sent; commands are written to the prompt and never run without your Enter.
 - **Encrypted export/import** of snippets, rules, highlights, layouts and settings (`.jumpdesk` files).
-- **In-app updates** from GitHub Releases for the AppImage, .deb and Windows installer builds.
+- **In-app updates** from GitHub Releases for the AppImage, .deb, Windows installer and macOS builds; the portable
+  Windows build links to the new version's download page.
 - English and Turkish interface, light and dark themes, per-user local settings.
 
 ## Screenshots
@@ -67,6 +68,8 @@ Get the latest version from the [Releases](https://github.com/metin-aydin/JumpDe
 | Debian, Ubuntu | `jumpdesk_<version>_amd64.deb` | In the app (asks for your password) |
 | Windows | `JumpDesk-<version>-Setup.exe` | In the app |
 | Windows, no install | `JumpDesk-<version>-Portable.exe` | Download page |
+| macOS (Apple Silicon) | `JumpDesk-<version>-mac-arm64.dmg` | In the app |
+| macOS (Intel) | `JumpDesk-<version>-mac-x64.dmg` | In the app |
 
 JumpDesk looks for a new version shortly after startup and every six hours. When it finds one it shows a
 notification; **Settings → Updates** downloads it, installs it and restarts the app. Nothing is downloaded or installed
@@ -102,7 +105,7 @@ On Linux the app runs under XWayland (`--ozone-platform=x11`) so tabs can be dra
 - `main` only changes through pull requests. Work happens on a `development` branch created from `main`; the pull
   request that merges it into `main` publishes a release, and the branch is then deleted.
 - Each merge into `main` publishes a release. The
-  [Release workflow](.github/workflows/release.yml) picks the version, builds the Linux and Windows packages and
+  [Release workflow](.github/workflows/release.yml) picks the version, builds the Linux, Windows and macOS packages and
   attaches them to a new GitHub release, which the in-app updater then offers to users.
 - The description of that pull request becomes the release notes (see the
   [pull request template](.github/pull_request_template.md)); if it is empty, the commit titles since the previous
@@ -115,7 +118,12 @@ On Linux the app runs under XWayland (`--ozone-platform=x11`) so tabs can be dra
 ```bash
 npm run build && npx electron-builder --linux       # AppImage + deb
 npx electron-builder --win portable --x64            # Windows portable
+npx electron-builder --mac                           # macOS dmg + zip (Apple Silicon and Intel; on macOS only)
 ```
+
+Release builds of the macOS app are signed with a Developer ID certificate and notarized by Apple. The Release
+workflow reads these repository secrets: `CSC_LINK` (the base64-encoded `.p12` certificate), `CSC_KEY_PASSWORD`,
+`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`. Without them, local macOS builds are left unsigned.
 
 ## Issues and contributions
 
