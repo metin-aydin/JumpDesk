@@ -136,6 +136,8 @@ export interface AppSettings {
   recentServers?: string[]
   /** Son seçilen arayüz dili; giriş ekranı ve ana sürecin iletileri bu dildedir. */
   language?: 'en' | 'tr'
+  /** Yeni sürüm kendiliğinden denetlenir (yoksa açık). Bilgisayara özeldir, dışa aktarılmaz. */
+  autoUpdateCheck?: boolean
 }
 
 export type ApiResult<T> =

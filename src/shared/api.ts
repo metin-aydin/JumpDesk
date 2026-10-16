@@ -1,4 +1,5 @@
 import type { AiConfig, AiFeatures, AiProvider, AiSuggestRequest, AiSuggestResult } from './ai'
+import type { UpdateState } from './update'
 import type {
   ApiResult,
   AppSettings,
@@ -69,7 +70,13 @@ export const IPC = {
   aiSetSecret: 'ai:set-secret',
   aiTest: 'ai:test',
   aiSuggest: 'ai:suggest',
-  aiListModels: 'ai:list-models'
+  aiListModels: 'ai:list-models',
+  updateGetState: 'update:get-state',
+  updateCheck: 'update:check',
+  updateDownload: 'update:download',
+  updateInstall: 'update:install',
+  updateSetAuto: 'update:set-auto',
+  updateState: 'update:state'
 } as const
 
 /** İçe aktarım dosyası okunurken çıkabilecek hatalar. */
@@ -251,6 +258,19 @@ export interface JumpDeskApi {
       provider: AiProvider
     ): Promise<{ ok: true; models: { id: string; label: string }[] } | { ok: false; error: string }>
     suggest(request: AiSuggestRequest): Promise<AiSuggestResult>
+  }
+  /**
+   * Uygulama güncellemesi: yeni sürüm GitHub Releases'ta aranır; AppImage, .deb ve Windows kurulumunda indirilip
+   * uygulama içinden kurulur, taşınabilir sürümde yalnız yayın sayfası gösterilir.
+   */
+  update: {
+    getState(): Promise<UpdateState>
+    check(): Promise<UpdateState>
+    download(): Promise<UpdateState>
+    /** Uygulamayı kapatıp indirilen sürümü kurar ve yeniden açar. */
+    install(): void
+    setAutoCheck(enabled: boolean): Promise<UpdateState>
+    onChange(cb: (state: UpdateState) => void): () => void
   }
   /** Ayar ve kayıtların şifreli `.jumpdesk` dosyasına aktarımı. */
   transfer: {

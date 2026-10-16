@@ -425,3 +425,27 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
 - **memory/ ve CLAUDE.md depoda kalır** (kullanıcı kararı, 2026-10-16; içlerindeki kişisel çalışma tercihleri ve tur
   geçmişi kendisine gösterildikten sonra "ikisi de kalsın" dedi). `.gitignore`'a eklenmez; paket içine girmezler
   (electron-builder dışlamaları).
+
+## Uygulama içi güncelleme (electron-updater) — tuzaklar (2026-10-16)
+- Güncelleyici sınıfı elle seçilir (`AppImageUpdater`/`DebUpdater`/`NsisUpdater`): electron-builder `.deb` hedefi
+  `linux-unpacked/resources/package-type` yazar ve AppImage aynı klasörden üretildiği için AppImage'a da girer;
+  electron-updater'ın kendi seçimi bu dosyaya baktığından AppImage'ı .deb sanabilir. Önce `APPIMAGE` denetlenir.
+- `latest-linux.yml` hem AppImage'ı hem .deb'i listeler (dosyalar birleştirilir); her güncelleyici kendi uzantısını
+  seçer. Windows'ta yalnız NSIS `latest.yml` yazar; taşınabilir sürümün güncelleme dosyası yoktur.
+- Test modu (`JUMPDESK_UPDATE_URL`): `userData/test-app-update.yml` (generic sağlayıcı + `updaterCacheDirName`)
+  yazılıp `updateConfigPath` ve `forceDevUpdateConfig` verilir; yoksa paketlenmemiş uygulamada `dev-app-update.yml`
+  aranır ve indirme ENOENT ile düşer. Klasör henüz yoksa önce oluşturulur (yoksa açılış takılıyordu; kurulum
+  try/catch içinde, hata açılışı durdurmaz). `JUMPDESK_RELEASES_API` kurulamayan sürümün sorduğu adresi değiştirir.
+- Paketlenmemiş uygulama `electron out/main/index.js` ile açılınca `app.getVersion()` Electron'un sürümünü (44.x)
+  döndürür; güncelleme testi uygulamayı proje kökünden (`.`) açar.
+- Güncelleyici istek adresine `?noCache=` ekler; sahte sunucular yolu `URL.pathname` ile eşlemeli.
+- Hata iletileri yanıt başlıklarını ve yığın izini içerir; arayüze ilk satır verilir.
+- AppImage yeniden açılışı: yeni sürüm eski ana süreçten başlatıldığı için eski sürecin dosya tanıtıcılarını ve
+  `APPDIR`/`LD_LIBRARY_PATH` değerlerini devralır; eski AppImage kabuğu ve bağlaması yeni sürüm kapanana kadar
+  kalır (silinen eski dosya diskte yer tutar). Güncelleme yine çalışır; electron-updater'ın davranışı, kabul edildi.
+- AppImage farklı (differential) indirme için aralık isteği ister; sahte sunucu desteklemezse tam indirmeye düşer.
+- **Paket boyutu tuzağı:** `-c.directories.output` başka klasöre verilince electron-builder `dist/`'i artık çıktı
+  saymaz ve eski paketleri asar'a koyar (AppImage 1 GB oldu). `files` dışlamasına `dist` eklendi; normal boyut ~126 MB.
+- Ayarlar penceresinin seçili bölümü `stores/dialogs.ts` `settingsSection` içinde (`openSettings('updates')` ile
+  dışarıdan seçilir, `setSettingsSection`); effect içinde setState lint kuralına (`react-hooks/set-state-in-effect`)
+  takıldığı için yerel state kullanılmaz. `Sidebar.tsx` 202/206'daki aynı kural hataları bu değişiklikten önce de vardı.

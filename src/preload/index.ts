@@ -103,6 +103,14 @@ const api: JumpDeskApi = {
     suggest: (request) => ipcRenderer.invoke(IPC.aiSuggest, request),
     listModels: (provider) => ipcRenderer.invoke(IPC.aiListModels, provider)
   },
+  update: {
+    getState: () => ipcRenderer.invoke(IPC.updateGetState),
+    check: () => ipcRenderer.invoke(IPC.updateCheck),
+    download: () => ipcRenderer.invoke(IPC.updateDownload),
+    install: () => ipcRenderer.send(IPC.updateInstall),
+    setAutoCheck: (enabled) => ipcRenderer.invoke(IPC.updateSetAuto, enabled),
+    onChange: (cb) => subscribe(IPC.updateState, cb)
+  },
   transfer: {
     save: (payload, username) => ipcRenderer.invoke(IPC.transferSave, payload, username),
     open: () => ipcRenderer.invoke(IPC.transferOpen)

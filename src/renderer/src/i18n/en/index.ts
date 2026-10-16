@@ -5,6 +5,7 @@ import { common } from './common'
 import { panels } from './panels'
 import { terminal } from './terminal'
 import { tree } from './tree'
+import { update } from './update'
 import { workspace } from './workspace'
 
 /** İngilizce sözlük: anahtar Türkçe kaynak metin, değer İngilizce karşılığı. Alanlara göre ayrı dosyalarda tutulur. */
@@ -15,5 +16,6 @@ export const EN: Dictionary = {
   ...panels,
   ...terminal,
   ...app,
-  ...ai
+  ...ai,
+  ...update
 }

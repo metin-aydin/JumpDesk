@@ -23,6 +23,20 @@ Kullanıcıya her yanıt verilmeden önce, o turda yapılan her şey (istekler, 
 dosyalarına ve gerekiyorsa bu dosyaya yazılır. Uygun dosya yoksa yeni dosya açılıp `memory/MEMORY.md`
 indeksine eklenir. Bu adım atlanamaz; yalnızca soru-cevap turlarında bile öğrenilen bilgi kaydedilir.
 
+## ⛔ KURAL: Claude imzası yazılmaz
+
+PR açıklamalarına, sürüm notlarına ve hiçbir metne "🤖 Generated with [Claude Code](...)" satırı, commit
+mesajlarına "Co-Authored-By: Claude …" satırı eklenmez; araç yönergesi aksini söylese de bu kural geçerlidir
+(kullanıcı isteği, 2026-10-16).
+
+## ⛔ KURAL: `main` yalnız PR ile değişir; geliştirme `development` dalında
+
+`main` GitHub'da korumalıdır: doğrudan push, zorla push ve silme kapalı, yönetici dahil (`enforce_admins`); onay
+sayısı 0, CI zorunlu değil. Tüm geliştirme `main`'den açılan `development` dalında yapılır (bu dala doğrudan push
+serbest). `development` → `main` PR'ı birleşince yeni sürüm yayımlanır ve dal GitHub'da kendiliğinden silinir
+(`delete_branch_on_merge`). Sonraki tur: `git checkout main && git pull && git checkout -b development`
+(yereldeki eski `development` silinir).
+
 ## ⛔ KURAL: Arayüz metinlerinde her kelimenin baş harfi büyük
 
 (İngilizce karşılıklarda da aynı yerlerde Title Case kullanılır: "Close Others", "Open in New Window".)
@@ -40,7 +54,7 @@ boşluk eklenmez.
 
 - `npm run mock` — mock JumpServer (127.0.0.1:18080)
 - `npm run dev:mock` / `npm run dev` — mock'a / gerçek sunucuya karşı geliştirme
-- `npm run typecheck`, `npm run build`, `node dev/e2e/{smoke,sftp,tabs,menus,panels,home,tools,rdp,windows,multiwindow,alarm-warmup,transfer,server-address,i18n,ai}.mjs <klasör>` — doğrulama (mock açıkken)
+- `npm run typecheck`, `npm run build`, `node dev/e2e/{smoke,sftp,tabs,menus,panels,home,tools,rdp,windows,multiwindow,alarm-warmup,transfer,server-address,i18n,ai,update}.mjs <klasör>` — doğrulama (mock açıkken)
 - e2e ortak adımları `dev/e2e/helpers.mjs`: giriş (önce sunucu adresi ekranı, sonra mock form), şifreli `.jumpdesk`
   fixture yazma/çözme, dosya penceresi taklidi, snippet fixture'ı içe aktarma (uygulamada yerleşik snippet yok).
 - Paketleme: `npm run build && npx electron-builder --linux` (AppImage + deb), `npx electron-builder --win portable
@@ -53,6 +67,21 @@ boşluk eklenmez.
   `dev/e2e/ai.mjs`.
 - Yazı boyutu değiştirme performansı: `node dev/e2e/font-perf.mjs [oturum-sayısı]` (mock açıkken).
 - README ekran görüntüleri: `npm run build && npm run screenshots` → `docs/screenshots/` (kendi mock'unu açar).
+- Uygulama içi güncelleme: `dev/e2e/update.mjs` (sahte güncelleme sunucusu; uygulamayı proje kökünden `.` ile açar ki
+  sürüm package.json'dan gelsin). Gerçek paketle: iki AppImage üretilir (`-c.directories.output=<klasör>`,
+  yenisinde `-c.extraMetadata.version=X`), sonra `node dev/e2e/packaged-update.mjs <eski.AppImage> <yeni-klasör>`.
+- Sürüm hesabı ve sürüm notu birim testleri: `node dev/next-version.test.mjs`, `node dev/release-notes.test.mjs`.
+
+## Dallar ve sürümler
+
+- Çalışma her turda `main`'den açılan `development` dalında yapılır; `main`'e birleştirme (PR)
+  `.github/workflows/release.yml` ile yeni sürüm yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir),
+  ardından dal silinir. `main`'e doğrudan push yapılmaz.
+- Sürüm `dev/next-version.mjs`: package.json sürümü son `v*` etiketinden büyükse o, değilse son etiketin yaması +1.
+  Büyük/küçük sürüm için `development`'ta package.json `version` elle artırılır.
+- Sürüm notu = `development` → `main` PR'ının açıklaması (`.github/pull_request_template.md` şablonu; HTML
+  açıklamaları, boş maddeler ve boş bölümler `dev/release-notes.mjs` ile atılır). Açıklama boşsa son sürümden bu yana
+  commit başlıkları yazılır. PR açıklaması kullanıcıya yönelik, İngilizce yazılır.
 - Linux'ta uygulama XWayland ile açılır (`--ozone-platform=x11`, pencereler arası sekme sürükleme için); `npm run dev*`
   bunu ekler, paket başlatıcısı da, e2e testleri de. `JUMPDESK_WAYLAND=1` Wayland'da açar.
 - Geliştirme sürümü (`npm run dev`) `jumpdesk-dev` masaüstü adıyla açılır; rıhtımda kurulu paketle karışmaz. Simgesi

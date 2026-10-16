@@ -4,6 +4,7 @@ import { attachAuthWindow, checkSession } from './auth'
 import { registerIpc } from './ipc'
 import { installRequestHooks } from './net-hooks'
 import { store } from './store'
+import { initUpdater } from './updater'
 import { createMainWindow } from './window'
 import { mt } from './i18n'
 
@@ -59,6 +60,7 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc(mainWindow)
     attachAuthWindow(mainWindow)
     installRequestHooks((id) => id === appContentsId)
+    initUpdater(mainWindow)
     await checkSession()
 
     app.on('activate', () => {

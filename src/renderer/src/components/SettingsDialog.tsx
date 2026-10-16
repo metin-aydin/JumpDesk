@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   ArchiveRestore,
   Bell,
@@ -7,6 +6,7 @@ import {
   Languages,
   Minus,
   Plus,
+  RefreshCw,
   RotateCcw,
   Settings,
   Sparkles,
@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Switch } from '@/components/ui/switch'
 import { OsBadge } from '@/components/OsBadge'
 import { AiSettingsSection } from '@/features/ai/AiSettingsSection'
+import { UpdatesSection } from '@/features/update/UpdatesSection'
 import { openExport, openImport } from '@/features/transfer/actions'
 import { SECTION_IDS } from '@/features/transfer/bundle'
 import { SECTION_META } from '@/features/transfer/sections'
@@ -43,7 +44,7 @@ import {
 } from '@/stores/notification-settings'
 import { useTheme } from '@/stores/theme'
 
-type SectionId = 'language' | 'fonts' | 'notifications' | 'ai' | 'backup'
+type SectionId = 'language' | 'fonts' | 'notifications' | 'ai' | 'backup' | 'updates'
 
 /** Ayar grupları; adlar Türkçe kaynak metindir, ekranda `t()` ile çevrilir. */
 const SECTIONS: { id: SectionId; label: string; Icon: typeof Type }[] = [
@@ -51,7 +52,8 @@ const SECTIONS: { id: SectionId; label: string; Icon: typeof Type }[] = [
   { id: 'fonts', label: 'Yazı Boyutu', Icon: Type },
   { id: 'notifications', label: 'Bildirimler', Icon: Bell },
   { id: 'ai', label: 'Yapay Zeka', Icon: Sparkles },
-  { id: 'backup', label: 'Dışa / İçe Aktarma', Icon: ArchiveRestore }
+  { id: 'backup', label: 'Dışa / İçe Aktarma', Icon: ArchiveRestore },
+  { id: 'updates', label: 'Güncellemeler', Icon: RefreshCw }
 ]
 
 const FONT_ROWS: { key: FontSizeKey; label: string; description: string }[] = [
@@ -509,15 +511,24 @@ const SECTION_INFO: Record<SectionId, { title: string; description: string }> = 
     title: 'Dışa / İçe Aktarma',
     description:
       'Snippetler, alarm kuralları, vurgular, düzen kayıtları ve uygulama ayarları dosyaya aktarılır.'
+  },
+  updates: {
+    title: 'Güncellemeler',
+    description:
+      'Yeni sürümler GitHub Releases sayfasında aranır ve uygulama içinden indirilip kurulur.'
   }
 }
+
+const isSectionId = (v: string | null): v is SectionId => SECTIONS.some((s) => s.id === v)
 
 /** Ayarlar: solda ayar grupları, sağda seçili grubun içeriği. */
 export function SettingsDialog(): React.JSX.Element {
   const open = useDialogs((s) => s.settings)
   const setOpen = useDialogs((s) => s.setSettings)
   const t = useT()
-  const [section, setSection] = useState<SectionId>('fonts')
+  const selected = useDialogs((s) => s.settingsSection)
+  const setSection = useDialogs((s) => s.setSettingsSection)
+  const section: SectionId = isSectionId(selected) ? selected : 'fonts'
   const info = SECTION_INFO[section]
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -554,6 +565,7 @@ export function SettingsDialog(): React.JSX.Element {
           {section === 'notifications' && <NotificationsSection />}
           {section === 'ai' && <AiSettingsSection />}
           {section === 'backup' && <BackupSection />}
+          {section === 'updates' && <UpdatesSection />}
         </section>
       </DialogContent>
     </Dialog>

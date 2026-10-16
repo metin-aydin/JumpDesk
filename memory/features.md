@@ -686,3 +686,59 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    bilgisini gösterir. `docs/` pakete girmez.
    `.gitignore` tüm `*.png`'leri dışlar; `!docs/screenshots/*.png` istisnası var (ilk push'ta görseller bu yüzden
    eksik kalmıştı).
+2. **README girişi (kullanıcı isteği):** "yalnız 443 açık ağlarda çalışır" cümlesi girişten çıkarıldı (kullanıcı neden
+   anlatıldığını sordu; doğrudan proje tanıtımı istedi), yerine sade tanıtım paragrafı; teknik bilgi Features'ta tek
+   madde. Üstte ortalanmış logo (`build/icons/256x256.png`, 112 px), başlık ve rozetler ortalı HTML.
+   **`main`'e doğrudan push izin denetiminde reddedildi** (README commit'i); kullanıcıya soruldu.
+3. **Dallar:** `development` dalı açıldı ve push edildi (`main`'in `4a31893` hâlinden). Akış: iş `development`'ta,
+   `main`'e birleştirme sürüm yayımlar; `main`'e doğrudan push yok.
+4. **Release iş akışı** (`.github/workflows/release.yml`, `main`'e push + elle): `prepare` (sürüm
+   `dev/next-version.mjs`, yarım kalmış taslak silinir, `gh release create --draft --generate-notes`), `build`
+   (ubuntu `--linux`, windows `--win`; `npm version X --no-git-tag-version` ile sürüm hem ana hem arayüz kodu için
+   ayarlanır, `electron-builder --publish always` taslağa yükler), `publish` (`gh release edit --draft=false
+   --latest`), `discard` (hata olursa taslağı siler). `electron-builder.yml` `publish.releaseType: draft`.
+   CI artık `development` push'larında da çalışır ve `next-version.test.mjs`'i koşar. package.json sürümü **0.2.0**
+   (ilk sürüm v0.2.0 olacak; etiket yok).
+5. **Uygulama içi güncelleme** (`src/main/updater.ts`, `electron-updater` 6.8.10, `src/shared/update.ts`):
+   AppImage (APPIMAGE ortam değişkeni), .deb (`resources/package-type` = deb; kurulumda pkexec ile parola sorulur),
+   Windows NSIS kendini günceller; taşınabilir Windows ve geliştirme sürümü yalnız GitHub API'den son sürümü sorup
+   yayın sayfasını açar. Otomatik denetim açılıştan 15 sn sonra ve 6 saatte bir (yalnız paketli sürümde; ayar
+   `settings.autoUpdateCheck`, bilgisayara özel, dışa aktarılmaz). Hiçbir şey sormadan indirilmez/kurulmaz.
+   Arayüz: Ayarlar → Güncellemeler (sürüm, durum, ilerleme çubuğu, İndir ve Kur / Yeniden Başlat ve Kur / İndirme
+   Sayfasını Aç, Sürüm Notları, Otomatik Denetle), girişten sonra bildirim (Güncelle düğmesi), ayarlar düğmesinde
+   nokta, kullanıcı menüsünde "Sürüm X Hazır", komut paletinde "Güncellemeleri Denetle".
+   Doğrulama: `dev/e2e/update.mjs` 14/14; gerçek paketle `dev/e2e/packaged-update.mjs` 6/6 (0.2.0 AppImage → 0.2.1:
+   bulundu, indirildi, dosya değişti, yeni sürüm açıldı ve yeniden denetledi). .deb ve Windows kurulumu gerçek
+   ortamda denenmedi (ilk iki sürüm yayımlanınca denenecek).
+6. **`.vscode` sorusu:** kullanıcı depoda durmasının doğru olup olmadığını sordu. İçerik electron-vite şablonunun
+   ortak ayarları (ESLint eklenti önerisi, ana/arayüz süreci hata ayıklama başlatıcısı, Prettier biçimlendirici);
+   kişisel bilgi yok. Öneri: kalsın (katkı verenler için yararlı); kullanıcının kararı bekleniyor.
+7. **Doğrulama (35. tur sonu):** typecheck, i18n 0 sorun (576 metin), birim testleri; e2e smoke, i18n 4, menus,
+   home 17, transfer 39, panels 13, tools 53, windows 44, update 14, ai 24 — hepsi geçti. Paketli AppImage
+   güncellemesi 6/6. **Commit/push yapılmadı:** `development` dalındaki tüm iş (güncelleyici, release akışı, README
+   girişi + logo, CLAUDE.md, hafıza) yerelde bekliyor; kullanıcıya önerilen: `development`'a commit + push, sonra
+   `development` → `main` PR (birleşince ilk sürüm v0.2.0 yayımlanır).
+8. **Sürüm notu (changelog) kararı:** kullanıcı "changelog'da ne yazacağını nasıl belirleyeceğiz" diye sordu ve
+   commit/push/PR'a "evet" dedi. Uygulanan: notu `development` → `main` PR açıklaması belirler (PR şablonu: New /
+   Changed / Fixed; `dev/release-notes.mjs` boş bölümleri atar, birim testi CI'da); açıklama boşsa commit başlıkları;
+   sonraki sürümlerde "Full changelog" karşılaştırma bağlantısı eklenir. Önceki `--generate-notes` (yalnız PR başlığı
+   listelerdi) kaldırıldı.
+9. **Gönderildi (2026-10-16):** `development` `75d26ec` (güncelleyici, release akışı, sürüm notu, README, 0.2.0).
+   PR https://github.com/metin-aydin/JumpDesk/pull/1 (`development` → `main`, başlık "JumpDesk 0.2.0", açıklaması
+   v0.2.0 sürüm notu; sondaki "Generated with Claude Code" satırı da nota girer, istenirse birleştirmeden önce
+   silinir). Oturuma bağlandı; CI bekliyor. Birleştirme kullanıcıda: birleşince v0.2.0 yayımlanır.
+10. **PR #1 açıklaması düzeltildi:** "Generated with Claude Code" satırı kaldırıldı (`gh pr edit` GraphQL "Projects
+    (classic)" hatası verdi; `gh api -X PATCH repos/…/pulls/1 -F body=@dosya` ile yapıldı). Kullanıcı bu satırın bir
+    daha hiç yazılmamasını istedi.
+11. **Dal koruması (GitHub, klasik koruma API'si):** `main` ve `development`: PR zorunlu (0 onay), `enforce_admins`
+    açık, zorla push ve silme kapalı, durum denetimi zorunlu değil. `delete_branch_on_merge` kapalı (zaten silme
+    korumalı). Release akışı dala push etmez (etiket yayımlanınca oluşur), korumadan etkilenmez.
+    Bu turun hafıza/CLAUDE.md notları yerelde, commit'lenmedi; sonraki PR'a girecek.
+12. **Dal akışı değişti (kullanıcı kararı):** kalıcı `development` dalına gerek yok; tüm geliştirme `development`'ta,
+    `main`'e PR ile birleşince dal silinir, sonraki turda `main`'den yeniden açılır. `development` koruması kaldırıldı
+    (`DELETE …/branches/development/protection`), depo ayarı `delete_branch_on_merge: true`. `main` korumalı kaldı.
+    README (Branches and releases, katkılar `main`'e PR) ve CLAUDE.md buna göre güncellendi.
+13. **Co-Authored-By kaldırıldı (kullanıcı isteği):** bundan sonra commit mesajlarına yazılmaz. `development`'taki iki
+    commit `git filter-branch --msg-filter` ile yeniden yazıldı (içerik aynı) ve `--force-with-lease` ile gönderildi.
+    `main`'deki dört commit'te (`5ce7c61`, `098f6e4`, `1bfb966`, `4a31893`) satır duruyor; silmek için `main`
+    korumasını geçici kaldırıp force push gerekir, kullanıcı kararı bekleniyor.
