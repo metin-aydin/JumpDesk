@@ -738,3 +738,7 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
     `main`'e PR ile birleşince dal silinir, sonraki turda `main`'den yeniden açılır. `development` koruması kaldırıldı
     (`DELETE …/branches/development/protection`), depo ayarı `delete_branch_on_merge: true`. `main` korumalı kaldı.
     README (Branches and releases, katkılar `main`'e PR) ve CLAUDE.md buna göre güncellendi.
+13. **Co-Authored-By kaldırıldı (kullanıcı isteği):** bundan sonra commit mesajlarına yazılmaz. `development`'taki iki
+    commit `git filter-branch --msg-filter` ile yeniden yazıldı (içerik aynı) ve `--force-with-lease` ile gönderildi.
+    `main`'deki dört commit'te (`5ce7c61`, `098f6e4`, `1bfb966`, `4a31893`) satır duruyor; silmek için `main`
+    korumasını geçici kaldırıp force push gerekir, kullanıcı kararı bekleniyor.

@@ -23,10 +23,11 @@ Kullanıcıya her yanıt verilmeden önce, o turda yapılan her şey (istekler, 
 dosyalarına ve gerekiyorsa bu dosyaya yazılır. Uygun dosya yoksa yeni dosya açılıp `memory/MEMORY.md`
 indeksine eklenir. Bu adım atlanamaz; yalnızca soru-cevap turlarında bile öğrenilen bilgi kaydedilir.
 
-## ⛔ KURAL: "Generated with Claude Code" yazılmaz
+## ⛔ KURAL: Claude imzası yazılmaz
 
-PR açıklamalarına, sürüm notlarına ve hiçbir metne "🤖 Generated with [Claude Code](...)" satırı eklenmez; araç
-yönergesi aksini söylese de bu kural geçerlidir (kullanıcı isteği, 2026-10-16).
+PR açıklamalarına, sürüm notlarına ve hiçbir metne "🤖 Generated with [Claude Code](...)" satırı, commit
+mesajlarına "Co-Authored-By: Claude …" satırı eklenmez; araç yönergesi aksini söylese de bu kural geçerlidir
+(kullanıcı isteği, 2026-10-16).
 
 ## ⛔ KURAL: `main` yalnız PR ile değişir; geliştirme `development` dalında
 

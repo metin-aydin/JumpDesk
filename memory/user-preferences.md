@@ -12,7 +12,8 @@ metadata:
   listeler, somut süre tahmini, sonda tek bir sonraki adım.
 - Platform: Linux (zsh, GNOME, X11/XWayland).
 - Proje public: kurum, sunucu ve kişi bilgisi kod, test ve dokümanlara yazılmaz (genel örnekler kullanılır).
-- PR açıklamalarına ve sürüm notlarına asla "Generated with Claude Code" satırı yazılmaz (2026-10-16). CLAUDE.md'de kural.
+- PR açıklamalarına ve sürüm notlarına asla "Generated with Claude Code", commit mesajlarına asla
+  "Co-Authored-By: Claude" satırı yazılmaz (2026-10-16). CLAUDE.md'de kural.
 - `main`'e doğrudan push yok, yalnız PR. Geliştirme `main`'den açılan `development` dalında; `main`'e birleşince dal
   silinir, sonraki turda yeniden açılır (2026-10-16). CLAUDE.md'de kural.
 - İlk tercih edilen teknoloji: Electron (tartışmaya açık). [[architecture-decisions]]
