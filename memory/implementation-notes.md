@@ -449,3 +449,21 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
 - Ayarlar penceresinin seçili bölümü `stores/dialogs.ts` `settingsSection` içinde (`openSettings('updates')` ile
   dışarıdan seçilir, `setSettingsSection`); effect içinde setState lint kuralına (`react-hooks/set-state-in-effect`)
   takıldığı için yerel state kullanılmaz. `Sidebar.tsx` 202/206'daki aynı kural hataları bu değişiklikten önce de vardı.
+
+## Terminal çizimi: gizli terminaller ve xterm iç yaması (2026-10-16)
+- `xterm-patches.ts` xterm 6'nın iç alanlarına dayanır: `term._core._renderService` üzerinde `_isPaused`,
+  `_needsFullRefresh`, `_needsSelectionRefresh`, `_selectionState`, `_handleIntersectionChange`,
+  `handleSelectionChanged/handleBlur/handleFocus`. Alanlar yoksa yama sessizce uygulanmaz. **xterm sürümü
+  yükseltilince** `node dev/e2e/group-perf.mjs 5` ve `JUMPDESK_DISABLE_WEBGL=1` ile tekrar ölçülmeli.
+- Yama `term.open` sonrası ve sekme başka pencereye taşınınca (`onTabHostMoved` → `term.open`) yeniden uygulanır
+  (sembolle işaretli, iki kez sarılmaz).
+- `setRenderingPaused(term, paused)`: gizlenince `_handleIntersectionChange({isIntersecting:false})`, görünürken
+  `true` + bekleyen odak olayı. IntersectionObserver'ı beklemek geç kalır: yeni sekmenin otomatik odağı gizli
+  terminalin `handleBlur`'unu xterm duraklatmadan önce tetikler.
+- DOM çizicide `.xterm-rows` vardır, WebGL kipinde yoktur (satırlar tuvalde); testler metni okumak için ya DOM kipini
+  (`JUMPDESK_DISABLE_WEBGL=1`) ya da pano/erişilebilirlik yollarını kullanmalı. Ekran dışı testlerde WebGL çalışır
+  (tuval var); SwiftShader bayrakları (`--ignore-gpu-blocklist --enable-unsafe-swiftshader`) group-perf'te açık.
+- Vurgu penceresi: `scannedFrom/scannedTo` işaretçileri geçmişte taranmış aralığı izler (satırlar kırpıldıkça kayar);
+  `pageTop` önceki sayfa başını; geçmişe kayan sayfa satırları metin karşılaştırmasıyla korunur.
+- Ölçüm tuzağı: `npm run build` `out/`'u değiştirir; arka planda e2e koşarken derlenecekse
+  `npx electron-vite build --outDir <klasör>` ve `PERF_APP=<klasör>/main/index.js` kullanılır.

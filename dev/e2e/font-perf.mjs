@@ -1,4 +1,6 @@
 // Çok sayıda açık oturumda terminal yazı boyutunu değiştirmenin arayüzü ne kadar kilitlediğini ölçer (uzun görevler).
+// Terminaller DOM çiziciyle çizilir (JUMPDESK_DISABLE_WEBGL): WebGL'siz makinelerdeki en pahalı yol ölçülür ve
+// yazı boyutu satır öğelerinden okunabilir (WebGL kipinde boyut yalnız tuvalde görünür).
 // Kullanım: node dev/e2e/font-perf.mjs [oturum-sayısı]
 import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
@@ -21,6 +23,7 @@ const app = await electron.launch({
     JUMPDESK_HIDE_WINDOW: '1',
     JUMPDESK_OFFSCREEN: '1',
     JUMPDESK_NO_NOTIFY: '1',
+    JUMPDESK_DISABLE_WEBGL: '1',
     JUMPDESK_USER_DATA: fs.mkdtempSync(path.join(os.tmpdir(), 'jumpdesk-fontperf-'))
   }
 })

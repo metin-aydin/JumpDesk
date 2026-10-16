@@ -139,6 +139,8 @@ export interface JumpDeskApi {
   language: 'en' | 'tr'
   /** Dil ortam değişkeniyle (JUMPDESK_LANGUAGE, testler) sabitlendi; ayardan değiştirilemez. */
   languageForced: boolean
+  /** Terminaller WebGL ile çizilir; JUMPDESK_DISABLE_WEBGL=1 ile DOM çizici kullanılır (GPU sorunlarında, ölçümde). */
+  terminalWebgl: boolean
   auth: {
     getState(): Promise<AuthState>
     /**

@@ -208,6 +208,55 @@ try {
   )
   await page.keyboard.type('clear\n')
 
+  // Yalnız görünen alanın çevresi süslenir: geçmişin başına kaydırınca oradaki satırlar da boyanır
+  await page.keyboard.type('for i in $(seq 1 400); do echo "satir $i JUMPDESKHL"; done\n')
+  await page.waitForTimeout(1500)
+  const historyBox = await page.locator('.xterm-screen:visible').first().boundingBox()
+  await page.mouse.move(historyBox.x + historyBox.width / 2, historyBox.y + historyBox.height / 2)
+  await page.mouse.wheel(0, -100000)
+  await page.waitForTimeout(600)
+  const historyDecos = await page.locator('.xterm-decoration:visible').count()
+  const historyTop = await page
+    .locator('.xterm-rows:visible, .xterm-accessibility-tree:visible')
+    .first()
+    .innerText()
+    .catch(() => '')
+  check(
+    'history decorated after scrolling to the top',
+    historyDecos >= 5,
+    `${historyDecos} süsleme${historyTop.includes('satir 1 ') ? ', ilk satırlar görünüyor' : ''}`
+  )
+  await page.mouse.wheel(0, 100000)
+  await page.waitForTimeout(300)
+  await page.keyboard.type('clear\n')
+
+  // Fareyle seçilen metin kopyalanır (seçim bildirimleri çizime ulaşır); tıklayınca seçim kalkar
+  await page.keyboard.type('clear; echo JDSELECT-ABC\n')
+  await page.waitForTimeout(700)
+  const selectBox = await page.locator('.xterm-screen:visible').first().boundingBox()
+  await page.mouse.move(selectBox.x + 2, selectBox.y + 2)
+  await page.mouse.down()
+  await page.mouse.move(selectBox.x + selectBox.width - 4, selectBox.y + 44, { steps: 8 })
+  await page.mouse.up()
+  await app.evaluate(({ clipboard }) => clipboard.writeText(''))
+  await page.keyboard.press('Control+Shift+C')
+  await page.waitForTimeout(200)
+  const copied = await app.evaluate(({ clipboard }) => clipboard.readText())
+  check(
+    'mouse selection copies terminal text',
+    copied.includes('JDSELECT-ABC'),
+    copied.slice(0, 60)
+  )
+  await page.mouse.click(selectBox.x + selectBox.width / 2, selectBox.y + selectBox.height - 10)
+  await app.evaluate(({ clipboard }) => clipboard.writeText(''))
+  await page.keyboard.press('Control+Shift+C')
+  await page.waitForTimeout(200)
+  check(
+    'click clears the selection',
+    (await app.evaluate(({ clipboard }) => clipboard.readText())) === ''
+  )
+  await page.keyboard.type('clear\n')
+
   // Terminal alta hizalı (artık alan üstte); geçmişte yukarıdayken "En Alta Kaydır" bandı görünür
   await page.keyboard.type('for i in $(seq 1 120); do echo satir $i; done\n')
   await page.waitForTimeout(1000)

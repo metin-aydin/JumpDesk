@@ -76,7 +76,8 @@ export function registerIpc(win: BrowserWindow): void {
       alarmWarmupMs: envMs('JUMPDESK_ALARM_WARMUP_MS'),
       alarmSnippetWaitMs: envMs('JUMPDESK_ALARM_SNIPPET_WAIT_MS'),
       language: currentLanguage(),
-      languageForced: languageForced()
+      languageForced: languageForced(),
+      terminalWebgl: process.env['JUMPDESK_DISABLE_WEBGL'] !== '1'
     }
   })
 

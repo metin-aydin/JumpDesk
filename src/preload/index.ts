@@ -13,6 +13,7 @@ const platformInfo = ipcRenderer.sendSync(IPC.platformInfo) as {
   alarmSnippetWaitMs?: number | null
   language?: 'en' | 'tr'
   languageForced?: boolean
+  terminalWebgl?: boolean
 } | null
 
 const api: JumpDeskApi = {
@@ -22,6 +23,7 @@ const api: JumpDeskApi = {
   alarmSnippetWaitMs: platformInfo?.alarmSnippetWaitMs ?? null,
   language: platformInfo?.language ?? 'en',
   languageForced: platformInfo?.languageForced === true,
+  terminalWebgl: platformInfo?.terminalWebgl !== false,
   auth: {
     getState: () => ipcRenderer.invoke(IPC.authState),
     login: (server) => ipcRenderer.invoke(IPC.authLogin, server),

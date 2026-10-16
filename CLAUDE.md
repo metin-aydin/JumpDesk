@@ -65,7 +65,11 @@ boşluk eklenmez.
   (varsayılan dil İngilizce). Yeni metin eklerken sözlüğe de eklenir; denetim `node dev/i18n-check.mjs` (0 sorun
   olmalı). Türkçe e2e testleri `JUMPDESK_LANGUAGE=tr` ile açılır; İngilizce tarama `dev/e2e/i18n.mjs`, yapay zeka
   `dev/e2e/ai.mjs`.
-- Yazı boyutu değiştirme performansı: `node dev/e2e/font-perf.mjs [oturum-sayısı]` (mock açıkken).
+- Yazı boyutu değiştirme performansı: `node dev/e2e/font-perf.mjs [oturum-sayısı]` (mock açıkken; DOM çizicide).
+- Grup/sekme geçişi performansı: `node dev/e2e/group-perf.mjs [sunucu-sayısı]` (kendi mock'unu `MOCK_DATA=perf` ile
+  açar; terminaller geçmişi doldurup sürekli log akıtır; `JUMPDESK_DISABLE_WEBGL=1` DOM çizicide, `PERF_PROFILE=1|idle`
+  CPU profili). Terminal çizimi, vurgular ya da sekme gösterme/gizleme değişince çalıştırılır (sınır 250 ms).
+- `JUMPDESK_DISABLE_WEBGL=1`: terminaller DOM çiziciyle çizilir (WebGL'siz makineler, ölçüm, GPU sorunları).
 - README ekran görüntüleri: `npm run build && npm run screenshots` → `docs/screenshots/` (kendi mock'unu açar).
 - Uygulama içi güncelleme: `dev/e2e/update.mjs` (sahte güncelleme sunucusu; uygulamayı proje kökünden `.` ile açar ki
   sürüm package.json'dan gelsin). Gerçek paketle: iki AppImage üretilir (`-c.directories.output=<klasör>`,
