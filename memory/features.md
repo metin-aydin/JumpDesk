@@ -763,3 +763,47 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
 6. README: macOS satırları (In the app), imza gizli değerleri, Packaging'de `--mac`.
 7. Doğrulama: typecheck, i18n 0 sorun, update e2e 14/14 (Linux). macOS derlemesi yerelde denenemez; PR CI'ındaki
    `package (macos)` işi imzasız paketlemeyi, ilk yayın imza ve onayı doğrular.
+8. **v0.2.0 yayımlandı** (ilk Release çalışması başarılı: prepare, linux, windows, publish). PR #2
+   (https://github.com/metin-aydin/JumpDesk/pull/2, "JumpDesk 0.2.1: macOS", `development` `b597b9b`) açıldı ve
+   oturuma bağlandı; birleştirmeden önce kullanıcı 5 gizli değeri eklemeli (yoksa macOS adımı ve tüm yayın durur).
+   Bu not yerelde; sonraki commit'e girecek.
+9. **Mac gerekmez (kullanıcı sorusu):** Developer ID sertifikası Linux'ta OpenSSL ile üretilen CSR'ı
+   developer.apple.com'a yükleyerek alınır (Developer ID Application, G2 Sub-CA; yalnız Account Holder oluşturabilir),
+   `.cer` + özel anahtar + Apple ara sertifikası (DeveloperIDG2CA.cer) `openssl pkcs12 -export -legacy` ile .p12
+   yapılır. `-legacy` gerekir: OpenSSL 3'ün varsayılan .p12 şifrelemesini macOS `security import` (CI'da
+   electron-builder'ın geçici anahtarlığı) okuyamaz. Anahtar ve .p12 depo dışında tutulur (öneri `~/apple-signing`).
+10. Kullanıcı `~/apple-signing` klasörünü açtı (adım 1/7); sıradaki CSR üretimi.
+11. Adım 2 ve 4 tamam: `developer-id.key`, `developer-id.csr` üretildi, `DeveloperIDG2CA.cer` indirildi (Apple
+    Developer ID Certification Authority G2, 2031'e kadar geçerli). Bekleyen: adım 3 (Apple'dan .cer), 5 (.p12), 6, 7.
+12. Adım 5 denendi, `developerID_application.cer` klasörde olmadığı için durdu (Apple'dan indirilmemiş/taşınmamış).
+13. `developerID_application.cer` `~/Downloads`'tan `~/apple-signing`'e taşındı; "Developer ID Application" sertifikası
+    (2027-11'e kadar), özel anahtarla eşleştiği doğrulandı (modulus özeti). Team ID sertifikada yazılı (hafızaya
+    yazılmadı). Sıradaki: kullanıcı adım 5'i yeniden çalıştırır (.p12, parola sorar).
+14. Adım 5: `cert.pem`, `ca.pem` oluştu; terminal parola doğrulamasında ("Verifying - Enter Export Password")
+    bekliyor, `DeveloperID.p12` henüz yok.
+15. `DeveloperID.p12` oluştu (4342 bayt, eski biçim: MAC sha1, 2048 yineleme; parolalı, yalnız sahibi okuyabilir).
+    Linux'ta base64 için `base64 -w0` kullanılır (macOS'taki `-i` GNU'da başka anlama gelir, satır kırmak da istenmez).
+    Sıradaki: adım 6 (uygulamaya özel parola) ve 7 (5 gizli değer, kullanıcı girer).
+16. **Gizli değerler eklendi** (kullanıcı, 2026-10-16): CSC_LINK, CSC_KEY_PASSWORD, APPLE_ID,
+    APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID. İmza klasörü `~/Documents/apple-signing`'e taşındı (anahtar, .p12,
+    sertifikalar; Kasım 2027'de sertifika yenilenirken gerekir). PR #2 denetimleri yeşil: check, package (linux,
+    windows, macOS imzasız) geçti; birleştirilebilir. Birleşince v0.2.1 macOS dahil yayımlanır (imza + onay ilk kez
+    gerçek ortamda denenecek).
+17. **PR #2 birleştirildi** (`51c734d`); v0.2.1 Release çalışması:
+    https://github.com/metin-aydin/JumpDesk/actions/runs/38911128835. Yerelde `main` güncellendi, `development` silindi.
+    Kullanıcı `~/Downloads/jumpdesk_0.2.0_amd64.deb`'i indirdi (kurulu JumpDesk paketi yok); kurulumu kendisi yapacak
+    (`sudo apt install`). v0.2.1 yayımlanınca kurulu 0.2.0 .deb'in uygulama içi güncellemesi (pkexec ile dpkg) ilk kez
+    gerçek ortamda denenecek. Dev masaüstü kaydı `jumpdesk-dev.desktop` ayrı, çakışmaz; ayarlar ortak
+    (`~/.config/JumpDesk`).
+18. `gh run list` çıktısı terminalde sayfalayıcıda (less) açılıyor ve satırları kesiyor; kullanıcı ilk sürümün
+    çalışmasını yenisi sandı. v0.2.1 çalışması 38911128835: prepare geçti, üç build sürüyordu (16:53).
+19. **0.2.0 .deb kuruldu** (kullanıcı, `sudo apt install`): `/opt/JumpDesk`, `resources/package-type` = deb,
+    `app-update.yml` (github, updaterCacheDirName jumpdesk-updater) → DebUpdater kipi. app-update.yml'deki
+    `releaseType: draft` güncelleyiciyi etkilemez (GitHubProvider `releases.atom` ve `/releases/latest` okur).
+    apt'nin "_apt kullanıcısı dosyaya erişemedi" notu ~/Downloads izninden, zararsız.
+20. **v0.2.1 yayımlanamadı:** macOS adımı: imza başarılı (Developer ID), Apple onayı kabul edildi (~3 dk), ama
+    `stapler staple` Apple'ın damga sunucusundan (api.apple-cloudkit.com) 503 aldı ("Error 65"). @electron/notarize
+    2.5.0 damgalamayı 3 kez 1–4 sn arayla deniyor, yetmedi. `discard` taslağı sildi (Linux/Windows başarılıydı).
+    Çözüm (PR #3): `build/notarize.cjs` afterSign kancası (ditto zip → `notarytool submit --wait --output-format
+    json`, reddedilirse `notarytool log`; sonra damgalama 30 sn arayla 10 deneme), `mac.notarize: false`. Kanca
+    değerler yoksa atlar (denendi). Sürüm notu PR #2'den PR #3'e taşındı.
