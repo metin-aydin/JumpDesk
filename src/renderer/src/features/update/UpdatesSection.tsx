@@ -19,7 +19,8 @@ const INSTALLER_NOTE: Record<string, string> = {
   appimage: 'AppImage dosyası yeni sürümle değiştirilir ve JumpDesk yeniden açılır.',
   deb: 'Kurulum sırasında sistem parolanız sorulur (paket dpkg ile kurulur) ve JumpDesk yeniden açılır.',
   nsis: 'Windows kurulum programı çalışır ve JumpDesk yeniden açılır.',
-  none: 'Bu sürüm kendini güncelleyemez (taşınabilir ya da geliştirme sürümü); yeni sürüm yayın sayfasından indirilir.'
+  none: 'Bu sürüm kendini güncelleyemez (taşınabilir ya da geliştirme sürümü); yeni sürüm yayın sayfasından indirilir.',
+  mac: 'Yeni sürüm indirilir, JumpDesk kapanıp yeni sürümle yeniden açılır.'
 }
 
 function StatusLine({ state }: { state: UpdateState }): React.JSX.Element {

@@ -742,3 +742,24 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
     commit `git filter-branch --msg-filter` ile yeniden yazıldı (içerik aynı) ve `--force-with-lease` ile gönderildi.
     `main`'deki dört commit'te (`5ce7c61`, `098f6e4`, `1bfb966`, `4a31893`) satır duruyor; silmek için `main`
     korumasını geçici kaldırıp force push gerekir, kullanıcı kararı bekleniyor.
+14. **PR #1 birleştirildi (kullanıcı, 2026-10-16):** merge commit `1ab01da`; uzak `development` kendiliğinden silindi,
+    yerelde `main` güncellendi ve yerel `development` silindi. İlk Release çalışması:
+    https://github.com/metin-aydin/JumpDesk/actions/runs/38907838865 (takip: Actions → Release, ya da
+    `gh run watch 38907838865 --repo metin-aydin/JumpDesk`). Sonuç: Releases sayfasında v0.2.0. Bu not yerelde;
+    sonraki `development` dalına girecek. `main`'deki eski Co-Authored-By satırları için karar hâlâ bekliyor.
+
+## Kullanıcı istekleri — 36. tur (2026-10-16): macOS sürümü
+1. Kullanıcı macOS release'inin neden olmadığını sordu, eklenmesini istedi; ardından "geliştirici imzam var" dedi.
+2. **electron-builder.yml mac:** dmg + zip, `arch: [arm64, x64]`, ad `JumpDesk-<sürüm>-mac-<arch>.<ext>`,
+   `hardenedRuntime: true`, entitlements mevcut (allow-jit vb.), şablondaki kamera/mikrofon izin metinleri atıldı.
+   Not: electron-builder 26 sertifika yoksa imzalamaz (ad-hoc'a düşmez; ad-hoc için `identity: '-'` +
+   `hardenedRuntime: false` gerekir). Onay (notarize) ayarı verilmezse APPLE_* ortam değişkenleri varsa yapılır,
+   yoksa uyarıyla atlanır; `notarize: false` onu tamamen kapatır (kaldırıldı).
+3. **release.yml:** matris'e `macos-latest` (`--mac`); Linux/Windows adımı `CSC_*` almaz (Windows `CSC_LINK`'i kendi
+   imzası sanardı), macOS adımı gizli değerleri alır ve eksikse hata verip durur.
+4. **ci.yml:** PR'larda `package` işi (3 platform, `--publish never`, `CSC_IDENTITY_AUTO_DISCOVERY=false`).
+5. **Güncelleyici:** `UpdateInstaller` 'mac' (MacUpdater, Squirrel.Mac); paketli macOS'ta `app-update.yml` varsa
+   kendini günceller. Not: "Yeni sürüm indirilir, JumpDesk kapanıp yeni sürümle yeniden açılır."
+6. README: macOS satırları (In the app), imza gizli değerleri, Packaging'de `--mac`.
+7. Doğrulama: typecheck, i18n 0 sorun, update e2e 14/14 (Linux). macOS derlemesi yerelde denenemez; PR CI'ındaki
+   `package (macos)` işi imzasız paketlemeyi, ilk yayın imza ve onayı doğrular.

@@ -26,16 +26,24 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+# macOS: Apple Silicon ve Intel için dmg (kurulum) ve zip (uygulama içi güncelleme, Squirrel.Mac). Developer ID
+# sertifikası CSC_LINK/CSC_KEY_PASSWORD, Apple onayı (notarization) APPLE_ID/APPLE_APP_SPECIFIC_PASSWORD/APPLE_TEAM_ID
+# ortam değişkenlerinden gelir; verilmezse imza ve onay atlanır (yalnız derlemeyi denemek için).
 mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
+    - NSDocumentsFolderUsageDescription: JumpDesk saves and opens export files in your Documents folder.
+    - NSDownloadsFolderUsageDescription: JumpDesk saves downloaded server files to your Downloads folder.
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
 linux:
   target:
     - AppImage

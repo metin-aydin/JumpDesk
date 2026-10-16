@@ -1,7 +1,13 @@
 import { app, net, type BrowserWindow } from 'electron'
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { AppImageUpdater, DebUpdater, NsisUpdater, type AppUpdater } from 'electron-updater'
+import {
+  AppImageUpdater,
+  DebUpdater,
+  MacUpdater,
+  NsisUpdater,
+  type AppUpdater
+} from 'electron-updater'
 import { IPC } from '@shared/api'
 import { compareVersions, type UpdateInstaller, type UpdateState } from '@shared/update'
 import { store } from './store'
@@ -41,11 +47,14 @@ const message = (err: unknown): string =>
 
 /**
  * Uygulamanın kendini güncelleyebildiği kurulum türü: Windows'ta NSIS kurulumu (taşınabilir sürüm değil), Linux'ta
- * AppImage ya da .deb paketi. Geliştirme sürümünde (test adresi verilmedikçe) yoktur.
+ * AppImage ya da .deb paketi, macOS'ta güncelleme dosyası (app-update.yml) bulunan imzalı paket. Geliştirme sürümünde
+ * (test adresi verilmedikçe) yoktur.
  */
 function detectInstaller(): UpdateInstaller | null {
   if (!app.isPackaged && !testFeed) return null
   if (process.platform === 'win32') return process.env['PORTABLE_EXECUTABLE_DIR'] ? null : 'nsis'
+  if (process.platform === 'darwin')
+    return existsSync(join(process.resourcesPath, 'app-update.yml')) ? 'mac' : null
   if (process.platform !== 'linux') return null
   if (process.env['APPIMAGE']) return 'appimage'
   try {
@@ -58,7 +67,13 @@ function detectInstaller(): UpdateInstaller | null {
 
 function createUpdater(kind: UpdateInstaller): AppUpdater {
   const u =
-    kind === 'nsis' ? new NsisUpdater() : kind === 'deb' ? new DebUpdater() : new AppImageUpdater()
+    kind === 'nsis'
+      ? new NsisUpdater()
+      : kind === 'mac'
+        ? new MacUpdater()
+        : kind === 'deb'
+          ? new DebUpdater()
+          : new AppImageUpdater()
   u.autoDownload = false
   u.autoInstallOnAppQuit = false
   if (testFeed) {

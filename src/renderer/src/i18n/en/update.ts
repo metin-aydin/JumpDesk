@@ -32,6 +32,8 @@ export const update: Dictionary = {
     'The Windows installer runs and JumpDesk reopens.',
   'Bu sürüm kendini güncelleyemez (taşınabilir ya da geliştirme sürümü); yeni sürüm yayın sayfasından indirilir.':
     'This build cannot update itself (portable or development build); download new versions from the releases page.',
+  'Yeni sürüm indirilir, JumpDesk kapanıp yeni sürümle yeniden açılır.':
+    'The new version is downloaded, then JumpDesk closes and reopens with it.',
 
   // Bildirimler, kullanıcı menüsü ve komut paleti
   'JumpDesk {version} yayımlandı': 'JumpDesk {version} is available',

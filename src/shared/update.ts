@@ -1,5 +1,5 @@
 /** Uygulamanın kendini güncelleyebildiği kurulum türleri. */
-export type UpdateInstaller = 'appimage' | 'deb' | 'nsis'
+export type UpdateInstaller = 'appimage' | 'deb' | 'nsis' | 'mac'
 
 export type UpdateStatus =
   'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error'

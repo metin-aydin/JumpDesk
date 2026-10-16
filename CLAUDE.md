@@ -75,8 +75,11 @@ boşluk eklenmez.
 ## Dallar ve sürümler
 
 - Çalışma her turda `main`'den açılan `development` dalında yapılır; `main`'e birleştirme (PR)
-  `.github/workflows/release.yml` ile yeni sürüm yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir),
-  ardından dal silinir. `main`'e doğrudan push yapılmaz.
+  `.github/workflows/release.yml` ile yeni sürüm yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir, macOS
+  arm64/x64 dmg + zip), ardından dal silinir. `main`'e doğrudan push yapılmaz.
+- macOS sürümü Developer ID ile imzalanır ve Apple onayından geçer; depo gizli değerleri `CSC_LINK` (base64 .p12),
+  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Eksikse macOS adımı ve dolayısıyla
+  tüm yayın durur. Gizli değerleri kullanıcı kendisi girer (Claude girmez). PR'larda CI üç platformu imzasız paketler.
 - Sürüm `dev/next-version.mjs`: package.json sürümü son `v*` etiketinden büyükse o, değilse son etiketin yaması +1.
   Büyük/küçük sürüm için `development`'ta package.json `version` elle artırılır.
 - Sürüm notu = `development` → `main` PR'ının açıklaması (`.github/pull_request_template.md` şablonu; HTML
