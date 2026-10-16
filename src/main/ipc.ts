@@ -34,6 +34,13 @@ import {
 import { currentLanguage, languageForced } from './i18n'
 import { store } from './store'
 import { openImport, saveExport } from './transfer'
+import {
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  setAutoCheck,
+  updateState
+} from './updater'
 import { currentBackground, getWindowState } from './window'
 
 function themeInfo(): ThemeInfo {
@@ -237,6 +244,11 @@ export function registerIpc(win: BrowserWindow): void {
   handle(IPC.aiTest, (language) => aiTest(language === 'tr' ? 'tr' : 'en'))
   handle(IPC.aiSuggest, (request) => aiSuggest(request))
   handle(IPC.aiListModels, (provider) => aiListModels(provider))
+  handle(IPC.updateGetState, () => updateState())
+  handle(IPC.updateCheck, () => checkForUpdates())
+  handle(IPC.updateDownload, () => downloadUpdate())
+  on(IPC.updateInstall, () => installUpdate())
+  handle(IPC.updateSetAuto, (enabled) => setAutoCheck(enabled === true))
   handle(IPC.serverMetaGetAll, () => store.servers)
   handle(IPC.serverMetaSet, (assetId, patch) =>
     store.updateServer(asString(assetId, 'assetId'), patch as Partial<ServerMeta>)

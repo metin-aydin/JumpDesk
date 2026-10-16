@@ -2,7 +2,7 @@
   "name": "jumpdesk",
   "productName": "JumpDesk",
   "desktopName": "jumpdesk.desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cross-platform desktop client for JumpServer (open-source PAM/bastion): tabbed SSH, RDP and SFTP sessions, split panes, snippets, alarm and highlight rules",
   "main": "./out/main/index.js",
   "author": "metin-aydin",
@@ -34,7 +34,8 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
-    "@electron-toolkit/utils": "^4.0.0"
+    "@electron-toolkit/utils": "^4.0.0",
+    "electron-updater": "^6.8.10"
   },
   "devDependencies": {
     "@base-ui/react": "^1.9.0",

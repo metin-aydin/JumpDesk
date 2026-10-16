@@ -1,11 +1,21 @@
-# JumpDesk
+<p align="center">
+  <img src="build/icons/256x256.png" width="112" alt="JumpDesk logo">
+</p>
 
-[![CI](https://github.com/metin-aydin/JumpDesk/actions/workflows/ci.yml/badge.svg)](https://github.com/metin-aydin/JumpDesk/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<h1 align="center">JumpDesk</h1>
 
-A desktop client for [JumpServer](https://github.com/jumpserver/jumpserver) (v4, Community edition). It signs in
-through your JumpServer's own login page and opens SSH, SFTP and RDP sessions over the same HTTPS port the web UI uses,
-so it works on networks where only 443 is reachable.
+<p align="center">
+  A cross-platform desktop client for <a href="https://github.com/jumpserver/jumpserver">JumpServer</a>.
+</p>
+
+<p align="center">
+  <a href="https://github.com/metin-aydin/JumpDesk/actions/workflows/ci.yml"><img src="https://github.com/metin-aydin/JumpDesk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+JumpDesk turns your JumpServer assets into a desktop workspace: browse the server tree, open SSH, SFTP and RDP
+sessions in tabs and split views, run snippets, follow logs with highlights and alarms, and ask an AI for a command
+when you need one. It works with JumpServer v4 (Community edition) on Linux and Windows.
 
 > JumpDesk is an independent project and is not affiliated with the JumpServer team.
 
@@ -13,6 +23,8 @@ so it works on networks where only 443 is reachable.
 
 ## Features
 
+- **Sign in with your JumpServer's own login page** (LDAP, MFA and SSO work as usual). Sessions use the same
+  HTTPS connection as the web UI, so no extra ports need to be open.
 - **Server tree and search** with tags, favorites, hover cards and multi-select connect.
 - **Terminal (SSH/Telnet)** built on xterm.js: split views (side by side, stacked, grid), broadcast input, tabs that
   can be dragged into separate windows and back, terminal search, keyword highlights and alarm rules with desktop
@@ -25,6 +37,7 @@ so it works on networks where only 443 is reachable.
   OpenAI, Google Gemini, Azure OpenAI and OpenAI-compatible servers (Ollama, LM Studio, vLLM). Only the question and the
   server type are sent; commands are written to the prompt and never run without your Enter.
 - **Encrypted export/import** of snippets, rules, highlights, layouts and settings (`.jumpdesk` files).
+- **In-app updates** from GitHub Releases for the AppImage, .deb and Windows installer builds.
 - English and Turkish interface, light and dark themes, per-user local settings.
 
 ## Screenshots
@@ -46,8 +59,18 @@ Screenshots are generated against the bundled mock server with `npm run build &&
 
 ## Download
 
-Prebuilt packages (Linux AppImage and .deb, Windows portable) are published on the
-[Releases](https://github.com/metin-aydin/JumpDesk/releases) page.
+Get the latest version from the [Releases](https://github.com/metin-aydin/JumpDesk/releases/latest) page:
+
+| Platform | File | Updates |
+| --- | --- | --- |
+| Linux | `JumpDesk-<version>.AppImage` (make it executable and run it) | In the app |
+| Debian, Ubuntu | `jumpdesk_<version>_amd64.deb` | In the app (asks for your password) |
+| Windows | `JumpDesk-<version>-Setup.exe` | In the app |
+| Windows, no install | `JumpDesk-<version>-Portable.exe` | Download page |
+
+JumpDesk looks for a new version shortly after startup and every six hours. When it finds one it shows a
+notification; **Settings → Updates** downloads it, installs it and restarts the app. Nothing is downloaded or installed
+without asking, and automatic checks can be turned off there.
 
 ## Development
 
@@ -74,6 +97,18 @@ npm run build && node dev/e2e/smoke.mjs   # end-to-end tests run against the moc
 On Linux the app runs under XWayland (`--ozone-platform=x11`) so tabs can be dragged between windows; set
 `JUMPDESK_WAYLAND=1` to use Wayland.
 
+## Branches and releases
+
+- Work happens on `development`; open pull requests against it.
+- Merging `development` into `main` publishes a release. The
+  [Release workflow](.github/workflows/release.yml) picks the version, builds the Linux and Windows packages and
+  attaches them to a new GitHub release, which the in-app updater then offers to users.
+- The description of that pull request becomes the release notes (see the
+  [pull request template](.github/pull_request_template.md)); if it is empty, the commit titles since the previous
+  release are listed.
+- Each release raises the patch number (0.2.0 → 0.2.1 → …). For a new minor or major version, set `version` in
+  `package.json` on `development` (for example `0.3.0`); the next release uses it.
+
 ## Packaging
 
 ```bash
@@ -84,6 +119,7 @@ npx electron-builder --win portable --x64            # Windows portable
 ## Issues and contributions
 
 Bug reports and feature requests are welcome on [GitHub Issues](https://github.com/metin-aydin/JumpDesk/issues).
+Pull requests go to the `development` branch.
 User-facing text is written in Turkish in the source and translated through `src/renderer/src/i18n/en/`; run
 `node dev/i18n-check.mjs` before opening a pull request.
 

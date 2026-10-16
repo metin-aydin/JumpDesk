@@ -10,7 +10,7 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # Geliştirme dosyaları, hafıza notları ve yerel eklenti günlükleri pakete girmez.
-  - '!{.remember,memory,dev,docs,.github}{,/**/*}'
+  - '!{.remember,memory,dev,docs,dist,.github}{,/**/*}'
   - '!{CLAUDE.md,LICENSE,swagger.json,components.json,*.tsbuildinfo}'
 asarUnpack:
   - resources/**
@@ -58,8 +58,10 @@ deb:
 portable:
   artifactName: ${productName}-${version}-Portable.${ext}
 npmRebuild: false
-# Sürüm dosyaları GitHub Releases'a yüklenir (yalnız --publish verilince ya da etiketli CI derlemesinde).
+# Sürüm dosyaları GitHub Releases'a yüklenir (yalnız --publish verilince): release iş akışı taslak sürümü önceden açar,
+# paketler ona eklenir, iş akışının son adımı yayımlar. Uygulama içi güncelleme aynı depoyu okur (src/main/updater.ts).
 publish:
   provider: github
   owner: metin-aydin
   repo: JumpDesk
+  releaseType: draft

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { UserProfile } from '@shared/types'
-import { Download, LogOut, Search, Settings, Upload, X } from 'lucide-react'
+import { CircleArrowUp, Download, LogOut, Search, Settings, Upload, X } from 'lucide-react'
 import { openExport, openImport } from '@/features/transfer/actions'
 import {
   DropdownMenu,
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/stores/auth'
 import { useDialogs } from '@/stores/dialogs'
 import { useTreeCommands } from '@/stores/tree-commands'
+import { startUpdate, useUpdate } from '@/stores/update'
 import { useWorkspace } from '@/stores/workspace'
 import { SlidePanel } from '@/components/SlidePanel'
 import { usePanelWidth } from '@/hooks/use-panel-width'
@@ -80,7 +81,13 @@ function UserFooter(): React.JSX.Element | null {
   const t = useT()
   const state = useAuth((s) => s.state)
   const avatar = useAvatar(state?.status === 'logged-in' ? state.user : undefined)
+  const update = useUpdate((s) => s.state)
   if (state?.status !== 'logged-in') return null
+  /** Bulunan yeni sürüm ayarlar düğmesinde nokta ve kullanıcı menüsünde öğe olarak gösterilir. */
+  const newVersion =
+    update && ['available', 'downloading', 'downloaded'].includes(update.status)
+      ? update.version
+      : undefined
   const { user, server } = state
   const fullName = user.name?.trim() || user.username
   /** Fotoğraf yoksa adın baş harfi gösterilir. */
@@ -131,6 +138,11 @@ function UserFooter(): React.JSX.Element | null {
           <DropdownMenuItem onClick={() => void openImport()}>
             <Download /> {t('İçe Aktar…')}
           </DropdownMenuItem>
+          {update && newVersion && (
+            <DropdownMenuItem onClick={() => startUpdate(update)}>
+              <CircleArrowUp /> {t('Sürüm {version} Hazır', { version: newVersion })}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem variant="destructive" onClick={() => void jumpdesk.auth.logout()}>
             <LogOut /> {t('Çıkış Yap')}
           </DropdownMenuItem>
@@ -149,15 +161,23 @@ function UserFooter(): React.JSX.Element | null {
             <button
               type="button"
               aria-label={t('Ayarlar')}
-              onClick={() => useDialogs.getState().setSettings(true)}
-              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+              onClick={() => useDialogs.getState().openSettings(newVersion ? 'updates' : undefined)}
+              className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
             />
           }
         >
           <Settings className="size-4" />
+          {newVersion && (
+            <span
+              aria-hidden
+              className="absolute top-1.5 right-1.5 size-2 rounded-full bg-primary ring-2 ring-sidebar"
+            />
+          )}
         </TooltipTrigger>
         <TooltipContent>
-          {t('Ayarlar ({shortcut})', { shortcut: SETTINGS_SHORTCUT })}
+          {newVersion
+            ? t('Yeni Sürüm: {version}', { version: newVersion })
+            : t('Ayarlar ({shortcut})', { shortcut: SETTINGS_SHORTCUT })}
         </TooltipContent>
       </Tooltip>
     </div>

@@ -18,6 +18,7 @@ import {
   PanelTopOpen,
   Plus,
   Radio,
+  RefreshCw,
   Rocket,
   Rows2,
   Search,
@@ -48,6 +49,7 @@ import { terminalRegistry } from '@/features/terminal/registry'
 import { useT } from '@/lib/i18n'
 import { SETTINGS_SHORTCUT, isMac, shortcutLabel } from '@/lib/shortcuts'
 import { useDialogs } from '@/stores/dialogs'
+import { jumpdesk } from '@/lib/jumpdesk'
 import { openLayout, useLayoutDialog, useLayouts } from '@/stores/layouts'
 import { closeAllSafely, closeTabSafely, ungroupSafely } from '@/features/layouts/guard'
 import { useRightPanel } from '@/stores/right-panel'
@@ -115,6 +117,16 @@ function buildCommands(
           Icon: Settings,
           shortcut: SETTINGS_SHORTCUT,
           run: () => useDialogs.getState().setSettings(true)
+        },
+        {
+          id: 'check-updates',
+          label: t('Güncellemeleri Denetle'),
+          Icon: RefreshCw,
+          keywords: ['update', t('sürüm'), 'version'],
+          run: () => {
+            useDialogs.getState().openSettings('updates')
+            void jumpdesk.update.check()
+          }
         },
         {
           id: 'snippet-editor',

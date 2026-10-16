@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
 
 jobs:
@@ -23,5 +23,7 @@ jobs:
           node dev/alarm-detector.test.mjs
           node dev/ai-safety.test.mjs
           node dev/ai-providers.test.mjs
+          node dev/next-version.test.mjs
+          node dev/release-notes.test.mjs
       - name: Build
         run: npx electron-vite build
