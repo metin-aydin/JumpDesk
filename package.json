@@ -25,6 +25,7 @@
     "dev:mock": "cross-env JUMPDESK_SERVER=http://127.0.0.1:18080 electron-vite dev -- --ozone-platform=x11",
     "mock": "node dev/mock-jms/server.mjs",
     "desktop-entry": "sh dev/install-desktop-entry.sh",
+    "screenshots": "node dev/screenshots.mjs",
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",

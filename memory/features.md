@@ -664,6 +664,8 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
   örnekleri. `.remember/` yerelde duruyor (gitignore'da; içinde eski konuşma kayıtları var).
 - **Proje klasörü `jumpdesk` adını aldı;** memory ve md dosyalarında önceki ad kalmadı. Claude'un proje dışı
   işaretçisi yeni klasörün anahtarıyla kuruldu (eskisi de yeni yolu gösterir).
+  Dev masaüstü kaydı yeni yolla yeniden kuruldu. Oturum eklentisi (`.remember`) oturum taşınana kadar eski yolda küçük
+  bir günlük klasörü yeniden yaratıyor; silinmesi güvenlik denetimine takıldı, kullanıcıya bırakıldı.
 - **md denetimi (üçüncü tarama, 2026-10-16):** tüm md dosyaları satır satır okundu; dolaylı ipuçları (klasör yolu,
   snippet sayıları, ağ kısıtları, log biçimi, sunucu port/sürüm ayrıntıları, e-posta notu) genel ifadeyle yeniden
   yazıldı. Kalan kişisel not yalnız çalışma tercihleri (ADHD biçimi; kullanıcı depoda kalmasını seçti). Mock klasör
@@ -671,5 +673,13 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
 - **İlk commit değiştirildi:** GitHub'ın oluşturduğu ilk commit (README'de önceki ad) kaldırıldı; tüm proje tek bir
   ebeveynsiz kök commit olarak force push edildi (kullanıcı "yeni ilk commit + force push" seçti; depoyu silip
   yeniden açma seçilmedi). Kullanıcı mock klasör adlarını doğru buldu.
-  Dev masaüstü kaydı yeni yolla yeniden kuruldu. Oturum eklentisi (`.remember`) oturum taşınana kadar eski yolda küçük
-  bir günlük klasörü yeniden yaratıyor; silinmesi güvenlik denetimine takıldı, kullanıcıya bırakıldı.
+
+## Kullanıcı istekleri — 35. tur (2026-10-16): ekran görüntüleri, sürüm akışı, uygulama içi güncelleme
+1. **README ekran görüntüleri (İngilizce):** `docs/screenshots/*.png` (10 adet, 1440×900, koyu tema; giriş ekranı açık
+   tema). Üretici `npm run screenshots` (`dev/screenshots.mjs`, önce `npm run build`): kendi mock'unu 18090 portunda
+   `MOCK_DATA=showcase` (İngilizce adlı küçük ağaç: Production/Web/App/Database, Staging, Windows, Monitoring;
+   örnek Java benzeri `logs/app.log`) ve `MOCK_ROOT=/tmp/home` ile açar (dosya yöneticisi yolu kısa görünsün; klasör
+   `.jumpdesk-showcase` işareti yoksa başkasınındır, geçici klasöre düşülür), sahte OpenAI uyumlu sağlayıcı açar,
+   snippet/vurgu/alarm örneklerini içe aktarır. Varsayılan mock verisi birebir aynı kaldı (karşılaştırıldı).
+   Gerçek sistem komutu (`systemctl`, `df`, `ls -l`) çalıştırılmaz: mock kabuğu yerel makinede çalışır, çıktı makine
+   bilgisini gösterir. `docs/` pakete girmez.

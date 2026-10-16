@@ -52,6 +52,7 @@ boşluk eklenmez.
   olmalı). Türkçe e2e testleri `JUMPDESK_LANGUAGE=tr` ile açılır; İngilizce tarama `dev/e2e/i18n.mjs`, yapay zeka
   `dev/e2e/ai.mjs`.
 - Yazı boyutu değiştirme performansı: `node dev/e2e/font-perf.mjs [oturum-sayısı]` (mock açıkken).
+- README ekran görüntüleri: `npm run build && npm run screenshots` → `docs/screenshots/` (kendi mock'unu açar).
 - Linux'ta uygulama XWayland ile açılır (`--ozone-platform=x11`, pencereler arası sekme sürükleme için); `npm run dev*`
   bunu ekler, paket başlatıcısı da, e2e testleri de. `JUMPDESK_WAYLAND=1` Wayland'da açar.
 - Geliştirme sürümü (`npm run dev`) `jumpdesk-dev` masaüstü adıyla açılır; rıhtımda kurulu paketle karışmaz. Simgesi

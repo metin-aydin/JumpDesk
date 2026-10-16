@@ -413,6 +413,9 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
 - **İlk commit:** GitHub'ın depo açılırken oluşturduğu commit (önceki adlı README + Apache LICENSE), kullanıcının
   isteğiyle ebeveynsiz yeni bir kök commit ve `git push --force-with-lease` ile değiştirildi (2026-10-16). Geçmişte
   önceki ad yok. Bu depoya özel `user.email` kullanıcının seçtiği adres (genel git ayarından bağımsız).
+  Kök commit `5ce7c61`. Eski commit dalda yok ama GitHub doğrudan SHA bağlantısıyla bir süre açabilir (GitHub'ın
+  kendi çöp toplaması siler; hemen silinmesi GitHub Destek isteğiyle olur).
+  İlk push'taki CI çalışması başarılı (yaklaşık 45 sn).
 - **Paket içeriği:** electron-builder `files` varsayılanı proje kökündeki her şeyi alıyordu (`.remember/` günlükleri,
   `memory/`, `CLAUDE.md`, `dev/`, `swagger.json`, tsbuildinfo). Dışlamalar eklendi; paket artık yalnız `out/`,
   `package.json`, `resources/` (+ üretim bağımlılıkları). Denetim: `npx @electron/asar list dist/linux-unpacked/resources/app.asar`.

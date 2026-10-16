@@ -9,6 +9,8 @@ so it works on networks where only 443 is reachable.
 
 > JumpDesk is an independent project and is not affiliated with the JumpServer team.
 
+![Four SSH sessions in a grid with log highlights and the snippets panel](docs/screenshots/split-view.png)
+
 ## Features
 
 - **Server tree and search** with tags, favorites, hover cards and multi-select connect.
@@ -24,6 +26,23 @@ so it works on networks where only 443 is reachable.
   server type are sent; commands are written to the prompt and never run without your Enter.
 - **Encrypted export/import** of snippets, rules, highlights, layouts and settings (`.jumpdesk` files).
 - English and Turkish interface, light and dark themes, per-user local settings.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Server address screen](docs/screenshots/sign-in.png) | ![Server tree with a hover card and the home view](docs/screenshots/servers.png) |
+| **Sign in** to any JumpServer: enter its address, then use its own login page (LDAP, MFA and SSO work as usual). | **Server tree** with folders, favorites, recent connections and hover cards. |
+| ![Command autocomplete in the terminal](docs/screenshots/autocomplete.png) | ![AI suggestions in the terminal](docs/screenshots/ai-assist.png) |
+| **Autocomplete** from history, snippets and remote files. | **Ask AI** with Ctrl+Space twice; pick a command, it is written to the prompt and runs only on Enter. |
+| ![Alarms panel listing caught exceptions](docs/screenshots/alarms.png) | ![File manager panel](docs/screenshots/files.png) |
+| **Alarm rules** catch words or regular expressions in any session and notify you. | **File manager (SFTP)** for the active session: browse, upload, download. |
+| ![Command palette](docs/screenshots/command-palette.png) | ![Export dialog](docs/screenshots/export.png) |
+| **Command palette** (Ctrl+Shift+P) for every action, tab, layout and snippet. | **Encrypted export/import** of snippets, rules, highlights, layouts and settings. |
+| ![AI provider settings](docs/screenshots/settings-ai.png) | |
+| **AI providers**: Anthropic, OpenAI, Gemini, Azure OpenAI or a local OpenAI-compatible server. | |
+
+Screenshots are generated against the bundled mock server with `npm run build && npm run screenshots`.
 
 ## Download
 

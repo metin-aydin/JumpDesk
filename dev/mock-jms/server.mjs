@@ -11,7 +11,8 @@ import { buildData } from './data.mjs'
 
 const PORT = Number(process.env.MOCK_PORT || 18080)
 const PASSWORD = process.env.MOCK_PASSWORD || 'demo'
-const ROOT = path.join(os.tmpdir(), 'jumpdesk-mock-hosts')
+const ROOT = process.env.MOCK_ROOT || path.join(os.tmpdir(), 'jumpdesk-mock-hosts')
+const SHOWCASE = process.env.MOCK_DATA === 'showcase'
 
 const { nodes, assets } = buildData()
 const sessions = new Map()
@@ -170,7 +171,7 @@ function hostHome(a) {
   if (!fs.existsSync(home)) {
     fs.mkdirSync(path.join(home, 'projects', 'api'), { recursive: true })
     fs.mkdirSync(path.join(home, 'logs'), { recursive: true })
-    fs.writeFileSync(path.join(home, 'notes.txt'), `${a.name} notları\n`)
+    fs.writeFileSync(path.join(home, 'notes.txt'), SHOWCASE ? `Notes for ${a.name}\n` : `${a.name} notları\n`)
     fs.writeFileSync(path.join(home, '.sudo_as_admin_successful'), '')
     fs.mkdirSync(path.join(home, '.mockbin'), { recursive: true })
     fs.writeFileSync(
@@ -178,11 +179,14 @@ function hostHome(a) {
       `#!/bin/sh\nif [ "$1" = "-I" ]; then echo "$MOCK_LOCAL_IP 172.17.0.1"; else echo ${a.name}; fi\n`,
       { mode: 0o755 }
     )
-    fs.writeFileSync(path.join(home, 'logs', 'app.log'), 'INFO started\nWARN slow query\nERROR timeout\n')
+    fs.writeFileSync(path.join(home, 'logs', 'app.log'), SHOWCASE ? showcaseLog() : 'INFO started\nWARN slow query\nERROR timeout\n')
     fs.writeFileSync(path.join(home, 'projects', 'api', 'docker-compose.yml'), 'services: {}\n')
     fs.writeFileSync(
       path.join(home, '.bash_history'),
-      ['ls -la', 'cd /var/log', 'tail -f syslog', 'systemctl status nginx', 'df -h', 'free -m'].join('\n') + '\n'
+      (SHOWCASE
+        ? ['ls', 'cd logs', 'tail -n 40 -f logs/app.log', 'systemctl status nginx', 'journalctl -u orders -f', 'free -m']
+        : ['ls -la', 'cd /var/log', 'tail -f syslog', 'systemctl status nginx', 'df -h', 'free -m']
+      ).join('\n') + '\n'
     )
     fs.writeFileSync(
       path.join(home, '.bashrc'),
@@ -198,6 +202,32 @@ function hostHome(a) {
     )
   }
   return home
+}
+
+/** Ekran görüntüleri için örnek uygulama günlüğü: INFO/WARN/ERROR satırları ve bir yığın izi. */
+function showcaseLog() {
+  const lines = [
+    'INFO  [main] c.e.orders.Application - Started Application in 4.21 seconds',
+    'INFO  [http-nio-8080-exec-1] c.e.orders.api.OrderController - GET /api/orders 200 (38 ms)',
+    'INFO  [http-nio-8080-exec-2] c.e.orders.api.OrderController - POST /api/orders 201 (64 ms)',
+    'WARN  [pool-2-thread-3] c.e.orders.db.ConnectionPool - Pool usage at 85% (17/20)',
+    'INFO  [http-nio-8080-exec-3] c.e.orders.api.OrderController - GET /api/orders/48213 200 (12 ms)',
+    'ERROR [http-nio-8080-exec-4] c.e.orders.api.OrderController - Request failed',
+    'java.lang.IllegalStateException: Order 48213 is already closed',
+    '\tat com.example.orders.service.OrderService.cancel(OrderService.java:118)',
+    '\tat com.example.orders.api.OrderController.cancel(OrderController.java:64)',
+    'INFO  [scheduler-1] c.e.orders.jobs.InvoiceJob - Sent 312 invoices',
+    'WARN  [http-nio-8080-exec-5] c.e.orders.api.RateLimiter - Client 10.12.0.41 throttled',
+    'INFO  [http-nio-8080-exec-6] c.e.orders.api.OrderController - GET /api/orders 200 (41 ms)',
+    'INFO  [http-nio-8080-exec-7] c.e.orders.api.HealthController - GET /health 200 (2 ms)'
+  ]
+  const start = Date.UTC(2026, 9, 16, 11, 2, 11)
+  let n = 0
+  const stamped = lines.map((l) => {
+    if (!/^[A-Z]{4,5} /.test(l)) return l
+    return `${new Date(start + n++ * 1370).toISOString().replace('T', ' ').slice(0, 23)} ${l}`
+  })
+  return stamped.join('\n') + '\n'
 }
 
 function spawnShell(a, cols, rows) {

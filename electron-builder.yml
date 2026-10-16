@@ -10,7 +10,7 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # Geliştirme dosyaları, hafıza notları ve yerel eklenti günlükleri pakete girmez.
-  - '!{.remember,memory,dev,.github}{,/**/*}'
+  - '!{.remember,memory,dev,docs,.github}{,/**/*}'
   - '!{CLAUDE.md,LICENSE,swagger.json,components.json,*.tsbuildinfo}'
 asarUnpack:
   - resources/**
