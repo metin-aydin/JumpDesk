@@ -8,9 +8,10 @@ out
 # yerel
 /out
 *.png
-# Uygulama ve paket ikonları depoda tutulur.
+# Uygulama ve paket ikonları ile README ekran görüntüleri depoda tutulur.
 !build/**/*.png
 !resources/*.png
+!docs/screenshots/*.png
 
 # TypeScript artımlı derleme önbelleği
 *.tsbuildinfo
