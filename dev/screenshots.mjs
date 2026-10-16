@@ -254,14 +254,19 @@ try {
   await page.waitForTimeout(600)
   await shot('alarms')
 
-  // 6. Dosya yöneticisi (SFTP)
+  // 6. Vurgular paneli
+  await page.getByRole('button', { name: 'Highlights', exact: true }).first().click()
+  await page.waitForTimeout(600)
+  await shot('highlights')
+
+  // 7. Dosya yöneticisi (SFTP)
   await terminal().nth(3).focus()
   await page.getByRole('button', { name: 'Files', exact: true }).first().click()
   await page.waitForTimeout(1500)
   await shot('files')
   await page.keyboard.press('Control+Shift+B')
 
-  // 7. Yapay zeka ayarları
+  // 8. Yapay zeka ayarları
   await page.keyboard.press('Control+,')
   await page.getByRole('button', { name: 'AI', exact: true }).click()
   await page.getByRole('button', { name: /OpenAI Compatible/ }).click()
@@ -283,7 +288,7 @@ try {
   await shot('settings-ai')
   await page.keyboard.press('Escape')
 
-  // 8. Tek oturum: autocomplete ve yapay zekaya sorma
+  // 9. Tek oturum: autocomplete ve yapay zekaya sorma
   await page.keyboard.press('Control+Shift+T')
   await page.waitForTimeout(400)
   await openServer('app-03')
@@ -304,7 +309,7 @@ try {
   await shot('ai-assist')
   await page.keyboard.press('Escape')
 
-  // 9. Dışa aktarım ekranı
+  // 10. Dışa aktarım ekranı
   await palette('Export')
   await page.getByRole('dialog').waitFor({ timeout: 5000 })
   await shot('export')

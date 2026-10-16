@@ -39,8 +39,8 @@ so it works on networks where only 443 is reachable.
 | **Alarm rules** catch words or regular expressions in any session and notify you. | **File manager (SFTP)** for the active session: browse, upload, download. |
 | ![Command palette](docs/screenshots/command-palette.png) | ![Export dialog](docs/screenshots/export.png) |
 | **Command palette** (Ctrl+Shift+P) for every action, tab, layout and snippet. | **Encrypted export/import** of snippets, rules, highlights, layouts and settings. |
-| ![AI provider settings](docs/screenshots/settings-ai.png) | |
-| **AI providers**: Anthropic, OpenAI, Gemini, Azure OpenAI or a local OpenAI-compatible server. | |
+| ![AI provider settings](docs/screenshots/settings-ai.png) | ![Highlights panel with colored log levels](docs/screenshots/highlights.png) |
+| **AI providers**: Anthropic, OpenAI, Gemini, Azure OpenAI or a local OpenAI-compatible server. | **Highlights** color words or regular expressions in terminal output, such as log levels. |
 
 Screenshots are generated against the bundled mock server with `npm run build && npm run screenshots`.
 

@@ -675,7 +675,8 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
   yeniden açma seçilmedi). Kullanıcı mock klasör adlarını doğru buldu.
 
 ## Kullanıcı istekleri — 35. tur (2026-10-16): ekran görüntüleri, sürüm akışı, uygulama içi güncelleme
-1. **README ekran görüntüleri (İngilizce):** `docs/screenshots/*.png` (10 adet, 1440×900, koyu tema; giriş ekranı açık
+1. **README ekran görüntüleri (İngilizce):** `docs/screenshots/*.png` (11 adet; kullanıcı tablodaki boş kutuya
+   vurgular panelini istedi, 1440×900, koyu tema; giriş ekranı açık
    tema). Üretici `npm run screenshots` (`dev/screenshots.mjs`, önce `npm run build`): kendi mock'unu 18090 portunda
    `MOCK_DATA=showcase` (İngilizce adlı küçük ağaç: Production/Web/App/Database, Staging, Windows, Monitoring;
    örnek Java benzeri `logs/app.log`) ve `MOCK_ROOT=/tmp/home` ile açar (dosya yöneticisi yolu kısa görünsün; klasör
@@ -683,3 +684,5 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    snippet/vurgu/alarm örneklerini içe aktarır. Varsayılan mock verisi birebir aynı kaldı (karşılaştırıldı).
    Gerçek sistem komutu (`systemctl`, `df`, `ls -l`) çalıştırılmaz: mock kabuğu yerel makinede çalışır, çıktı makine
    bilgisini gösterir. `docs/` pakete girmez.
+   `.gitignore` tüm `*.png`'leri dışlar; `!docs/screenshots/*.png` istisnası var (ilk push'ta görseller bu yüzden
+   eksik kalmıştı).
