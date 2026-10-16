@@ -99,8 +99,9 @@ On Linux the app runs under XWayland (`--ozone-platform=x11`) so tabs can be dra
 
 ## Branches and releases
 
-- Work happens on `development`; open pull requests against it.
-- Merging `development` into `main` publishes a release. The
+- `main` only changes through pull requests. Work happens on a `development` branch created from `main`; the pull
+  request that merges it into `main` publishes a release, and the branch is then deleted.
+- Each merge into `main` publishes a release. The
   [Release workflow](.github/workflows/release.yml) picks the version, builds the Linux and Windows packages and
   attaches them to a new GitHub release, which the in-app updater then offers to users.
 - The description of that pull request becomes the release notes (see the
@@ -119,7 +120,7 @@ npx electron-builder --win portable --x64            # Windows portable
 ## Issues and contributions
 
 Bug reports and feature requests are welcome on [GitHub Issues](https://github.com/metin-aydin/JumpDesk/issues).
-Pull requests go to the `development` branch.
+Pull requests go to the `main` branch.
 User-facing text is written in Turkish in the source and translated through `src/renderer/src/i18n/en/`; run
 `node dev/i18n-check.mjs` before opening a pull request.
 

@@ -723,3 +723,18 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    Changed / Fixed; `dev/release-notes.mjs` boş bölümleri atar, birim testi CI'da); açıklama boşsa commit başlıkları;
    sonraki sürümlerde "Full changelog" karşılaştırma bağlantısı eklenir. Önceki `--generate-notes` (yalnız PR başlığı
    listelerdi) kaldırıldı.
+9. **Gönderildi (2026-10-16):** `development` `75d26ec` (güncelleyici, release akışı, sürüm notu, README, 0.2.0).
+   PR https://github.com/metin-aydin/JumpDesk/pull/1 (`development` → `main`, başlık "JumpDesk 0.2.0", açıklaması
+   v0.2.0 sürüm notu; sondaki "Generated with Claude Code" satırı da nota girer, istenirse birleştirmeden önce
+   silinir). Oturuma bağlandı; CI bekliyor. Birleştirme kullanıcıda: birleşince v0.2.0 yayımlanır.
+10. **PR #1 açıklaması düzeltildi:** "Generated with Claude Code" satırı kaldırıldı (`gh pr edit` GraphQL "Projects
+    (classic)" hatası verdi; `gh api -X PATCH repos/…/pulls/1 -F body=@dosya` ile yapıldı). Kullanıcı bu satırın bir
+    daha hiç yazılmamasını istedi.
+11. **Dal koruması (GitHub, klasik koruma API'si):** `main` ve `development`: PR zorunlu (0 onay), `enforce_admins`
+    açık, zorla push ve silme kapalı, durum denetimi zorunlu değil. `delete_branch_on_merge` kapalı (zaten silme
+    korumalı). Release akışı dala push etmez (etiket yayımlanınca oluşur), korumadan etkilenmez.
+    Bu turun hafıza/CLAUDE.md notları yerelde, commit'lenmedi; sonraki PR'a girecek.
+12. **Dal akışı değişti (kullanıcı kararı):** kalıcı `development` dalına gerek yok; tüm geliştirme `development`'ta,
+    `main`'e PR ile birleşince dal silinir, sonraki turda `main`'den yeniden açılır. `development` koruması kaldırıldı
+    (`DELETE …/branches/development/protection`), depo ayarı `delete_branch_on_merge: true`. `main` korumalı kaldı.
+    README (Branches and releases, katkılar `main`'e PR) ve CLAUDE.md buna göre güncellendi.

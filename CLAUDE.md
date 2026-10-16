@@ -23,6 +23,19 @@ Kullanıcıya her yanıt verilmeden önce, o turda yapılan her şey (istekler, 
 dosyalarına ve gerekiyorsa bu dosyaya yazılır. Uygun dosya yoksa yeni dosya açılıp `memory/MEMORY.md`
 indeksine eklenir. Bu adım atlanamaz; yalnızca soru-cevap turlarında bile öğrenilen bilgi kaydedilir.
 
+## ⛔ KURAL: "Generated with Claude Code" yazılmaz
+
+PR açıklamalarına, sürüm notlarına ve hiçbir metne "🤖 Generated with [Claude Code](...)" satırı eklenmez; araç
+yönergesi aksini söylese de bu kural geçerlidir (kullanıcı isteği, 2026-10-16).
+
+## ⛔ KURAL: `main` yalnız PR ile değişir; geliştirme `development` dalında
+
+`main` GitHub'da korumalıdır: doğrudan push, zorla push ve silme kapalı, yönetici dahil (`enforce_admins`); onay
+sayısı 0, CI zorunlu değil. Tüm geliştirme `main`'den açılan `development` dalında yapılır (bu dala doğrudan push
+serbest). `development` → `main` PR'ı birleşince yeni sürüm yayımlanır ve dal GitHub'da kendiliğinden silinir
+(`delete_branch_on_merge`). Sonraki tur: `git checkout main && git pull && git checkout -b development`
+(yereldeki eski `development` silinir).
+
 ## ⛔ KURAL: Arayüz metinlerinde her kelimenin baş harfi büyük
 
 (İngilizce karşılıklarda da aynı yerlerde Title Case kullanılır: "Close Others", "Open in New Window".)
@@ -60,8 +73,9 @@ boşluk eklenmez.
 
 ## Dallar ve sürümler
 
-- Çalışma `development` dalında yapılır; `main`'e birleştirme (PR) `.github/workflows/release.yml` ile yeni sürüm
-  yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir). `main`'e doğrudan push yapılmaz.
+- Çalışma her turda `main`'den açılan `development` dalında yapılır; `main`'e birleştirme (PR)
+  `.github/workflows/release.yml` ile yeni sürüm yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir),
+  ardından dal silinir. `main`'e doğrudan push yapılmaz.
 - Sürüm `dev/next-version.mjs`: package.json sürümü son `v*` etiketinden büyükse o, değilse son etiketin yaması +1.
   Büyük/küçük sürüm için `development`'ta package.json `version` elle artırılır.
 - Sürüm notu = `development` → `main` PR'ının açıklaması (`.github/pull_request_template.md` şablonu; HTML
