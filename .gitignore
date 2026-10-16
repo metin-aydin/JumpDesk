@@ -1,0 +1,18 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+
+# yerel
+/out
+*.png
+# Uygulama ve paket ikonları depoda tutulur.
+!build/**/*.png
+!resources/*.png
+
+# TypeScript artımlı derleme önbelleği
+*.tsbuildinfo
+# Yerel eklenti/oturum geçmişi
+/.remember

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "app-server-1-log",
+    "name": "App Server 1 Log",
+    "group": "App Server",
+    "command": "tail -f /opt/app/servers/app_server1/logs/app_server1.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "app-server-2-log",
+    "name": "App Server 2 Log",
+    "group": "App Server",
+    "command": "tail -f /opt/app/servers/app_server2/logs/app_server2.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-1-log",
+    "name": "Queue Server 1 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server1/logs/queue_server1.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-2-log",
+    "name": "Queue Server 2 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server2/logs/queue_server2.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-3-log",
+    "name": "Queue Server 3 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server3/logs/queue_server3.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-4-log",
+    "name": "Queue Server 4 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server4/logs/queue_server4.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-5-log",
+    "name": "Queue Server 5 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server5/logs/queue_server5.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-6-log",
+    "name": "Queue Server 6 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server6/logs/queue_server6.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-7-log",
+    "name": "Queue Server 7 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server7/logs/queue_server7.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  },
+  {
+    "id": "queue-server-8-log",
+    "name": "Queue Server 8 Log",
+    "group": "Queue Server",
+    "command": "tail -f /opt/app/servers/queue_server8/logs/queue_server8.out | sed -e '/ERROR\\|Exception/ s/.*/\\x1b[41;97m&\\x1b[0m/' -e '/WARN\\|<Warning>/ s/.*/\\x1b[43;97m&\\x1b[0m/' -e '/INFO/ s/.*/\\x1b[44;97m&\\x1b[0m/'"
+  }
+]

@@ -1,0 +1,675 @@
+---
+name: features
+description: Kullanıcının belirlediği en önemli özellikler (2026-10-14) — snippet paneli, autocomplete, otomatik komutlar, history, arama, düzen, yerel IP, hızlı bağlan
+metadata:
+  type: project
+---
+
+Kullanıcının verdiği öncelikli özellik listesi (2026-10-14). Tasarım bağlamı: [[desktop-design]],
+kararlar: [[architecture-decisions]].
+
+## Genel
+- UI: **shadcn/ui** (onaylı). **Koyu ve açık tema** ikisi de olacak.
+- Termius'un sağ paneli referans (kullanıcının ekran görüntüsü): üstte ikon sekmeleri (roket = snippetler,
+  `{}` = değişkenler, saat = history, palet = tema), altında "Search terminal - Ctrl+Shift+F" arama kutusu
+  (yukarı/aşağı okları), "Autocomplete BETA — Enabled" açılır seçimi. Başlık çubuğunda pencere düğmelerinin
+  solunda bildirim zili ve **sağ paneli aç/kapat** düğmesi.
+
+## Özellikler
+1. **Snippetler (ön kayıtlı komutlar):** 34. turdan beri uygulamada yerleşik liste yok; kullanıcı düzenleyiciden ekler
+   ya da `.jumpdesk` dosyasından içe aktarır (bkz. 34. tur).
+   Her birinin anlaşılır bir **adı** ve komutu var. Sağ panelde Termius'taki gibi listelenir; tıklayınca
+   aktif terminalde **doğrudan çalışır**.
+2. **Terminal autocomplete:** hem komutlar hem de bulunulan klasördeki dosya/dizin ağacı önerilir ve doldurulur.
+3. **Bağlantı sonrası otomatik komutlar:** snippetler arasından seçilir; **yerelde saklanır**, **sunucu bazında**
+   değiştirilebilir.
+4. **Renkli terminal (komutlar).**
+5. **Sağ panel:** başlık çubuğundaki düğmeyle açılır; **Snippetler** ve **History** sekmeleri.
+   History: sunucuda `history` çalıştırılır, her komut satır satır listelenir, tıklayınca çalıştırılır.
+6. **Sol ağaçta arama** (ağaç lazy yükleniyor; arama için ayrı API kullanılabilir).
+7. **Sekmeleri yerleştir:** Xshell'deki "Arrange vertically / horizontally" gibi tüm açık sekmeleri eşit boyda
+   yan yana/alt alta sığdır; sonra yeniden boyutlandırılabilir. Sekmeye sağ tık menüsünden de erişilebilir.
+8. **Sekme sırası sürükle-bırak** ile değişir.
+9. **Sunucunun yerel IP'si:** her bağlantıdan sonra yerelde saklanır, ağaçta sunucu adının yanında gösterilir.
+10. **Serbest sekme / hızlı bağlan:** yeni sekmede IP ya da sunucu adı yazılan, autocomplete yapan bir input ile
+    doğrudan bağlanma.
+
+## Kullanıcı yanıtları (2026-10-14)
+- **Renkli terminal: üçü birden** — (a) yazılan komutun sözdizimi renklensin, (b) çıktıda anahtar kelime/IP
+  vurgulama, (c) sunucu kabuğu renkli (renkli PS1, `ls`/`grep` renkleri).
+- **Yerel IP: sunucunun içinden alınan IP** (`hostname -I`), yerelde saklanır, ağaçta adın yanında.
+- **History:** sekme açılınca **aynı oturumda** otomatik çalıştırılsın, panelde gösterilsin; her yeni komut
+  otomatik eklensin; history içinde **arama** olsun. İkinci gizli oturum açılmaz.
+- Snippetler kullanıcıya özel kayıtlarda (`stores/snippets.ts`); yerleşik liste 34. turda kaldırıldı.
+
+## Uygulama yaklaşımı (kabuk entegrasyonu)
+- Bağlantı sonrası ilk istemde (çıktı ~400 ms durulunca) tek satırlık kurulum gönderilir:
+  ` eval "$(printf %s <base64> | base64 -d)"` (başta boşluk → HISTCONTROL ignorespace).
+- Kurulum bash/zsh'ta `PROMPT_COMMAND`/`precmd` ile her istemde özel OSC dizileri yayar:
+  `ESC ] 6973 ; <tür> ; <base64> BEL` — C=cwd, L=klasör listesi, X=son komut (numarayla), H=tüm geçmiş,
+  I=yerel IP, K=`compgen -c` komut listesi, B=istem sonu (girdi başlangıcı, PS1 sonuna eklenir).
+- xterm `parser.registerOscHandler(6973)` ile yakalanır; ekranda görünmez. Kurulum satırının yankısı yerelde
+  bastırılır (ilk OSC görülene kadar çıktı tutulur, sonra `\r\x1b[2K` ile eski istem satırı temizlenir);
+  3 sn'de OSC gelmezse tutulan çıktı olduğu gibi gösterilir (yedek yol).
+- Yalnız linux/unix platformlarda ve ssh protokolünde kurulur; ağ cihazlarına gönderilmez.
+- JumpServer komut denetiminde kurulum satırı bir komut olarak görünür (beklenen, şeffaf).
+
+## Durum (2026-10-14 sonu, mock'ta e2e ile doğrulandı)
+- ✅ 1 Snippet paneli (tıkla-çalıştır); liste kullanıcının kendi kayıtlarından (34. tur).
+- ✅ 2 Autocomplete (geçmiş + snippet + `compgen -c` komutları + bulunulan klasör girdileri; Tab/→ kabul, ↑↓, Esc).
+  Eksik: alt klasör yolları (`dir/xx`) için liste yok — yalnız bulunulan klasör.
+- ✅ 3 Bağlanınca otomatik komutlar (snippet satırındaki ⚡, sunucu bazında `ServerMeta.autoRun`, ilk istemden sonra çalışır).
+- ✅ 4 Renkler: (a) komut satırı boyama, (b) çıktı vurgulama, (c) kabuk renkleri (PS1 renksizse sarılır, ls/grep alias).
+- ✅ 5 Sağ panel (başlık çubuğu düğmesi, Ctrl+Shift+B): Snippetler + Geçmiş (arama, tıkla-çalıştır, canlı ekleme).
+- ✅ 6 Ağaçta arama (`assets/tree/?search=`), ✅ 7 yan yana/alt alta yerleştirme, ✅ 9 yerel IP (`hostname -I`).
+- ⚠️ 8 sekme sürükle-bırak ve ⚠️ 10 yeni bağlantı sekmesi: yazıldı, e2e'de denenmedi.
+- 🟡 RDP: `features/rdp/RdpPane.tsx` yazıldı (guacamole-common-js 1.5.0 → `/lion/ws/connect/`, TOKEN_ID/GUAC_*,
+  `tr-tr-qwerty`, sığdırma ölçeği, sendSize, iki yönlü pano, jms_event). Derleniyor; **uçtan uca test edilmedi**
+  (guacd + RDP hedefi gerekir: gerçek sunucu ya da Docker imajları — kullanıcı onayı bekleniyor).
+- ⏳ Paketleme, tercihler ekranı (autocomplete/vurgulama anahtarları `stores/preferences.ts`'de var, arayüzü yok).
+
+## Kullanıcı istekleri — 2. tur (2026-10-14, hepsi mock e2e ile doğrulandı)
+- Görünmeyen sekmede yeni çıktı → sekme simgesinin sağ üstünde mavi rozet (ilk karşılama çıktısı sayılmaz;
+  sekme etkinleşince silinir; grup sekmesinde üyelerden biri varsa gösterilir).
+- Ağaçta/aramada IP asla kırpılmaz (`shrink-0 whitespace-nowrap`), ad kısalır.
+- Bölünmüş görünüm: grup başına tek sekme + panel başlıkları (8. turdan beri birden çok grup) (ayrıntı: [[architecture-decisions]] madde 5). Ek olarak
+  ızgara düzeni ve gruba yayın (girdi/snippet/geçmiş tüm panellere; panel başlığından tek tek hariç tutma).
+- Ağaçta çoklu seçim (Ctrl/Shift+tık, Shift+ok): sağ tık "N sunucuya bağlan" ve Enter tümüne bağlanır;
+  sağ tıklanan öğe seçimde değilse seçim yalnız o öğe olur.
+
+## Kullanıcı istekleri — 3. tur (2026-10-15, mock e2e ile doğrulandı)
+- Ağaç satırı taşması: uzun hostname adresleri artık gösterilmez (yalnız IP gösterilir: `displayAddress`), satır
+  `overflow-hidden`, ad `…` ile kısalır; iç IP hiç kırpılmaz.
+- Menü metinleri Title Case ([[user-preferences]]).
+- "Yeni Bağlantı" sekmesi ana ekranla aynı bileşen (`HomeView tabId=...`): son bağlantılar + favoriler; seçilen sunucu
+  o sekmede açılır. Yer tutucu: "Sunucu adı veya IP adresi yazın". `ConnectView` silindi.
+- Sekmelerde başlığın altında soluk IP (iç IP, yoksa IP biçimindeki adres). Sekme yüksekliği 32px.
+- Sekme üzerine gelince (500 ms) Chrome tarzı önizleme kartı: tam ad, iç IP · adres · durum, terminalin renkli anlık
+  görüntüsü (`@xterm/addon-serialize` → HTML, görünür satırlar) ya da RDP küçük resmi (`display.flatten()`); kart
+  açıkken sekmeler arası geçiş anında, 1 sn'de bir tazelenir. Grup sekmesinde üyeler listelenir.
+- Sunucu arama kısayolu Ctrl+Shift+F.
+- Profil düğmesi hatası giderildi; altta tam ad + kullanıcı adı, menüde ad/kullanıcı adı/sunucu.
+
+## Kullanıcı istekleri — 4. tur (2026-10-15, mock e2e ile doğrulandı)
+- Autocomplete: ↑/↓, PageUp/Down, Ctrl+P/N, Ctrl+R ile geçmişte gezinirken otomatik açılmaz (yazmaya başlayınca
+  yeniden açılır). **Ctrl+Space** elle açar; boş satırda son geçmiş komutları, hiç veri yoksa "Öneri yok" gösterir.
+- Sekme önizlemesi kırpılmaz: terminal HTML'i doğal boyutta çizilip karta (340×≤260) sığacak şekilde ölçeklenir.
+- **Uygulama ikonu = B varyantı** (renkli karo, beyaz `>_`, beyaz şeritte "JUMP"; 34. turdan beri Claude turuncusu).
+  Kaynak `build/icon.svg`; `build/icon.png` 1024 (electron-builder .ico/.icns'i buradan üretir),
+  `resources/icon.png` 512 (pencere ikonu, Win+Linux), `src/renderer/src/assets/app-icon.svg` (başlık çubuğu,
+  giriş ekranı). PNG üretimi: `electron dev/render-svg.cjs <svg> <önek> <boyutlar>`.
+  Not: GNOME/Wayland'da görev çubuğu ikonu .desktop kaydından gelir; geliştirme modunda Electron ikonu görünebilir.
+- Giriş ekranında tema menüsü: açılır menü açıkken giriş WebContentsView'ı gizlenir (`stores/overlay.ts`).
+- Ağaçta sunucu üzerine gelince kart (`AssetHoverCard`): ad, platform, iç IP, adres, protokoller, hesaplar
+  (asset detail önbellekli), son bağlantı, açıklama. Yerel `title` ipucu kaldırıldı.
+- Çıkışta/oturum düşünce çalışma alanı sıfırlanır (`useWorkspace.reset`); yeniden girişte eski sunuculara bağlanılmaz.
+- **HTTP/web konsol varlıkları:** `GET /api/v1/terminal/components/connect-methods/?os=&asset_id=` → protokolün
+  `type: applet` yöntemi (ör. `chrome`, component `tinker`) ile token: `connect_method=<applet>`,
+  `connect_options={appletConnectMethod:'web'}`; görüntü lion (`RdpPane`). Luna da tinker'ı lion ile açar.
+  `@ANON` hesapta kimlik bilgisi sorulmaz.
+- Ad-soyad: profildeki `name` olduğu gibi gösterilir (kullanıcı tahmin istemedi, 5. tur). JumpServer profil API'sinde
+  ayrı soyad alanı yok.
+
+## Kullanıcı istekleri — 5. tur (2026-10-15, mock e2e ile doğrulandı)
+- Logo: alttaki beyaz şeritteki "JUMP" yazısı kaldırıldı (küçükte okunmuyordu); şerit boş beyaz.
+- Snippetler kullanıcının listesiyle değiştirildi: **`src/renderer/src/features/snippets/snippets.txt`** (kullanıcının
+  biçimi; `####` arası `# Grup`, sonra `# Ad` + komut). `snippets.ts` çalışma anında ayrıştırır. Panel grupları açılır/kapanır
+  (açıklar localStorage'da), aramada eşleşen gruplar açılır. Snippet id = ad slug'ı.
+- Bölünmüş görünümde panel başlığından sürükle-bırak → hedef panelle yer değiştirir (`swapInGroup`), Esc iptal.
+- Ad tahmini kaldırıldı.
+- Windows/RDP/web oturumlarında iç IP: adres IP ise o, değilse istemci DNS'iyle çözümleme (`net.resolve` IPC,
+  `dns.promises.lookup`). Linux entegrasyonu 10 sn'de IP vermezse aynı yedek.
+- Klasör sağ tık → "Yenile" (önbellek + açık alt klasörler yeniden yüklenir).
+- Etiketler (yerel, `ServerMeta.tags`): sağ tık "Etiketleri Düzenle" / çoklu "N Sunucuyu Etiketle" (`TagDialog`),
+  aramada ad/IP ile birlikte eşleşir (`#etiket` = tam eşleşme, yalnız yerel), sonuçlarda ve ağaç kartında renkli çip.
+- Sekme / panel başlığı sağ tık → "Klasörde Göster" (6. turda düzeltildi, aşağıya bakın).
+
+## SFTP (eski not; uygulanan hâli aşağıda "SFTP dosya yöneticisi")
+- koko v4.10 web SFTP: `wss://host/koko/ws/sftp/?token=<id>` (çerez auth), mesajda `cmd`: `list`, `download`,
+  `upload`, `rm`, `rename`, `mkdir` (+`current_path`); token `protocol: sftp`, `connect_method: web_sftp`.
+  Yetki sunucuda: varlıkta `sftp` protokolü izinli olmalı, hesap `actions` içinde upload/download/delete denetlenir
+  (`ConnectToken.Actions.EnableUpload()` vb.). Eski arayüz: `/koko/elfinder/sftp/?token=`. 2222 SFTP yalnız 443 açık ağlarda kapalı olabilir.
+
+## Kullanıcı istekleri — 6. tur (2026-10-15, mock e2e ile doğrulandı)
+- **"Klasörde Göster" düzeltmesi:** v4'te `assets/tree/?id=` tüm varlıklar için `pId: 'root'` döner (anahtar vermez).
+  Doğru yol: `assets/<id>/` detayındaki `nodes` (klasör UUID listesi) → `nodes/children-with-assets/tree/?id=<uuid>`
+  → dönen varlığın `pId`'si klasör anahtarı → yol sırayla açılır. Bulunamazsa toast. Mock da gerçeğe uyduruldu.
+- Etiket penceresi: Enter'a basılmamış metin "Kaydet"te ve odak kaybında etikete dönüşür.
+- Panel sürükleme: tutulan panel küçük kopyasıyla (anlık görüntü) imleci izler, eski yerinde kesik çizgili yuva kalır,
+  imleç başka yuvaya gelince sıra canlı değişir ve paneller 200 ms kayar; bırakınca `reorderGroup`, Esc iptal.
+- Sekme sürükleme (Chrome tarzı): sekme imleci izler (inline transform), sıra değişince diğerleri FLIP animasyonuyla kayar.
+- Profil: tek satır `[baş harf] Ad · kullanıcı_adı ˅`; ad `…` ile kısalır, kullanıcı adı hep tam (ad = kullanıcı adı
+  ise tek yazılır).
+- Sağ tık "Bağlan": hatırlanan hesap yok sayılır, hesap yeniden sorulur (`chooseAccount`). Çift tık hatırlanan hesabı
+  kullanır. Hatırlanan hesapla token alınamaz ya da ilk bağlantı hata verirse hesap unutulur (`forgetAccount`).
+- "SSH Guide" menü öğesi kaldırıldı.
+- Bölünmüş görünüm panel başlığı: sağ tık menüsü (Büyüt/Küçült, Ayrı Sekmeye Al, Klasörde Göster, Kapat); el/tutma
+  imleci yok.
+- Ubuntu görev çubuğu ikonu: Electron `CHROME_DESKTOP=jumpdesk.desktop` (paket adından) → GNOME/Wayland app_id `jumpdesk`.
+  Geliştirme için `npm run desktop-entry` (`dev/install-desktop-entry.sh`) `~/.local/share/applications/jumpdesk.desktop`
+  + `~/.local/share/icons/hicolor/<boyut>/apps/jumpdesk.png` (48–512, `build/icons/`) kurar (`--remove` ile kaldırılır). 2026-10-15'te kullanıcının
+  makinesine kuruldu. Paketler (deb/AppImage) kendi kaydını kurar.
+- SFTP: karar verildi ve uygulandı (aşağıda).
+
+## Kullanıcı istekleri — 7. tur (2026-10-15, mock e2e ile doğrulandı)
+- **HTTP/RDP siyah ekran:** Guacamole varsayılan katman tuvaline `z-index:-1` verir; görüntü kabının kendi katman
+  bağlamı yoksa tuval siyah zeminin arkasında kalır (önizleme `flatten()` ile çizildiği için içerik orada görünür).
+  Çözüm: `RdpPane` görüntü kabında `isolate`. Doğrulama: mock'taki sahte lion (`handleLion`) + `dev/e2e/rdp.mjs`.
+- **Ana sayfa sekmesi kaldırıldı** (logonun yanındaki 4 kutucuk): sekme türleri `connect | session`. Hiç sekme
+  kalmayınca otomatik "Yeni Bağlantı" sekmesi açılır; açılışta da tek bir "Yeni Bağlantı" sekmesi vardır. Etkin sekme
+  boş bir bağlantı sekmesiyse ağaçtan/aramadan açılan bağlantı o sekmeye yerleşir (yeni sekme açılmaz).
+- "Yeni Bağlantı" sekme ikonu: lucide `File` (boş sayfa).
+- **Profil fotoğrafı:** `users/profile/` → `avatar_url` (göreli yol). Ana süreç `jmsImage` ile oturum çereziyle indirir,
+  data URL döner (CSP dış görseli engeller; yalnız sunucunun kendi origin'i, ≤2 MB, `image/*`). IPC `jms:avatar`.
+  Profil menüsünde ad/kullanıcı adı satırlarının sağında 32 px yuvarlak; görsel yoksa baş harfler.
+- **Uygulama ikonu (yuvarlak/pofuduk):** 1024 tuvalde 832 px karo (96 px kenar boşluğu, GNOME rıhtımında diğer
+  ikonlarla aynı boy), `rx=208`, dikey kırmızı degrade + üstte hafif parlaklık, yumuşak gölge; `>_` yuvarlak uçlu,
+  beyaz bant tüm köşeleri yuvarlak. `build/icon.svg` (OS, gölgeli) ve `assets/app-icon.svg` (başlık çubuğu, boşluksuz)
+  aynı çizimdir. PNG'ler: `build/icon.png` 1024, `resources/icon.png` 512, `build/icons/<n>x<n>.png` (electron-builder
+  linux `icon: build/icons`).
+
+## SFTP dosya yöneticisi (2026-10-15, karar: kendi arayüzümüz + "ikisi birden"; mock e2e ile doğrulandı)
+- Kullanıcı: JMS'in dosya yöneticisinin kullandığı koko SFTP kanalı üstüne kendi arayüzümüz; hem sağ panelde hem ayrı
+  sekmede. Protokol: [sftp-koko-protocol.md](sftp-koko-protocol.md).
+- **Sağ panel "Dosyalar"** (Snippetler/Geçmiş yanında): etkin SSH terminalinin token'ı `exchange` edilir (hesap
+  sorulmaz). Açılış klasörü **`/tmp`** (`FILES_START_PATH`; SFTP kökü dışındaysa kök). "Terminali İzle" (cd takibi)
+  kullanıcı isteğiyle **kaldırıldı** (8. tur). Son klasör oturum başına hatırlanır. "Ayrı Sekmede Aç" aynı token'dan
+  sekme açar; sekme de `/tmp` ile (ya da panelin klasörüyle) açılır.
+- **Dosya yöneticisi sekmesi:** `WorkspaceTab.view = 'files'` (+`startPath`, `sourceToken`, `sourceActions`); sekme
+  ve panel başlığında OS renginde klasör rozeti. Ağaç sağ tık → "Dosya Yöneticisi" (yalnız linux türü; çoklu seçimde
+  "N Sunucuda Dosyaları Aç"); hesap seçimi "Dosya yöneticisi için hesap seçin", protokol seçeneği yok.
+- Arayüz (`features/sftp/FileBrowser.tsx`): yol çubuğu (parçalar tıklanır, çift tık = yol yaz, kök dışı parçalar
+  pasif), süzme, klasör önce + Türkçe doğal sıralama, sekmede sıralanabilir sütunlar (Ad/Boyut/Değiştirilme/İzinler)
+  ve durum çubuğu (öğe/seçili/toplam, kök). Çoklu seçim (Ctrl/Shift), klavye (↑↓, Enter, Backspace, Delete, F2, F5,
+  Ctrl+A, Esc). Sağ tık: Aç, Terminalde Bu Klasöre Geç, İndir/Zip Olarak İndir, Yeniden Adlandır, Yolu Kopyala, Sil
+  (onay penceresi); boş alan: Yeni Klasör, Dosya Yükle, Yenile. Masaüstünden sürükle-bırak yükleme (klasör değil).
+- İndirme: ana süreç İndirilenler'e akıtarak yazar (`downloads.ts`, IPC `download:*`, aynı ad → `ad (1).uzantı`),
+  bitince toast + "Klasörde Göster". Aktarımlar panelin/sekmenin altında ilerleme çubuğuyla; yükleme iptal edilebilir.
+- Yetki: hesabın `actions`'ında upload/download/delete yoksa ilgili düğmeler pasif; sunucu da reddeder.
+- Mock: `/koko/ws/sftp/` (kök = varlığın ev dizini, gizli dosyalar gizli), `deploy` hesabında upload/delete yok.
+  Test: `node dev/e2e/sftp.mjs <klasör>` (JUMPDESK_DOWNLOADS ile indirme klasörü).
+- Gerçek sunucuda doğrulanmadı: platformun SFTP kökü (`sftp_home`) değeri. Kullanıcı açılışta `/tmp`
+  istedi (8. tur).
+
+## Kullanıcı istekleri — 8. tur (2026-10-15, mock e2e ile doğrulandı: smoke, sftp, tabs)
+- **Birden çok grup:** `workspace.groups: TabGroup[]` (her grubun `id`, `mode`, `zoomedId`, `broadcast`, `excluded`,
+  `layoutVersion`, `focusedId`'si var). Gruplanmamış bir sekmede "Yan Yana/Alt Alta/Izgara" yalnız **gruba ait
+  olmayan** oturumları yeni bir grupta toplar; var olan gruplar korunur. Gruptaki sekmede aynı menü o grubun düzenini
+  değiştirir (`arrange(mode, tabId)`). Yeni grubun üyeleri şeritte ilk üyenin yerinde yan yana toplanır. Panel
+  boyutları grup + `layoutVersion` anahtarıyla tutulur.
+- **Sekme sağ tık "Tümünü Kapat"** (`closeAll`): tüm sekmeler/gruplar kapanır, tek "Yeni Bağlantı" kalır. Grup
+  sekmesinde de var.
+- **Klasör sağ tık → "Klasördeki Sunuculara Bağlan ▸"** alt menüsü: "Tümünü Yan Yana / Alt Alta / Izgara Şeklinde
+  Açarak Bağlan". Yalnız klasörün **doğrudan** altındaki sunucular (`TreeDataSource.directAssets`: API'den taze,
+  `pId === key`, devre dışı olanlar hariç); sayı alt menü başlığında. `openGroup(assets, mode)` hepsini tek grupta açar.
+- **Çoklu seçim sağ tık:** "N Sunucuya Bağlan" (ayrı sekmeler) + "N Sunucuya Farklı Bağlan… ▸" (aynı alt menü,
+  `ConnectAllSubmenu`, `showCount={false}`: sağında sayı yok; klasör menüsünde sayı gösterilir). Adresi/Yerel IP'yi/Adı
+  Kopyala çoklu seçimde gizli. (Metinler kullanıcı isteğiyle, 2026-10-15.)
+- **Chrome tarzı sekme şeridi:** sekme genişliği JS ile hesaplanır (`tabWidth`: en çok 224, en az 44 px; eşit
+  genişlik). 88 px altında başlık ve kapatma gizlenir, yalnız simge kalır. En küçükte de sığmazsa şerit yatay kayar
+  (4 px kaydırma çubuğu, dikey tekerlek yatay kaydırır, etkin sekme görünür alana kaydırılır).
+  Not: CSS container query (`@container`) sekmelerin doğal genişliğini sıfırladığı için kullanılmadı.
+- **Sekme arama** (Chrome'daki gibi): tema düğmesinin solunda ⌄ düğmesi, kısayol Ctrl+Shift+A (⌘⇧A). Arama ad, IP,
+  adres ve etiketlerde; ↑↓/Enter, satırda kapatma; gruptaki sekmede düzen simgesi. Depo `stores/tab-search.ts`.
+- **Sekme sürükleme tam genişlik:** tutulan sekmenin kopyası (`position: fixed`) pencere boyunca imleci izler, + ve
+  şeridin ötesine gidebilir; yerinde boşluk kalır; şerit kayabiliyorsa kenarda kendiliğinden kayar.
+- **Dosya silme onayı:** pencere kapanırken başlığın "undefined" olması düzeltildi (liste açık durumundan ayrı tutulur).
+- **Logo:** üstteki parlaklık azaltıldı (degrade başı koyulaştırıldı, parlama opaklığı 0.08). Görev çubuğundaki bulanıklık:
+  `render-svg.cjs` SVG'yi 1024'te çizip küçültüyordu; artık kök width/height hedef boyuta ayarlanıp her boyut vektörden
+  çizilir. Boyutlar 16–512 (`build/icons/`), `npm run desktop-entry` ile kuruldu.
+- **Profil satırı:** profil düğmesi kalan alanı kaplar, ok kaldırıldı, sağında sürüm etiketi `v<package.json
+  version>` (`__APP_VERSION__`, electron.vite.config `define`).
+- Kural eklendi: her yanıttan sonra hafıza ve proje md dosyaları kendiliğinden güncellenir (CLAUDE.md).
+- Test: `node dev/e2e/tabs.mjs <klasör>` (klasör alt menüsü, ikinci grup, arama, tümünü kapat, taşma, uzak sürükleme,
+  çoklu seçim menüsü).
+
+## Kullanıcı istekleri — 9. tur (2026-10-15, mock e2e ile doğrulandı: smoke, sftp, tabs)
+- Grup sekmesi sağ tık: "Gruptaki N Oturumu Kapat".
+- **Profil fotoğrafı tek kaynak:** profil düğmesi ve açılır menü aynı `UserAvatar`'ı kullanır; JumpServer
+  `avatar_url` görseli indirilebiliyorsa o, değilse **adın baş harfi** (tek harf). Not: JumpServer fotoğrafı olmayan
+  kullanıcıya varsayılan bir avatar görseli (`/static/img/avatar/...`) döndürebilir; o da fotoğraf olarak gösterilir.
+- **Grup sekmesi sürüklenir:** grup, üyeleriyle birlikte blok olarak taşınır (`moveBlock(ids, toIndex)`); tekli
+  sekmeler de aynı yoldan taşınır. Sürüklenen bloğun üyeleri kayma animasyonundan muaf.
+- **Araç ipuçları baş harf kuralı:** tüm tooltip/`title` metinleri her kelimenin baş harfi büyük (CLAUDE.md kuralı).
+  Düzeltilenler: "Bölünmüş Görünümde", "Sağ Paneli Aç/Kapat (…)", "Sürükleyerek Boyutlandır, Çift Tıklayarak Eşitle",
+  "Yolu Düzenlemek İçin Çift Tıklayın", "Platformda Tanımlı SFTP Kök Dizini", "Dosya Yükleme Yetkiniz Yok".
+- **Geçmiş sekmesine geçişte donma:** sebep komut değildi (geçmiş oturum kurulurken bir kez okunur); 500 satırın her
+  biri için ayrı Base UI ContextMenu oluşturuluyordu. Şimdi liste sanal (tanstack virtual), tek paylaşılan sağ tık
+  menüsü (kontrollü `open`, boş alanda açılmaz), geçmiş `useDeferredValue(history, [])` ile ertelenir; açılışta
+  "Geçmiş hazırlanıyor…" yükleniyor simgesi görünür. Satır sınırı (500) kaldırıldı.
+
+## Kullanıcı istekleri — 10. tur (2026-10-15, mock e2e ile doğrulandı: smoke, sftp, tabs)
+- **Bağlanırken tek görünüm:** token alınırken ve WebSocket bağlanırken aynı `LoadingState` kutusu, aynı metin
+  (`<sunucu> bağlanıyor…`), aynı yer (terminal zemini üstünde ortada). `components/LoadingState.tsx`.
+- **Dosyalar yükleniyor tek görünüm:** panel, sekme ve dosya tarayıcının tüm hazırlık aşamaları alanın ortasında
+  aynı metinle (`FILES_LOADING_LABEL` = "Dosya oturumu açılıyor…"); üstte çıkıp ortaya zıplama giderildi.
+- **Sekmeyi sürükleyip açık gruba bırakma:** gruba ait olmayan tek bir oturum sekmesi, grup görünümü açıkken çalışma
+  alanına (`[data-workspace]`) sürüklenirse kesik çizgili "Gruba Ekle" alanı çıkar; bırakınca `addToGroup` ile grubun
+  sonuna eklenir. Bunun için sekme **basınca değil bırakınca** etkinleşir (sürükleme sırasında grup görünür kalır).
+  Grup sekmesi basınca etkinleşmeye devam eder.
+- **Grup sekmesinde sayı:** "+N" yerine gruptaki toplam sunucu sayısı (araç ipucu "N Sunucu").
+- **Sekme aramada önizleme:** satır üzerine gelince sekme önizleme kartı listenin solunda açılır
+  (`TabPreviewCard placement="left"`, alttan taşarsa yukarı kaydırılır).
+
+## Kullanıcı istekleri — 11. tur (2026-10-15)
+- Sağ tık ve açılır menülerde simgesi olmayan öğeler (ör. "Diğerlerini Kapat") simgeli öğelerin metniyle aynı hizada:
+  `MenuItem` için `not-has-[>svg]:pl-7.5`, alt menü tetikleyicisi için `not-has-[>svg:not(:last-child)]:pl-7.5`
+  (tetikleyicinin sonundaki ok simgesi sayılmaz). Doğrulama: `node dev/e2e/menus.mjs` (simgesiz öğe 30 px, simgeli 8 px).
+
+## Kullanıcı istekleri — 12. tur (2026-10-15, mock e2e: panels, smoke, tabs)
+- **Sol sunucu ağacı kapatılabilir:** başlık çubuğunda logonun sağında aç/kapat düğmesi ("Sunucu Ağacını Aç/Kapat"),
+  kısayol **Ctrl+Shift+E** (⌘E). Durum `workspace.leftPanelOpen`, localStorage `jumpdesk.leftPanelOpen` ile saklanır.
+  Kapalıyken Ctrl+Shift+F ve "Klasörde Göster" ağacı kendiliğinden açar.
+- **Kayma efekti (sol ve sağ panel):** `components/SlidePanel.tsx` — dış kap genişliği 0↔genişlik arasında 200 ms
+  canlandırılır, içerik sabit genişlikte kenara yaslı kaldığı için kayarak girip çıkar; kapalıyken `inert`.
+  Sol ağaç hep bağlı kalır (ağaç durumu korunur), sağ panel kapanma bitince kaldırılır. Sol panel kenardan
+  boyutlandırılırken canlandırma kapalı. Sağ panel genişliği 320 px (`App.tsx`).
+- Test: `node dev/e2e/panels.mjs <klasör>` (ara genişlik ölçümüyle canlandırma, inert, kısayollar).
+
+## Kullanıcı istekleri — 13. tur (2026-10-15, mock e2e: home, panels, smoke, tabs, menus, sftp)
+- **Sağ panel genişliği ayarlanır:** sol kenarındaki tutamaçtan (260–640 px, varsayılan 320), localStorage
+  `jumpdesk.rightPanelWidth`. Sol ağaçla ortak kanca `hooks/use-panel-width.ts`; sürüklerken kayma canlandırması kapalı.
+- **Yeni Bağlantı ekranında "Klasörler" bölümü** (Son Bağlantılar'ın altında, `features/workspace/FolderBrowser.tsx`):
+  ağaçtaki klasörler ızgara kartlar olarak; tek kök klasör (Default) varsa doğrudan onun içinden başlar, kökteki
+  Favoriler atlanır (ayrı bölümde). Klasöre **çift tıkla** girilir; alt klasörler ve doğrudan altındaki sunucular
+  listelenir. Her açılışta kökten başlar.
+- **Yol çubuğu (breadcrumb)** başlığın yanında; 4 seviyeyi aşarsa ortası "…" açılır menüsüne toplanır, adlar yalnız
+  sığmadığında kısalır (son ad daha geç kısalır).
+- **Ağaçtaki gibi etkileşim:** tek tık seçer, Ctrl/Shift ile çoklu seçim (Shift aralığı çapadan), boş alana tık seçimi
+  kaldırır. Sunucu sağ tık = `AssetContextMenu` (çoklu seçimde "N Sunucuya Bağlan" / "N Sunucuya Farklı Bağlan…"),
+  klasör sağ tık = `FolderContextMenu` ("Klasörü Aç", "Klasördeki Sunuculara Bağlan ▸"). Enter seçili tüm
+  sunuculara bağlanır (ilki bu sekmede). Sunucu kartı `AssetCard.tsx`, kart stilleri `card-styles.ts`.
+- Ağacın klasör menüsü de aynı `FolderContextMenu`'yu kullanır (ağaçta "Yenile" ile); `fetchDirectAssets` tree-data'da.
+- Mock'a derin/uzun adlı klasör zinciri eklendi (Partner A › Bölge Ofisleri… › Merkez Kampüs › Ana Veri Merkezi… ›
+  dr-site-01) — yol çubuğu taşmasını denemek için.
+
+## Öneri tartışması — Java exception yakalama ve yeni özellikler (2026-10-15)
+- **Karar:** kullanıcı "Terminalde arama + alarm kelimeleri" ve "Çalışma düzeni + komut paleti"ni seçti; exception
+  yakalayıcı ve arka plan log izleme seçilmedi. Java paket öneki yok ("bizim kod" çerçevesi aranmayacak).
+- Kullanım senaryosu: uygulama logları `tail` ile izlenip exception takibi yapılır; yakalayıp haber veren bir şey istendi.
+- Teknik dayanak: terminal çıktısı zaten `TerminalPane` içinde `OutputHighlighter.process(text)` üzerinden geçiyor;
+  aynı noktaya satır tabanlı bir dedektör eklenebilir (sunucuda kurulum gerekmez). Masaüstü bildirimi henüz yok
+  (Electron `Notification` eklenecek). `@xterm/addon-search` kurulu ama kullanılmıyor.
+- Önerilen tasarım (A, ön planda tail): Java yığın izini yakala (`pkg.XxxException: mesaj` / `Exception in thread`,
+  `\tat ...(Foo.java:42)`, `Caused by:`, `... N more`, log4j/logback `ERROR` satırları) → tek olay; kök neden (son
+  Caused by), "bizim kod" ilk çerçevesi (paket öneki ayarı, ör. `com.example`); aynı tür+çerçeve tekrarları sayaçla
+  gruplanır. Bildirim: sekme/panel rozeti (kırmızı), pencere ya da sekme odakta değilse masaüstü bildirimi, sağ panelde
+  "Hatalar" sekmesi (zaman, sunucu, tür, mesaj, kök neden; tıkla → terminalde o satıra git; yığını kopyala; yoksay).
+  Tahmin: ~1 gün.
+- Seçenek B (arka plan log izleyici): tail açık olmasa da seçilen log dosyalarını gizli bir koko oturumunda
+  `tail -F` ile izlemek; snippet'lerdeki log yolları kaynak olabilir. Dikkat: her izleyici JumpServer'da gerçek bir
+  oturumdur (oturum listesi, kayıt/replay, komut denetimi, boşta zaman aşımı). Tahmin: +1–1,5 gün.
+- Diğer öneriler: terminalde arama (Ctrl+F, ~1 saat), kendi regex anahtar kelime alarmları (~2 saat, A'nın
+  genellemesi), kayıtlı çalışma alanları/düzenler (~3 saat), oturum çıktısını dosyaya kaydetme (~1 saat), komut
+  paleti (~2–3 saat).
+
+## Kullanıcı istekleri — 14. tur (2026-10-15, mock e2e: tools + tüm paketler)
+- **Terminalde arama:** `Ctrl+Shift+S` (⌘S; `Ctrl+F` less/vim/readline'a bırakıldı), komut paleti ya da alarm olayı.
+  `@xterm/addon-search` + `TerminalSearchBar.tsx`: tüm eşleşmeler vurgulu, "n/N" sayaç, Aa (büyük/küçük harf), .*
+  (düzenli ifade), Enter/Shift+Enter, Esc. Terminal tutamağında `openSearch(text?)` (seçili metinle başlar).
+- **Alarm kelimeleri** (`stores/alarms.ts`, `features/alarms/`): kurallar localStorage `jumpdesk.alarmRules`;
+  varsayılan iki kural açık: `Exception`, `OutOfMemoryError` (büyük/küçük harf duyarlı). Terminal çıktısı satırlara
+  bölünür, ANSI temizlenir, alternatif ekran (less/vim) taranmaz; kullanıcının gönderdiği komutun yankısı (ör.
+  `grep Exception`) sayılmaz. Aynı sekme + kural 3 sn içinde tek olayda "×N" birleşir. Kullanıcı bakmıyorsa sekmeye
+  kırmızı rozet (`tab.alarm`, grup sekmesinde de), sağ panel düğmesinde kırmızı nokta, yeni olayda masaüstü bildirimi
+  (aynı sekme + kural için 30 sn'de bir; tıklanınca pencere öne gelir, sekmeye geçer). Sağ panelde "Alarmlar"
+  sekmesi (okunmamış sayısı rozetli): kurallar (aç/kapat, sil, ekle; Aa/.*) ve olaylar (tıkla → oturuma geç ve
+  satırı terminalde arat; satırı kopyala; temizle). Test ortamında `JUMPDESK_NO_NOTIFY` bildirimi göstermez, sayar.
+- **Kayıtlı çalışma düzenleri** (`stores/layouts.ts`, `features/layouts/`): açık oturumlar + gruplar (düzen, sıra)
+  ad verilerek kaydedilir (localStorage `jumpdesk.layouts`, aynı ad üzerine yazar). Kaydet: sekme/grup sağ tık
+  "Düzeni Kaydet…" ya da komut paleti. Yeni Bağlantı ekranında "Kayıtlı Düzenler" kartları (çift tık/Enter açar;
+  sağ tık Aç / Yeniden Adlandır / Sil).
+- **Komut paleti** `Ctrl+Shift+P` (`components/CommandPalette.tsx`, cmdk): Genel, Sekmeler (Sekmeye Geç: …),
+  Görünüm (paneller, sağ panel sekmeleri, tema), Bölünmüş Görünüm, Çalışma Düzenleri (Düzeni Aç: …), Terminal
+  (Terminalde Ara, Snippet Çalıştır: …). Sağ panel sekmesi artık `stores/right-panel.ts` deposunda (`show(tab)`).
+- **Klavye kısayolları penceresi:** tema düğmesinin solunda klavye simgeli düğme ve `Ctrl+Shift+K`; liste
+  `lib/shortcut-list.ts`'te tek yerde (pencere ve palet aynı kaynağı kullanır).
+- Tuzak: shadcn `CommandDialog` kendi `Command` kökünü içermez; içerik `<Command>` ile sarılmazsa cmdk "subscribe"
+  hatasıyla çöker.
+
+## Kullanıcı istekleri — 15. tur (2026-10-15, mock e2e: tools, home + tüm paketler geçti)
+- **Komut paleti vurgusu:** tüm öğeler seçili görünüyordu. Sebep: cmdk seçili olmayan öğelere `data-selected="false"`
+  yazar, shadcn sınıfı `data-selected:` ise yalnız niteliğin varlığına bakar. `components/ui/command.tsx` içinde
+  `data-[selected=true]:` kullanılır. Fare/ok tuşu seçimi taşır, Enter çalıştırır.
+- **Komut paleti konumu:** ekranın üst ortası (`top-[12vh]`, `sm:max-w-xl`).
+- **Klasör ızgarasında klavye:** ok tuşları kartlar arasında gezer ve seçer (yukarı/aşağı bir satır, sütun sayısı
+  `grid-template-columns`'tan), Shift ile seçim genişler, Home/End, Enter klasörü açar / sunucuya bağlanır,
+  Backspace üst klasöre çıkar; klasör değişince odak yeni listenin ilk kartına geçer (`data-nav-card`).
+- **Görev çubuğu bildirim rozeti:** GNOME dock, uygulamanın bildirim merkezinde duran bildirimlerini sayar. Ana süreç
+  gösterdiği bildirimleri tutar; Alarmlar sekmesi açılınca (okunmamış 0) tümü, alarmlı sekme açılınca o sekmeninkiler
+  `Notification.close()` ile kaldırılır (`notify:clear`, `features/alarms/notification-sync.ts`).
+
+## Kullanıcı istekleri — 16. tur (2026-10-15, mock e2e: tools, smoke, tabs)
+- **Düzen = adlandırılmış grup:** grup sekmesinden (ya da etkin sekme bir gruptayken komut paletinden) "Düzeni
+  Kaydet…" o grubu (sunucular + yerleşim) kaydeder ve grup sekmesi düzenin adını alır (`TabGroup.name`,
+  `layoutId`); sekmede IP alt satırı yerine yalnız ad + sunucu sayısı. Düzen açılınca grup aynı adla gelir; düzen
+  yeniden adlandırılınca açık grubun adı da değişir. Tekli sekmenin menüsündeki "Düzeni Kaydet…" tüm açık oturumları
+  kaydeder (`openSave(null)`). Adlandırılmış grubu yeniden kaydederken ad hazır gelir (aynı ad üzerine yazar).
+- **Kayıtlı düzen özeti** yalnız "N sunucu" (grup sayısı yazılmaz).
+
+## Kullanıcı istekleri — 17. tur (2026-10-15, mock e2e: tools)
+- Alarm olayına gelince çıkan "Satırı Kopyala" düğmesi satırı uzatıp zıplatıyordu. Düğme artık saatin üstüne mutlak
+  konumla bindiriliyor (hover'da saat gizlenir, düğme görünür); satır yüksekliği sabit (test: 47.75 → 47.75 px).
+
+## Kullanıcı istekleri — 18. tur (2026-10-15, mock e2e: tools + tüm paketler)
+- **Grup içinde alarm rozeti:** grup panel başlığında (sunucu simgesinin sağ üstü) kırmızı rozet; grup sekmesinde de
+  (üyelerden birinde alarm varsa). Rozet **yalnız o panele/sekmeye odaklanınca** kalkar: `activate(tabId)` artık yalnız
+  o sekmenin alarm/etkinlik bayrağını siler (grup açılınca tüm üyeleri silmez). Grup ekranda olsa da alarm gelen panel
+  odakta değilse rozet konur; masaüstü bildirimi ise yalnız oturum ekranda değilse ya da pencere odakta değilse çıkar.
+  Pencereye dönülünce odaktaki oturumun rozeti kalkar (`window` focus).
+- **Panel başlığına tıklama:** odak terminalde kalır/terminale geçer (başlık `mousedown`'da varsayılanı engeller ve o
+  panelin terminaline odaklanır); önceden başlığa tıklayınca klavye girdisi hiçbir yere gitmiyordu.
+
+## Kullanıcı istekleri — 19. tur (2026-10-15, mock e2e: tüm paketler)
+- **Terminal araması Ctrl+F (⌘F):** kullanıcı Ctrl+F istedi. Kabukta (normal ekran) Ctrl+F aramayı açar; less/vim
+  gibi tam ekran programlarda (alternatif ekran) tuş programa gider (sayfa ilerletme). Ctrl+Shift+S her yerde açar.
+- **Dar panelde arama çubuğu:** çubuk panel genişliğini aşmaz (`max-w-[calc(100%-1rem)]`, giriş kutusu küçülür, düğmeler
+  sabit); yan yana gruptaki ~386 px panelde sığdığı testle doğrulandı.
+- **Klasör sağ tık:** "Klasördeki N Sunucuya Bağlan" (ayrı sekmeler, hesap yeniden sorulur — çoklu seçimdeki
+  "N Sunucuya Bağlan" ile aynı) ve "Klasördeki N Sunucuya Farklı Bağlan… ▸" (yan yana / alt alta / ızgara). Sayı
+  yüklenirken "Klasördeki Sunuculara …" + dönen simge; doğrudan sunucu yoksa "Klasörde Doğrudan Sunucu Yok".
+  "Farklı Bağlan…" alt menüsünün simgesi `LayoutGrid`.
+
+## Kullanıcı istekleri — 20. tur (2026-10-15, mock e2e: tools, smoke)
+- **Dar panelde arama çubuğu iki satır:** terminal kabı `@container`; 28rem'den dar terminalde giriş kutusu üst satırda
+  tam genişlik, sayaç (solda) ve düğmeler (sağda) alt satırda; daha geniş terminalde tek satır (w-56 giriş).
+  Testte: geniş terminalde çubuk 34 px (tek satır), ~386 px panelde 62 px ve giriş 360 px.
+- **Klasör menüsü yüklenirken** yalnız "Klasördeki Sunucular Okunuyor…" (dönen simge, pasif) görünür; "N Sunucuya
+  Bağlan" ve "N Sunucuya Farklı Bağlan…" ikisi birlikte, sunucular yüklenince çıkar. Okuma hatasında "Sunucular
+  Okunamadı". Test: `menus.mjs` (mock ağaç isteği 150 ms gecikmeli olduğu için yüklenme anı yakalanır).
+
+## Kullanıcı istekleri — 21–23. tur (2026-10-15, mock e2e: 7 paketin hepsi)
+- **Terminal bağlantıları yalnız Ctrl+Tık (⌘+Tık) ile açılır;** düz tık açmaz (seçim yapar). Bağlantının üzerine
+  gelince imlecin üstünde (ilk satırlarda altında, kenarlara taşmadan) ipucu: URL + "Bağlantıyı Açmak İçin Ctrl +
+  Tıklayın" (`LinkHint`, WebLinksAddon `hover`/`leave`).
+- **Hayalet komut satırı düzeltmesi:** `clear`/`reset` sonrası komut renklendirmesi eski komutu boş ekrana yeniden
+  yazıyordu; çıktıda ED 2/3 ya da RIS (`\x1b[2J`, `\x1b[3J`, `\x1bc`) görülünce yeniden boyama durur.
+- **Alarmlar sayfası:** "Kurallar" bölümü ve "Olaylar" başlığı kaldırıldı; liste tüm alanı kaplar. Altta sabit çubuk:
+  "Kurallar" düğmesi (çerçeveli, gölgeli — mavi dolgu kullanıcıya fazla belirgin geldi; açık kural sayısıyla) kuralları
+  ayrı bir pencerede ("Alarm Kuralları") düzenler; "Alarmları Temizle" (silgi simgesi + yazı) olayları kaldırır. Çöp kutusu
+  simgesi satır siliniyormuş gibi algılandığı için kullanılmaz.
+- **Okunmamış sayısı oturum bazında:** olaylarda `read` bayrağı. Bir oturuma odaklanınca (sekme/grup paneli etkinleşir,
+  pencereye dönülür) o oturumun olayları okundu sayılır ve o oturumun masaüstü bildirimleri kapatılır; böylece
+  Alarmlar sekmesindeki sayı ve görev çubuğundaki bildirim sayısı o kadar düşer, tüm oturumlar gezilince sıfırlanır.
+  Odaktaki oturumdan gelen alarm doğrudan okundu sayılır. Alarmlar sekmesini açmak hepsini okundu yapar. Listede
+  okunmamış olayın noktası kırmızı, okunmuşun soluk.
+
+## Kullanıcı istekleri — 24. tur (2026-10-15, mock e2e: tools, tabs, smoke)
+- **Adlandırılmış grup sekmesi menüsü:** grup kayıtlı bir düzene bağlıysa "Düzeni Kaydet…" yerine "Düzeni Yeniden
+  Adlandır…" (ad hazır gelir; aynı düzeni ve sekme adını değiştirir, yeni düzen oluşturmaz) ve "Düzeni Sil" (düzen
+  silinir, grup açık kalır ve yeniden sunucu adıyla görünür — `unnameGroup`). Yeni Bağlantı ekranındaki kartta düzen
+  silinince de açık grubun adı kalkar.
+- **"Alarmları Temizle"** tüm sekme ve panel alarm rozetlerini (`clearAlarmBadges`) ve masaüstü bildirimlerini de
+  kaldırır.
+- **Orta tık grup sekmesini kapatır** (gruptaki tüm oturumlar; tekli sekmedeki gibi). Orta tuşa basınca tarayıcının
+  otomatik kaydırma imleci çıkmasın diye `mousedown` varsayılanı engellenir (tekli sekmede de). (2026-10-15)
+
+## Kullanıcı istekleri — 25. tur (2026-10-15, mock e2e: tools + tüm paketler)
+- **Düzendeki değişiklikler:** düzene bağlı grup, kayıtlı hâlinden (sunucular, sıraları, yerleşim) farklıysa
+  "değişmiş" sayılır (`isGroupDirty`, `TabGroup.layoutItem` düzendeki öğenin sırası). Grup sekmesinin en sağında
+  soluk mavi nokta ("Kaydedilmemiş Düzen Değişiklikleri"); sağ tıkta "Düzendeki Değişiklikleri Kaydet" yalnız değişiklik
+  varken etkin (`updateFromGroup`). Panel boyutları düzene dahil değil.
+- **Kaydetmeden kapatma onayı:** "Düzende yaptığınız değişiklikler kaybolacaktır. Devam etmek istiyor musunuz?"
+  (Vazgeç / Devam Et). Kapsam (`features/layouts/guard.ts`): orta tık, "Gruptaki N Oturumu Kapat", "Grubu Ayır" (düğme,
+  menü, palet), "Tümünü Kapat", "Diğerlerini Kapat", ve grubu dağıtacak panel kapatma/ayrı sekmeye alma (iki panelli
+  grupta), Ctrl+Shift+W, sekme aramasındaki kapat. Genel onay penceresi `stores/confirm.ts` + `ConfirmDialog`.
+- **Orta tık yapıştırma koruması (Linux birincil seçim):** sekmeye orta tıklayınca kapanan sekmenin ardından odak arama
+  kutusuna geçip seçili metin oraya yapıştırılıyordu. Sekme şeridindeki orta tık `mouseup` varsayılanı engellenir
+  (Chromium birincil seçimi `mouseup` işlenmezse yapıştırır) ve sonraki 500 ms'deki `paste`/`beforeinput`
+  (insertFromPaste) olayları yok sayılır (`useMiddleClickPasteGuard`).
+
+## Öneri listesi — 2. tartışma (2026-10-15, karar bekliyor)
+- Hızlı kazanımlar: uzun süren komut bitince bildirim (kabuk entegrasyonunun istem işaretleriyle süre ölçümü),
+  kopan oturuma otomatik yeniden bağlanma (token exchange), terminal yazı boyutu Ctrl+= / Ctrl+-, oturum çıktısını
+  dosyaya kaydetme.
+- Daha büyük: uygulama içinden snippet yönetimi (ekle/düzenle/sil, `{{değişken}}` sorma), ayarlar ekranı (yazı tipi,
+  boyut, geri kaydırma, tema, varsayılanlar), birden çok sunucuda komut çalıştırıp sonuçları yan yana karşılaştırma,
+  paketleme + otomatik güncelleme (deb/AppImage/Windows).
+- Paylaşım: snippet/düzen/alarm kurallarını dışa/içe aktarma (JSON), sunucuya yerel not.
+
+## Yayın — 0.1.0 (2026-10-15)
+- Kullanıcı yeni özellik eklemeyi şimdilik bitirdi ("hepsi tamam"), yayın istedi: Ubuntu ve Windows için tek tık ya da
+  kurulum dosyaları. Üretilenler `dist/`: `JumpDesk-0.1.0.AppImage` (tek tık), `jumpdesk_0.1.0_amd64.deb` (kurulum),
+  `JumpDesk-0.1.0-Portable.exe` (Windows tek tık), `JumpDesk-0.1.0-Windows.zip` (klasör sürümü), `SHA256SUMS.txt`,
+  `KURULUM.txt` (Türkçe kurulum notu).
+- Doğrulanan: AppImage bu makinede (Ubuntu 24.10) açıldı, mock'a giriş + ağaç + terminal çalıştı
+  (`dev/e2e/packaged.mjs`). `.deb` kullanıcı tarafından kuruldu (`sudo apt install ./dist/jumpdesk_0.1.0_amd64.deb`):
+  `/opt/JumpDesk`, `/usr/bin/jumpdesk` (update-alternatives), `/usr/share/applications/jumpdesk.desktop`, sistem ikonları;
+  kurulu ikili `--no-sandbox` olmadan (sandbox açık) mock testini geçti. Windows paketleri gerçek Windows'ta denenmedi.
+- Geliştirme masaüstü kaydı (`~/.local/share/applications/jumpdesk.desktop`, `npm run dev` çalıştırır) kurulu paketin
+  kaydını gölgeliyordu; `sh dev/install-desktop-entry.sh --remove` ile kaldırıldı. Paket kuruluyken bu betik
+  çalıştırılmaz (uygulama menüsündeki JumpDesk geliştirme sürümünü açar).
+- Kurulumdan sonra dock'ta ikon çıkmadı: kaldırılan geliştirme ikonları yerel ikon önbelleğinde kalmıştı. Önbellek
+  yenilendi (`gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor`), ikon artık
+  `/usr/share/icons/hicolor/*/apps/jumpdesk.png`'den çözülüyor; `--remove` betiği önbelleği de yeniliyor.
+- Windows NSIS kurulum sihirbazı üretilemedi: Linux'ta `wine32` gerekiyor (yok);
+  `electronuserland/builder:wine` Docker imajı da o sırada çekilemedi. Seçenekler: `sudo dpkg --add-architecture
+  i386 && sudo apt update && sudo apt install wine32:i386` sonra `npx electron-builder --win nsis --x64 --prepackaged
+  dist/win-unpacked`; ya da Windows makinede `npm run build:win`.
+- `.deb` AppArmor profili özel şablon (`build/apparmor-profile.tpl`, `deb.appArmorProfile`): yol
+  `/opt/JumpDesk/jumpdesk{,-bin}` (başlatıcı + gerçek ikili). `linux.synopsis/description` eklendi.
+- Dosyalar imzasız: Windows SmartScreen uyarısı ("Ek bilgi > Yine de çalıştır"); otomatik güncelleme yok.
+
+## Kullanıcı istekleri — 26. tur (2026-10-15, mock e2e: yeni `windows` + tüm paketler)
+1. **Ayarlar:** profil satırındaki sürüm etiketi kaldırıldı, sürüm profil menüsünün altına ("Sürüm 0.1.0") taşındı; yerine
+   dişli düğmesi (ipucu "Ayarlar (Ctrl+,)"). Profil menüsünde de "Ayarlar" öğesi var. Ayarlar penceresi Claude
+   masaüstündeki gibi: solda grup listesi, sağda içerik (`components/SettingsDialog.tsx`). Açma: düğme, Ctrl+, (macOS ⌘,),
+   komut paleti "Ayarlar", profil menüsü.
+2. **İlk ayar grubu "Yazı Boyutu":** Yazılım Geneli (11–18, vars. 13), Sunucu Ağacı (10–20, vars. 13), Terminal (SSH)
+   (9–24, vars. 13); her biri −/kaydırıcı/+ ve varsayılana döndür; önizleme (ağaç satırı + terminal). Birbirinden
+   bağımsız: arayüz pencere yakınlaştırmasıyla, ağaç ve terminal yakınlaştırmaya bölünmüş boyutla çizilir.
+   Kalıcı: localStorage `jumpdesk.fontSizes`.
+3. **Vurgular** (sağ panelde Alarmlar'ın sağında, `features/panel/HighlightsPanel.tsx`): kelime ya da düzenli ifade,
+   büyük/küçük harf, yazı rengi + arka plan rengi (renk seçici: 16 hazır renk, "Şeffaf (Rengi Değiştirme)", sistem renk
+   seçicisi, #rrggbb kodu). Kural aç/kapat, sil, renkleri satırda değiştir. Kurallar tüm açık terminallere hemen
+   uygulanır (geçmiş dahil). Varsayılan yeni kural: siyah yazı + sarı arka plan. Kalıcı: `jumpdesk.highlightRules`.
+   Komut paleti: "Vurgular Panelini Aç".
+4. **Aramadan toplu bağlanma:** sunucu arama sonuçlarında (kenar çubuğu ve "Yeni Bağlantı" ekranı) Ctrl (⌘) basılıyken
+   tıklanan sonuçlar işaretlenir; Ctrl bırakılınca hepsine ayrı sekmelerde bağlanılır ("Yeni Bağlantı" ekranında ilki o
+   sekmede açılır). Esc ya da pencere odağı kaybı seçimi iptal eder. Altta ipucu şeridi.
+5. **Sekmeyi ayrı pencerede açma:** tekli oturum sekmesi pencerenin dışına ya da (açık grup yokken) şeridin 56 px'ten
+   fazla altına, çalışma alanına sürüklenip bırakılınca ("Yeni Pencerede Aç" bırakma alanı görünür; ekranı kaplayan
+   pencerede dışarı çıkılamadığı için), sağ tık "Yeni
+   Pencerede Aç", grup paneli sağ tık "Yeni Pencerede Aç" ya da komut paleti "Sekmeyi Yeni Pencerede Aç" ile ayrı
+   pencere açılır. **Oturum kopmaz** (bağlantı ana pencerede yaşar, görüntü taşınır). Geri alma: ayrı pencerenin
+   sekmesini ana pencereye sürükleyip bırakmak (sekme şeridinde bırakılan yere, başka yerde sona), "Ana Pencereye Geri
+   Al" düğmesi/menüsü, komut paleti "Ana Pencereye Geri Al: <ad>". Ayrı pencereyi sistemden kapatmak (Alt+F4) oturumu
+   ana pencereye geri alır; başlıktaki ✕ oturumu kapatır. Geri alınınca ana pencere öne gelir, klavye terminale geçer. Ayrı pencerede Ctrl+Shift+W (kapat) ve Ctrl+Shift+S (ara)
+   çalışır. Ana pencerede yalnız boş "Yeni Bağlantı" kaldıysa geri alınan sekme onun yerine geçer.
+6. **Hata:** başlık çubuğunun boş yerine tıklayınca açık sağ tık/açılır menüler kapanmıyordu (sürükleme bölgesi
+   tıklamayı işletim sistemine veriyor) → menü/pencere açıkken başlık çubuğu sürüklenmez (`globals.css` `html:has(...)`).
+- Kapsam dışı (şimdilik): grup sekmesini (tüm grubu) ayrı pencereye taşıma; ayrı pencerede birden çok sekme; ayrı
+  penceredeki oturum için sağ panel (snippet/geçmiş/dosyalar) — sağ panel ana pencerenin etkin sekmesine bakar.
+
+## Kullanıcı istekleri — 27. tur (2026-10-15, mock e2e: windows + tüm paketler, birim testi: alarm algılayıcı)
+1. **Grup sekmesi ayrı pencereye:** grup sekmesi sağ tık "Grubu Yeni Pencerede Aç", komut paleti, grup sekmesini
+   pencere dışına ya da çalışma alanına aşağı sürükleme. Ayrı pencerede grup aynı döşeme davranışıyla çalışır (panel
+   başlıkları, büyüt/küçült, sürükleyerek sıralama, boyutlandırma, yayın, yerleşim değiştirme). Panel başlığında "Ana
+   Pencereye Al" (yalnız o panel, ayrı sekme olarak) ve "Yeni Pencerede Aç" (kendi penceresine). Geri alma: sekme
+   çipini sürükle-bırak, "Ana Pencereye Geri Al", Alt+F4; grup aynı kimlikle, düzeniyle geri gelir. Pencere ✕: gruptaki
+   tüm oturumları kapatır (kayıtlı düzen değiştiyse sorar). Ayrı pencerede Ctrl+Shift+Enter paneli büyütür.
+2. **Yanlış "Exception" alarmı (snippet çalıştırınca, satırı base64 ile başlayan):** iki neden — (a) kabuk
+   entegrasyonu kurulumunun büyük OSC verisi (komut adları, base64) parçalar halinde gelirken başlangıcı kurulum
+   kapısından (SetupEchoGate) geçtiği için algılayıcı görmüyordu, devamı düz metin sayılıyordu; (b) satıra sığmayan
+   snippet komutunun yankısını bash araya " \r" (ya da "\r\n") koyarak kaydırıyor, yankı tanınmıyordu ve komuttaki
+   `sed '/ERROR\|Exception/...'` alarm oluyordu. Çözüm: algılayıcı kaçış dizilerini parçalar arası durum makinesiyle
+   ayıklar (OSC/DCS gövdesi hiç metne karışmaz), yankıyı boşluksuz karşılaştırır ve parçalı yankıyı tanır; kurulum
+   kapısının bıraktığı çıktı da süzgeçlerden geçer; gönderilen komut her zaman yankı olarak kaydedilir (ekrandaki
+   satır yalnız istemdeyken ek olarak). Birim testi: `node dev/alarm-detector.test.mjs` (eski algılayıcıda 3 hata).
+3. **Grup paneli başlığında sunucu bilgisi:** başlıktaki sunucu adının üzerinde ~0,45 sn beklenince ağaçtaki bilgi
+   kartı (adres, iç IP, protokoller, hesaplar, açıklama) başlığın altında açılır; ayrı pencerede de çalışır.
+
+## Kullanıcı istekleri — 28. tur (2026-10-15, mock e2e: windows, tabs, menus, smoke)
+1. **Yeni pencere yalnız uygulama dışına bırakınca:** çalışma alanına aşağı sürükleyince pencere açma ("Yeni Pencerede
+   Aç" bırakma alanı) kaldırıldı. Sekme (ya da grup sekmesi) uygulama penceresinin dışına çıktığı an imleçte yarı
+   saydam bir pencere önizlemesi belirir (oturumların anlık görüntüsü, grup panelleri), içeri dönünce kaybolur,
+   dışarıda bırakılınca o konum ve boyutta gerçek pencere açılır. Wayland'da önizleme imleci izlemez (konumu
+   bileşik yönetici belirler); Windows/X11'de izler. Sağ tık / komut paleti "Yeni Pencerede Aç" aynen duruyor.
+2. **"Vurgu tüm satırı boyuyor" bildirimi:** WebGL çizimde de yalnız eşleşen kısım boyanıyor (zorla WebGL açılarak
+   doğrulandı: `--ignore-gpu-blocklist --enable-unsafe-swiftshader`). Tam satır rengi snippet'lerdeki `sed` renklendirmesinden
+   geliyor (eşleşen satırın tamamını boyar).
+   Kullanıcıya soruldu: snippet'ler yalnız eşleşen kelimeyi boyayacak şekilde değiştirilsin mi? (karar bekliyor)
+
+## Kullanıcı istekleri — 29. tur (2026-10-16, Chrome tarzı çok pencere; mock e2e: multiwindow + tüm paketler)
+1. **Serbest sürükleme:** şeritte tutulan sekmenin kopyası imleci yatay ve dikeyde izler (yalnız sağa-sola değil).
+2. **Şeritten çıkınca şeffaf pencere:** sekme başlık çubuğu bandının (40 px + 16 px tolerans) dışına çıktığı an kopya
+   kaybolur, imleçte yarı saydam pencere önizlemesi belirir (pencerenin içinde de, dışında da); bırakınca o yerde
+   gerçek pencere açılır. İstisna: açık grubun alanında tek bir oturum "Gruba Ekle" ile gruba bırakılır (önceki istek).
+   Bir önceki turdaki "yalnız uygulama dışına bırakınca" kuralı bu istekle değişti (Chrome davranışı).
+3. **Pencereleri birleştirme (Chrome gibi):** her ayrı pencerenin kendi sekme şeridi ve çalışma alanı var (birden çok
+   sekme, grup, döşeme). Sekme ya da grup sekmesi başka bir pencerenin şeridine sürüklenince bırakılacağı yer çizgiyle
+   gösterilir, bırakınca o pencereye geçer (ana pencereden ayrı pencereye, ayrı pencereden ana pencereye ya da ayrı
+   pencereler arasında). Pencerenin tüm sekmeleri dışarı sürüklenince yeni pencere açılmaz, pencere oraya taşınır.
+   Ayrı pencere sekme menüsü: Ana Pencereye Taşı, Yeni Pencerede Aç, Kapat, Diğerlerini Kapat, yerleşim; başlıkta
+   "Tüm Sekmeleri Ana Pencereye Geri Al" düğmesi. Ayrı pencerede Ctrl+Tab pencere içinde gezinir.
+4. **Linux'ta X11 (XWayland):** Wayland pencere/imleç konumlarını vermediği için uygulama Wayland oturumunda XWayland
+   ile açılır (`--ozone-platform=x11`: geliştirme komutları ve paket başlatıcısı; `JUMPDESK_WAYLAND=1` ile Wayland).
+   Kullanıcının ekran ölçeği 1 (kesirli ölçek yok), görüntü kaybı yok. Wayland'da çalışırsa pencereler arası sürükleme
+   yapılamaz (yalnız kendi şeridi + dışarı bırakınca yeni pencere), önizleme imleci izlemez.
+
+## Kullanıcı istekleri — 30. tur (2026-10-16, mock e2e: alarm-warmup, windows, tools + tüm paketler)
+1. **Alarm bekleme süresi:** bağlantı kurulduktan sonra 10 sn alarm bildirilmez (karşılama çıktısı, giriş betikleri,
+   otomatik komutlar); çıktı bu sürede de okunur (satır/kaçış dizisi takibi bozulmasın), yalnız eşleşme bildirilmez.
+   Yeniden bağlanınca süre yeniden başlar.
+2. **Grup paneli başlığında sunucu kartı tüm satırda:** başlığın herhangi bir yerinde beklenince açılır; düğmelerin
+   (büyüt, ana pencereye al, kapat, yayın) üzerinde açılmaz, sağ tıklanınca fare başlıktan çıkana kadar açılmaz.
+   Başlıkta gezinirken bekleme süresi yeniden başlamaz.
+
+## Kullanıcı istekleri — 31. tur (2026-10-16, mock e2e: multiwindow ×3, tabs)
+- **"Yeni Bağlantı" sekmesi pencere dışına çıkamaz:** dışarı sürüklenince kopya ekranın sağına sıçrıyordu (gerçek fare
+  olaylarında, taklit olaylarla yeniden üretilemedi; olası neden pencere dışındaki bozuk koordinatlar, ör. soldaki
+  Ubuntu Dock). Artık imleç pencere dışındayken gelen olaylar yok sayılır: kopya imlecin pencereden çıktığı kenarda
+  kalır, sıralama da durur.
+
+## Kullanıcı istekleri — 32. tur (2026-10-16, ölçüm: dev/e2e/font-perf.mjs)
+- **Yazı boyutu değiştirmek arayüzü kastırıyordu** (çok oturumda terminal yazısı): her adımda tüm terminaller
+  yeniden ölçülüp gliflerini yeniden çiziyor, vurgular baştan taranıyordu. Artık görünen terminaller ayar değişmeyi
+  bırakınca (150 ms) bir kez, gizli terminaller ekrana geldiklerinde güncellenir; gizli terminallerde vurgu taraması
+  da ekrana gelene kadar ertelenir. Ölçüm (12 oturum, 6 adım): toplam donma 4380 ms → 374 ms, en uzun 423 → 106 ms.
+
+## Kullanıcı istekleri — 33. tur (2026-10-16, birim testi 14/14, e2e: tools, windows, alarm-warmup)
+- Girişten sonra yine alarm: satır `[appuser@<sunucu> ~]$ ` ×12 + `tail -f <log yolu>…` (otomatik çalışan log
+  snippet'inin yankısı; komutta `sed '/ERROR\|Exception/…'`). İstemin tekrarları, bash'in pencere boyutu değişince
+  istemi aynı satıra CR ile yeniden çizmesinden; yankı, kayıttan 3 sn sonra geldiği için tanınmadı.
+- İstek: alarmlar bağlantıdan **20 sn** sonra başlasın → bekleme 20 000 ms.
+- Yankı tanıma 15 sn'ye çıktı ve sıralı yapıldı (yankı tamamlanınca kayıt düşer; ardından gelen çıktı, komut metninin
+  parçası olsa da alarmdır). Alarm panelinde satırın görünen son hali gösterilir (üst üste çizilen istemler değil).
+
+## Kullanıcı istekleri — 34. tur (2026-10-16; birim 19/19, e2e: transfer 39 kontrol, alarm-warmup, smoke + tüm paketler)
+1. **Alarm bekletme snippet'e bağlı:** yavaş bağlantıda 20 sn yetmedi. Sunucuya bağlanınca çalışacak snippet varsa
+   hepsi gönderilene kadar ve gönderildikten sonra 10 sn alarm yakalanmaz; bağlantıdan sonraki bekleme (20 sn) de
+   geçerli kalır (hangisi geç biterse). İki süre de Ayarlar → Bildirimler'den değiştirilebilir.
+2. **Ayarlar → Bildirimler:** "Alarm Bildirimleri" anahtarı (masaüstü bildirimi; kapalıyken panel ve rozet sürer),
+   "Bağlantıdan Sonra" ve "Otomatik Snippetlerden Sonra" bekleme süreleri (sn, 0–300).
+3. **Statik snippetler silindi** (`features/snippets/snippets.txt` yok). Snippetler kullanıcının kayıtlarında; sağ
+   panelin altında "Snippetleri Düzenle" düğmesi → düzenleyici (solda gruplu liste + arama, sağda Ad/Grup/Komut,
+   Sil/Vazgeç/Kaydet, Ctrl+Enter, kaydedilmemiş değişiklikte onay; altta İçe/Dışa Aktar). Satıra sağ tık:
+   "“Ad” Snippetini Düzenle". Kullanıcının mevcut snippetleri şifreli dosyaya dönüştürüldü:
+   kullanıcının İndirilenler klasörüne (kimlikler eski slug'lar; sunuculardaki "bağlanınca çalıştır" seçimleri
+   içe aktarınca yeniden eşleşir). Kullanıcı bunu bir kez içe aktaracak.
+4. **Dışa/İçe aktarma:** bölümler snippetler, alarm kuralları, vurgular, düzen kayıtları, uygulama ayarları (yazı
+   boyutları, terminal tercihleri, bildirimler, tema). Dosya `.jumpdesk`, AES-256-GCM şifreli + doğrulamalı; ad
+   `<kullanıcı adı, harf/rakam dışı _>_<YYYYMMDDHHmmss>.jumpdesk`, varsayılan klasör İndirilenler. Dışa aktarım ekranı
+   kartlarla seçim (sayılar + ayrıntı çipleri, boş bölüm pasif). İçe aktarımda dosya doğrulanır, kartlarda dosyadaki
+   ve mevcut sayılar, "Seçilen bölümlerdeki mevcut kayıtlarınız silinir" uyarısı. Giriş noktaları: profil menüsü,
+   komut paleti, Ayarlar → Dışa / İçe Aktarma, snippet ve alarm kuralı pencerelerindeki düğmeler, Snippetler /
+   Alarmlar / Vurgular panellerinde sağ tık (yalnız o bölüm seçili gelir).
+5. **Logo:** yalnız kırmızı karo Claude turuncusu (`#D97757` degrade); beyaz şerit ve `>_` aynı. PNG'ler yeniden
+   üretildi (build/icon.png, build/icons/*, resources/icon.png). Kullanıcı "simge hâlâ kırmızı" dedi: rıhtım, dev
+   modunda bile kurulu .deb'in simgesini gösteriyor. Yeni `dist/jumpdesk_0.1.0_amd64.deb` (turuncu simge) derlendi;
+   kullanıcının `sudo apt install` ile kurması gerekiyor.
+6. **Girişte önce sunucu adresi:** her girişte (oturum geçerliyse açılışta sorulmaz) adres ekranı: JumpDesk ve JumpServer
+   karoları (rıhtım simgesi gibi gölgeli), arada ⇄; son adres hazır, son kullanılanlar çipleri. Şema yoksa https.
+   Adres `/api/health/` ile doğrulanır; yanıt yoksa hata ileti. Giriş sayfası başlığında "Sunucuyu Değiştir".
+7. **Kullanıcıya özel kayıtlar:** ayarlar, snippetler, kurallar, vurgular, düzenler, tema, panel genişlikleri ve sunucu
+   bilgileri (etiket, otomatik komut, iç IP) sunucu + kullanıcı adına göre ayrı; başka kullanıcı görmez. Eski
+   (kullanıcısız) kayıtlar güncellemeden sonra ilk giriş yapan kullanıcıya bir kez taşınır.
+
+## Kullanıcı istekleri — 34. tur devamı (2026-10-16)
+- **"Simge hâlâ kırmızı" (paketi kurmadan `npm run dev`):** rıhtım dev penceresini (WM_CLASS `jumpdesk`) kurulu paketin
+  kaydıyla eşleyip paketin eski kırmızı simgesini gösteriyordu. Geliştirme sürümü artık `jumpdesk-dev` adıyla açılır;
+  ardından "simge komple kayboldu": GNOME 47 pencere simgesini kullanmıyor; `jumpdesk-dev.desktop` kaydı (Icon = proje
+  `build/icon.png`) kullanıcının `~/.local/share/applications` klasörüne kuruldu, dev yeniden başlatılınca görünür. Ayrıca turuncu simgeli yeni
+  `dist/jumpdesk_0.1.0_amd64.deb` derlendi (kurulu paket için `sudo apt install`).
+- **Sol üstteki uygulama simgesi kaldırıldı:** ana pencere başlık çubuğu sunucu ağacı düğmesiyle, ayrı pencereler
+  doğrudan sekme şeridiyle başlar (macOS'ta zaten yoktu).
+- **Turuncu Claude ile aynı yapıldı** (kullanıcı rıhtım görüntüsüyle "biraz koyulaştır" dedi): Claude masaüstü simgesi
+  (`/usr/share/icons/hicolor/256x256/apps/claude-desktop.png`) ölçüldü — karo neredeyse düz, üst `#da7a58`, orta
+  `#da714c`, alt `#dc6943`. Bizim degrade `#D6714F → #D96F4A → #D96741` (parlaklık katmanı dahil ölçüm üst `#d87959`,
+  orta `#d86f4a`, alt `#d86942`). PNG'ler yeniden üretildi.
+- "Rıhtımda hâlâ eski hali": GNOME simge önbelleği (aynı dosya yolu). Geliştirme kaydı artık içerik özetli simge yolu
+  kullanıyor (`icon-ccf74d70614b.png`); kayıt yeniden kuruldu.
+
+## Kullanıcı istekleri — 35. tur (2026-10-16; e2e: i18n, ai + tüm paketler; birim: alarm 19, ai-safety 58)
+1. **Sunucu adresi gömülü değil:** `DEFAULT_SERVER` kaldırıldı; ilk açılışta adres boş, girilen adres `settings.server`
+   + `recentServers`'a kaydedilip sonraki açılışta hazır gelir (`dev/e2e/server-address.mjs`). Yan bulgu: `auth.ts`
+   modül yüklenirken `serverUrl()` çağırıyordu → ayar dosyası `userData` ayarlanmadan okunuyordu (yalnız
+   `electron out/main/index.js` ile açılan testlerde yanlış klasör); başlangıç durumu artık `server: ''`.
+2. **Dışa aktarım kartları:** seçilemeyen kartta imleç değişmez, alttaki "şifrelenir" satırı kaldırıldı, açıklamalar
+   kesilmez (iki satırlık yer). Snippet paneli alt düğmesi "Snippetler" + ListChecks simgesi; Alarmlar düğmesinde
+   "N Aktif" (özet çiplerinde de "aktif").
+3. **Kullanıcının snippetleri:** `sed` renklendirmesi atıldı (yalnız `tail -f <yol>`), renkler vurgu kuralı oldu
+   (hata/exception kırmızı #cf222e, uyarı sarı #9a6700, INFO mavi #0969da, yazı beyaz, büyük/küçük harf
+   duyarlı), mevcut 2 alarm kuralı (Exception, OutOfMemoryError) eklendi →
+   kullanıcının İndirilenler klasörüne yeni bir `.jumpdesk` dosyası. Kullanıcı içe aktarıp her şeyi kendisi dışa
+   aktaracak.
+4. **Vurgu metni çift tıkla düzenlenir** (satır içinde; Enter/odak dışı kaydeder, Esc vazgeçer; seçenekler de).
+5. **Vurgu hatası:** satır sonunda bölünen eşleşmede ("warni|ngs") alt satır baştan sona boyanıyordu (`decorateSpan`
+   satır değişince `right` sıfırlanmıyordu). Düzeltildi; windows e2e "wrapped match colors only its cells".
+6. **Terminal altındaki boşluk:** satıra tamamlanmayan artık alan (~16 px) alttaydı; terminal alta hizalandı (artık
+   üstte). **"En Alta Kaydır" bandı:** görünüm geçmişte yukarıdayken altta iki satır yüksekliğinde, tema arka planından
+   şeffafa geçişli bant; tıklayınca en alta iner (windows e2e).
+7. **Font önizlemesi** genel örnek (`user@server:~$ ls -l /var/log`).
+8. **Dil desteği (İngilizce varsayılan, Türkçe):** tüm renderer ekranları + ana süreç iletileri; Ayarlar → Dil
+   (ilk bölüm) ve giriş ekranında dil seçici; dil kullanıcıya özel, "Uygulama Ayarları" dışa aktarımına dahil. ~530
+   çeviri. Ayrıntı: implementation-notes "Dil desteği".
+9. **Komut satırı boyaması çıktının üstüne düşüyordu** (hızlı çıktıda "for i in …" satırı başka satıra boyanıyordu):
+   boyama artık bekleyen yazma yokken yapılır (windows e2e "command line painted only once").
+10. **Yapay zeka (Ayarlar → Yapay Zeka):** sağlayıcı seçimi (Anthropic, OpenAI, Gemini, Azure OpenAI, OpenAI uyumlu /
+    Ollama-LM Studio-vLLM, Kullanma) ve sağlayıcının alanları; API anahtarı şifreli, ekrana geri gelmez, dışa
+    aktarılmaz. "Bağlantıyı Dene". Özellik anahtarı: "Yapay Zeka ile Autocomplete". Terminalde Ctrl+Space (öneriler)
+    → ikinci Ctrl+Space ya da "Yapay zekaya sor…" satırı → soru → komut seçenekleri (açıklama + Dikkat/Riskli rozeti)
+    → seçilen komut satıra yazılır (çalışmaz; Enter kullanıcıda). Riskli komut onay ister. Sohbet oturum başına
+    (önceki sorular bağlam olarak gider, "Sohbeti Temizle"). Yapay zekaya yalnız soru, önceki sorular ve sunucu türü
+    gider.
+- Çalışma alanına bağlı olmayan bir Anthropic anahtarı → HTTP 400 (anthropic-workspace-id gerekli). Anthropic
+  ayarlarına "Çalışma Alanı Kimliği (İsteğe Bağlı)" alanı eklendi; kimlik Console → Settings → Workspaces'ten alınır
+  ya da çalışma alanına bağlı yeni bir anahtar oluşturulur.
+- Opus 5.5 ile "tool_choice … not supported for this model" hatası → serbest araç seçimiyle yeniden deneme. Kullanıcı
+  "tüm modelleri ekle, istediğimi seçeyim" dedi → Model alanı, kayıtlı anahtarla sağlayıcıdan alınan listeden seçilir.
+- Yapay zeka penceresi: klavyeyle seçilen öneri listede görünür alana kaydırılır (`scrollIntoView nearest`); Enter'dan
+  sonra soru kutusu temizlenir, soru kutunun altında sabit bir sohbet balonunda (sağda, birincil renk) görünür, yanında
+  "+N önceki soru bağlamda". Kutuda yazı varsa Enter devam sorusu sorar, boşsa seçili öneriyi yazar; hata olursa soru
+  kutuya geri konur. Bekleme sırasında üç noktalı "Yapay zeka düşünüyor…" (e2e ai 24/24).
+- **Ctrl+Space program çalışırken açılıyordu** (tail -f): iki neden — (a) bağlanınca çalışan snippetler kabuğa doğrudan
+  gönderildiği için `live.atPrompt` true kalıyordu; artık gönderilince false olur; (b) `closePopup` yalnız çizilmiş
+  pencereyi kapatıyordu, hızlı yazımda Enter'dan hemen önce kurulan açılış kalıyordu; artık her durumda kapatır.
+  Ctrl+Space yalnız komut satırı açıkken (normal ekran + entegrasyon varsa istemde) çalışır, değilse tuş programa gider
+  (windows e2e "no suggestions while a program runs").
+
+## Public proje hazırlığı (2026-10-16)
+Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcının kararlarıyla temizlendi:
+- **Ad JumpDesk** (paket `jumpdesk`, dosya uzantısı `.jumpdesk`, ortam değişkenleri `JUMPDESK_*`, köprü
+  `window.jumpdesk`, appId `io.github.metin-aydin.jumpdesk`); depo `https://github.com/metin-aydin/JumpDesk`,
+  yazar `metin-aydin`, lisans MIT.
+- Kimlik/paket alanları, mock verisi (genel klasör/sunucu adları), test fixture'ları (genel `/opt/app/...` log yolları,
+  "App Server"/"Queue Server" grupları), alarm testi, e2e kullanıcı adı (`demo`), `swagger.json` sunucu adresi
+  (`jumpserver.example.com`), memory ve CLAUDE.md genelleştirildi.
+- Eski ad altındaki yerel veriler (ayarlar, localStorage) uygulama koduna taşıma eklenmeden, kullanıcının makinesinde
+  bir kerelik betikle yeni ada taşındı (kodda eski ad geçmez).
+- Git'te henüz commit yok (geçmiş temiz). Kökteki `.remember/` (eklenti geçmişi) .gitignore'a eklendi.
+- **İkinci tarama (kullanıcı isteği, tüm dosyalar):** geniş özel bilgi sözcük listesi, tüm alan adları/IP'ler/e-postalar,
+  arayüz örnek metinleri, SVG/PNG meta verisi, `.vscode`, paketleme betikleri, `package-lock.json` kayıt adresleri
+  (yalnız registry.npmjs.org). Kalan iki örnek ad genelleştirildi (`stores/snippets.ts` yorumu, alarm testi istemi). swagger.json'daki IP/adresler JumpServer'ın kendi
+  örnekleri. `.remember/` yerelde duruyor (gitignore'da; içinde eski konuşma kayıtları var).
+- **Proje klasörü `jumpdesk` adını aldı;** memory ve md dosyalarında önceki ad kalmadı. Claude'un proje dışı
+  işaretçisi yeni klasörün anahtarıyla kuruldu (eskisi de yeni yolu gösterir).
+- **md denetimi (üçüncü tarama, 2026-10-16):** tüm md dosyaları satır satır okundu; dolaylı ipuçları (klasör yolu,
+  snippet sayıları, ağ kısıtları, log biçimi, sunucu port/sürüm ayrıntıları, e-posta notu) genel ifadeyle yeniden
+  yazıldı. Kalan kişisel not yalnız çalışma tercihleri (ADHD biçimi; kullanıcı depoda kalmasını seçti). Mock klasör
+  adları (Partner A, Bölge Ofisleri…) kodla aynı genel adlar; değiştirilmedi.
+- **İlk commit değiştirildi:** GitHub'ın oluşturduğu ilk commit (README'de önceki ad) kaldırıldı; tüm proje tek bir
+  ebeveynsiz kök commit olarak force push edildi (kullanıcı "yeni ilk commit + force push" seçti; depoyu silip
+  yeniden açma seçilmedi). Kullanıcı mock klasör adlarını doğru buldu.
+  Dev masaüstü kaydı yeni yolla yeniden kuruldu. Oturum eklentisi (`.remember`) oturum taşınana kadar eski yolda küçük
+  bir günlük klasörü yeniden yaratıyor; silinmesi güvenlik denetimine takıldı, kullanıcıya bırakıldı.

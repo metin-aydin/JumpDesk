@@ -1,0 +1,28 @@
+// Linux paketinde Electron ikilisini küçük bir başlatıcı betikle sarar. AppImage salt okunur ve nosuid bağlandığı için
+// chrome-sandbox kullanılamaz; Ubuntu 23.10+ AppArmor da yetkisiz kullanıcı ad alanlarını kısıtlar. Bu yüzden AppImage
+// içinden (APPIMAGE tanımlı) çalışırken --no-sandbox eklenir; .deb kurulumunda sandbox olduğu gibi kullanılır.
+// Wayland oturumunda uygulama XWayland (X11) üzerinde açılır: sekmeyi pencereler arasında sürüklemek için pencere ve
+// imleç konumları gerekir, Wayland bunları uygulamaya vermez. JUMPDESK_WAYLAND=1 ile Wayland'da açılır.
+const fs = require('fs')
+const path = require('path')
+
+exports.default = async function afterPack(context) {
+  if (context.electronPlatformName !== 'linux') return
+  const name = context.packager.executableName
+  const exe = path.join(context.appOutDir, name)
+  const bin = `${exe}-bin`
+  if (fs.existsSync(bin)) return
+  fs.renameSync(exe, bin)
+  fs.writeFileSync(
+    exe,
+    [
+      '#!/bin/sh',
+      'HERE="$(dirname "$(readlink -f "$0")")"',
+      'if [ "$XDG_SESSION_TYPE" = wayland ] && [ -z "$JUMPDESK_WAYLAND" ]; then set -- --ozone-platform=x11 "$@"; fi',
+      `if [ -n "$APPIMAGE" ]; then exec "$HERE/${name}-bin" --no-sandbox "$@"; fi`,
+      `exec "$HERE/${name}-bin" "$@"`,
+      ''
+    ].join('\n'),
+    { mode: 0o755 }
+  )
+}

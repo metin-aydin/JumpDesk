@@ -1,0 +1,65 @@
+appId: io.github.metin-aydin.jumpdesk
+productName: JumpDesk
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # Geliştirme dosyaları, hafıza notları ve yerel eklenti günlükleri pakete girmez.
+  - '!{.remember,memory,dev,.github}{,/**/*}'
+  - '!{CLAUDE.md,LICENSE,swagger.json,components.json,*.tsbuildinfo}'
+asarUnpack:
+  - resources/**
+afterPack: build/after-pack.cjs
+win:
+  executableName: jumpdesk
+  icon: build/icon.png
+  target:
+    - nsis
+    - portable
+nsis:
+  artifactName: ${productName}-${version}-Setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    - NSCameraUsageDescription: Application requests access to the device's camera.
+    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
+    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
+    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+  notarize: false
+dmg:
+  artifactName: ${name}-${version}.${ext}
+linux:
+  target:
+    - AppImage
+    - deb
+  executableName: jumpdesk
+  maintainer: metin-aydin
+  synopsis: Desktop client for JumpServer
+  description: Desktop client for JumpServer with SSH, RDP, a file manager and split view.
+  category: Network
+  icon: build/icons
+  syncDesktopName: true
+  desktop:
+    entry:
+      Name: JumpDesk
+appImage:
+  artifactName: ${productName}-${version}.${ext}
+deb:
+  artifactName: ${name}_${version}_${arch}.${ext}
+  appArmorProfile: build/apparmor-profile.tpl
+portable:
+  artifactName: ${productName}-${version}-Portable.${ext}
+npmRebuild: false
+# Sürüm dosyaları GitHub Releases'a yüklenir (yalnız --publish verilince ya da etiketli CI derlemesinde).
+publish:
+  provider: github
+  owner: metin-aydin
+  repo: JumpDesk
