@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { SearchAddon } from '@xterm/addon-search'
@@ -35,6 +35,7 @@ import { SetupEchoGate, attachIntegration, buildSetupCommand } from './shell-int
 import { TerminalSearchBar } from './TerminalSearchBar'
 import { terminalTheme } from './themes'
 import { acquireWebgl, forgetTerminal, releaseWebgl } from './webgl-pool'
+import { patchHiddenRendering, setRenderingPaused } from './xterm-patches'
 
 export const TERMINAL_FONT =
   '"JetBrains Mono Variable", "JetBrains Mono", "Cascadia Mono", Menlo, monospace'
@@ -583,6 +584,8 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         .catch(() => undefined)
       if (disposed) return
       term.open(host)
+      patchHiddenRendering(term)
+      if (!visibleRef.current) setRenderingPaused(term, true)
       // Terminale tıklanınca yapay zeka kipi kapanır.
       term.textarea?.addEventListener('focus', () => setAiAnchor(null))
       if (visibleRef.current) acquireWebgl(term)
@@ -702,6 +705,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const unsubscribeMoved = onTabHostMoved(tabId, () => {
       if (disposed || !term.element) return
       term.open(host)
+      patchHiddenRendering(term)
       ro?.restart()
       if (visibleRef.current) {
         releaseWebgl(term)
@@ -741,23 +745,28 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     }
   }, [tabId, wsUrl])
 
+  // Çizim, sekme gizlendiği anda (aynı işlemdeki odak değişikliğinden önce) duraklatılır, görünür olunca sürdürülür.
+  useLayoutEffect(() => {
+    const term = termRef.current
+    if (term?.element) setRenderingPaused(term, !visible)
+  }, [visible])
+
+  // Gizlenen terminal WebGL çizicisini korur: bırakılırsa xterm DOM çiziciye geçer ve gizliyken çıktı aktıkça satırları
+  // pahalı biçimde yeniden çizer (bkz. webgl-pool, xterm-patches). Görünür olunca bağlam yoksa yeniden alınır.
   useEffect(() => {
     const term = termRef.current
     if (!term || !term.element) return
     decoratorRef.current?.setActive(visible)
-    if (visible) {
-      syncFontRef.current()
-      acquireWebgl(term)
-      requestAnimationFrame(() => {
-        const dims = fitRef.current?.proposeDimensions()
-        if (dims && (dims.cols !== term.cols || dims.rows !== term.rows)) {
-          term.resize(dims.cols, dims.rows)
-          connRef.current?.resize(dims.cols, dims.rows)
-        }
-      })
-    } else {
-      releaseWebgl(term)
-    }
+    if (!visible) return
+    syncFontRef.current()
+    acquireWebgl(term)
+    requestAnimationFrame(() => {
+      const dims = fitRef.current?.proposeDimensions()
+      if (dims && (dims.cols !== term.cols || dims.rows !== term.rows)) {
+        term.resize(dims.cols, dims.rows)
+        connRef.current?.resize(dims.cols, dims.rows)
+      }
+    })
   }, [visible])
 
   useEffect(() => {

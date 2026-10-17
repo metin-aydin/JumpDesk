@@ -1,9 +1,11 @@
 import type { Terminal } from '@xterm/xterm'
 import { WebglAddon } from '@xterm/addon-webgl'
+import { jumpdesk } from '@/lib/jumpdesk'
 
 /**
  * Chromium bir renderer'da en çok 16 etkin WebGL bağlamına izin verir ve aşınca en eskisini sessizce düşürür.
- * Yalnızca görünen terminaller WebGL kullanır; üst sınır aşılırsa en uzun süredir kullanılmayan bırakılır.
+ * Terminal gizlense de bağlamını korur (DOM çiziciye geçiş gizli terminalde pahalıdır); üst sınır aşılırsa en uzun
+ * süredir görünmeyen terminalinki bırakılır, o terminal yeniden görününce bağlam yeniden alınır.
  */
 const MAX_CONTEXTS = 12
 const MAX_RETRIES = 3
@@ -30,6 +32,7 @@ function disposeAddon(term: Terminal, addon: WebglAddon): void {
 }
 
 export function acquireWebgl(term: Terminal): void {
+  if (!jumpdesk.terminalWebgl) return
   const existing = active.get(term)
   if (existing) {
     existing.lastUsed = Date.now()

@@ -807,3 +807,34 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
     Çözüm (PR #3): `build/notarize.cjs` afterSign kancası (ditto zip → `notarytool submit --wait --output-format
     json`, reddedilirse `notarytool log`; sonra damgalama 30 sn arayla 10 deneme), `mac.notarize: false`. Kanca
     değerler yoksa atlar (denendi). Sürüm notu PR #2'den PR #3'e taşındı.
+    PR #3: https://github.com/metin-aydin/JumpDesk/pull/3 (oturuma bağlı, CI bekliyor). Birleşince sürüm yine
+    0.2.1 olur (v0.2.1 etiketi oluşmadı).
+21. **v0.2.1 yayımlandı** (PR #3 birleşti `33de76d`, Release 38912717839): macOS arm64/x64 dmg+zip, Windows, Linux;
+    notarize.cjs ile iki mimari de onaylandı ve ilk denemede damgalandı. Sürüm notu PR #3 açıklamasından geldi.
+    Kullanıcının makinesinde kurulu .deb 0.2.0 → **0.2.1 uygulama içinden güncellendi** (DebUpdater/pkexec gerçek
+    ortamda çalıştı). Yerelde main eşitlendi, yeni `development` açıldı.
+
+## Kullanıcı istekleri — 37. tur (2026-10-16): performans
+1. Şikâyet: 5 sunuculu bir grup açıkken "+" (yeni sekme) tıklanınca uygulama donuyor. "İyice incele ve düzelt,
+   zamandan/token'dan tasarruf etme."
+2. **Yeniden üretildi** (`dev/e2e/group-perf.mjs`, 5 terminal, 6000 satır geçmiş + saniyede ~50 satır/terminal,
+   vurgu+alarm kuralları, ekran dışı + SwiftShader WebGL): "+" **31–52 sn**, gruba dönüş **~7,5 sn** kilitlenme.
+3. **Kök neden 1 (donma):** gizlenen terminal WebGL'i bırakıyordu → xterm DOM çiziciye geçiyordu. xterm 6'da çıktı
+   her kaydığında gelen seçim bildirimi (`RenderService.handleSelectionChanged`), odak kaybı/kazanma
+   (`handleBlur/handleFocus`) duraklatmayı atlayıp DOM çiziciye gidiyor ve tüm satırları yeniden çizdiriyor; display:none
+   içinde `WidthCache._measure` 0 döndürdüğü için önbelleğe girmiyor, her karakter zorunlu yerleşimle yeniden ölçülüyor
+   (profilde 73 sn `_measure`). Düzeltme: (a) gizlenen terminal WebGL bağlamını korur (havuz 12, aşınca en uzun süre
+   görünmeyen bırakılır); (b) `features/terminal/xterm-patches.ts`: duraklatılmışken seçim/odak bildirimleri saklanır,
+   çizim sürünce uygulanır; seçim hiç yokken gelen seçim bildirimi atlanır; terminal gizlendiği anda
+   (useLayoutEffect, odak değişikliğinden önce) çizim duraklatılır, görünür olunca sürdürülür.
+4. **Kök neden 2 (akışta takılma):** vurgu katmanı tüm geçmişi süslüyordu (terminal başına ~15.000 işaretçi); xterm
+   her işaretçi için kırpma dinleyicisi tutar, geri kaydırma doluyken her yeni satırda hepsi çalışıyordu (~100 ms kare
+   boşlukları). Düzeltme: `highlight-decorator.ts` yalnız görünen alanın bir ekran üstü/altını süsler, satır başına tek
+   işaretçi, etkin sayfada metni değişmeyen satırlar yeniden kurulmaz, kaydırınca (`onScroll`) pencere güncellenir.
+5. Ayrıca: `Workspace.tsx` `TabContent` memo (başka sekme açılınca oturum görünümleri yeniden çizilmez);
+   `JUMPDESK_DISABLE_WEBGL` (main → preload `terminalWebgl`); mock `MOCK_DATA=perf` (Cluster, `MOCK_PERF_SERVERS`).
+6. **Sonuç:** WebGL: "+" 14–21 ms, dönüş 7–16 ms, akışta uzun görev yok (kare boşluğu ~20 ms). DOM çizici: "+" 16–48 ms,
+   dönüş 1–12 ms; 5 görünür terminal akarken ~50 ms görevler kalır (tarayıcının satır yerleşimi/boyaması, DOM çizicinin
+   doğası). 14 terminal (12 WebGL + 2 DOM): geçiş ≤ 48 ms. font-perf artık DOM çizicide (WebGL kipinde yazı boyutu
+   yalnız tuvalde; denetim `.xterm-rows` okur): en uzun 75 ms. windows.mjs'e geçmiş vurgusu ve fare seçimi/kopyalama
+   denetimleri eklendi.

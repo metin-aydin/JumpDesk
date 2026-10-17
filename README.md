@@ -98,7 +98,8 @@ npm run build && node dev/e2e/smoke.mjs   # end-to-end tests run against the moc
 ```
 
 On Linux the app runs under XWayland (`--ozone-platform=x11`) so tabs can be dragged between windows; set
-`JUMPDESK_WAYLAND=1` to use Wayland.
+`JUMPDESK_WAYLAND=1` to use Wayland. Terminals are drawn with WebGL; set `JUMPDESK_DISABLE_WEBGL=1` to use the DOM
+renderer instead (for GPU problems).
 
 ## Branches and releases
 

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { cn } from '@/lib/utils'
@@ -22,7 +22,8 @@ import { DragGhost, PaneHeader, TileHandles } from './tiling'
 import { pct } from './tile-layout'
 import { useTiling } from './use-tiling'
 
-function TabContent({
+/** Sekmenin kendisi, etkinliği ve görünürlüğü değişmedikçe içeriği yeniden çizilmez (başka sekme açılıp kapanınca). */
+const TabContent = memo(function TabContent({
   tab,
   active,
   visible
@@ -33,7 +34,7 @@ function TabContent({
 }): React.JSX.Element {
   if (tab.kind === 'connect') return <HomeView tabId={tab.id} active={active} />
   return <SessionView tab={tab} active={active} visible={visible} />
-}
+})
 
 /**
  * Sekme içeriği sekmenin kalıcı kabına çizilir; sekme başka pencereye taşınsa da React ağacındaki yeri aynı kalır ve

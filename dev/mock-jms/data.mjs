@@ -1,6 +1,7 @@
 // Mock ağaç verisi: Default kökü altında Linux/Windows/Veritabanı grupları ve
 // sanallaştırmayı denemek için 250 sunuculu büyük bir alt grup. MOCK_DATA=showcase ekran görüntüleri için İngilizce
-// adlı küçük bir veri seti verir.
+// adlı küçük bir veri seti, MOCK_DATA=perf performans ölçümü için tek hesaplı sunuculardan oluşan bir klasör verir
+// (sunucu sayısı MOCK_PERF_SERVERS, varsayılan 8).
 import crypto from 'node:crypto'
 
 function uuid(seed) {
@@ -9,7 +10,8 @@ function uuid(seed) {
 }
 
 export function buildData(kind = process.env.MOCK_DATA) {
-  const { nodes, assets } = kind === 'showcase' ? showcaseData() : defaultData()
+  const { nodes, assets } =
+    kind === 'showcase' ? showcaseData() : kind === 'perf' ? perfData() : defaultData()
   const amount = (key) =>
     assets.filter((a) => a.nodeKeys.some((k) => k === key || k.startsWith(`${key}:`))).length
   for (const n of nodes) n.amount = amount(n.key)
@@ -112,6 +114,17 @@ function showcaseData() {
   })
   add('prometheus-01', '1:4', { comment: 'Metrics' })
   add('bastion-ops', '1')
+  return { nodes, assets }
+}
+
+function perfData() {
+  const count = Number(process.env.MOCK_PERF_SERVERS) || 8
+  const nodes = withIds([
+    { key: '1', value: 'Default', parentKey: '' },
+    { key: '1:1', value: 'Cluster', parentKey: '1' }
+  ])
+  const { assets, add } = assetList()
+  for (let i = 1; i <= count; i++) add(`node-${String(i).padStart(2, '0')}`, '1:1')
   return { nodes, assets }
 }
 
