@@ -2,7 +2,14 @@
 export type UpdateInstaller = 'appimage' | 'deb' | 'nsis' | 'mac'
 
 export type UpdateStatus =
-  'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'downloaded' | 'error'
+  | 'idle'
+  | 'checking'
+  | 'up-to-date'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'installing'
+  | 'error'
 
 /** Güncelleme durumu: ana süreç tutar, ayarlar ekranı ve bildirimler gösterir. */
 export interface UpdateState {

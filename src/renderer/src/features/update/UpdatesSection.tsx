@@ -67,6 +67,13 @@ function StatusLine({ state }: { state: UpdateState }): React.JSX.Element {
           })}
         </span>
       )
+    case 'installing':
+      return (
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" />{' '}
+          {t('Kuruluyor… Sistem parolanız sorulduysa girin.')}
+        </span>
+      )
     case 'error':
       return <span className="text-destructive">{t('Denetlenemedi.')}</span>
     default:
@@ -104,7 +111,7 @@ export function UpdatesSection(): React.JSX.Element {
               <RotateCcw /> {t('Yeniden Başlat ve Kur')}
             </Button>
           )}
-          {!['available', 'downloading', 'downloaded'].includes(state.status) && (
+          {!['available', 'downloading', 'downloaded', 'installing'].includes(state.status) && (
             <Button
               size="sm"
               variant="outline"

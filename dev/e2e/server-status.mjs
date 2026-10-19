@@ -168,27 +168,44 @@ try {
   check('uptime stays fixed outside the scrolled area', uptime.visible)
   await shot('status-02-narrow')
 
-  // 5. Ayrıntı kartı: sabit genişlik, dar panelde pencerenin içinde
-  await scroll.evaluate((el) => (el.scrollLeft = 0))
-  await scroll.getByRole('button').first().click()
-  const card = page.locator('[data-server-status-card]')
-  await card.waitFor({ timeout: 5000 })
-  // Kart küçükten büyüyerek açılır; ölçü açılış bitince alınır.
-  await page.waitForTimeout(400)
-  const cardBox = await card.locator('xpath=..').boundingBox()
-  check('details card has a fixed width', Math.round(cardBox.width) === 320, `${cardBox.width}`)
-  check('details card is not clipped', cardBox.x >= 0 && cardBox.x + cardBox.width <= WIDTH)
-  const cardText = await card.innerText()
-  check(
-    'card lists memory, disks, load and update time',
-    /Bellek/.test(cardText) &&
-      /Diskler/.test(cardText) &&
-      /Yük/.test(cardText) &&
-      /sn önce/.test(cardText)
-  )
-  await shot('status-03-card')
-  await page.keyboard.press('Escape')
-  await page.waitForTimeout(300)
+  // 5. Her çip kendi ayrıntısını açar; kart sabit genişlikte ve dar panelde pencerenin içinde
+  const expectations = [
+    ['cpu', /CPU/, /Ortalama|Geçmiş birikiyor/],
+    ['mem', /Bellek/, /GB/],
+    ['disk', /Diskler/, /\//],
+    ['load', /Yük/, /dk ortalaması/]
+  ]
+  for (const [index, [focus, title, detail]] of expectations.entries()) {
+    const chip = scroll.getByRole('button').nth(index)
+    await chip.scrollIntoViewIfNeeded()
+    await chip.click()
+    const card = page.locator(`[data-server-status-card="${focus}"]`)
+    await card.waitFor({ timeout: 5000 })
+    // Kart küçükten büyüyerek açılır; ölçü açılış bitince alınır.
+    await page.waitForTimeout(400)
+    const cardBox = await card.locator('xpath=..').boundingBox()
+    const text = await card.innerText()
+    check(
+      `${focus} chip opens its own details`,
+      title.test(text) && detail.test(text) && /sn önce/.test(text),
+      text.replace(/\s+/g, ' ').slice(0, 80)
+    )
+    check(
+      `${focus} card has a fixed width and is not clipped`,
+      Math.round(cardBox.width) === 320 && cardBox.x >= 0 && cardBox.x + cardBox.width <= WIDTH,
+      `${Math.round(cardBox.x)}+${Math.round(cardBox.width)}`
+    )
+    if (focus === 'cpu') {
+      await page.waitForTimeout(6000)
+      check(
+        'cpu card shows a history chart',
+        (await page.getByRole('img', { name: 'CPU Geçmişi' }).count()) === 1
+      )
+      await shot('status-03-card-cpu')
+    }
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(300)
+  }
 
   // 6. Tam ekran program öndeyken ölçüm durur, çıkınca sürer
   const firstStrip = strips().first()

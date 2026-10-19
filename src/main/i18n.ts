@@ -26,6 +26,11 @@ const EN: Record<string, string> = {
   'Dışa Aktar': 'Export',
   'İçe Aktar': 'Import',
   Pencere: 'Window',
+  'Kurulum başlatılamadı: {message}': 'Could not start the installation: {message}',
+  'Parola penceresi kapatıldı ya da yetki verilmedi; güncelleme kurulmadı.':
+    'The password dialog was closed or authorization was denied; the update was not installed.',
+  'Güncelleme kurulamadı (çıkış kodu {code}).':
+    'The update could not be installed (exit code {code}).',
   'Yapay zeka yanıt vermedi (zaman aşımı).': 'The AI provider did not respond (timed out).',
   'Yapay zeka sağlayıcısına ulaşılamadı: {message}': 'Could not reach the AI provider: {message}',
   'API anahtarı geçersiz ya da bu işlem için yetkisi yok.':

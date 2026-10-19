@@ -894,3 +894,46 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
     Tuzak: kart açılış animasyonu (%95 ölçekten) sırasında genişlik 304 ölçülür; 400 ms beklenir.
 11. PR #4 kullanıcı tarafından birleştirildi (2026-10-17, `95dbea5`), **v0.2.2 yayımlandı**. Yeni `development` güncel
     main'den açıldı; sunucu durumu işi onun üstünde.
+12. Tam regresyon geçti (smoke, tools 53, windows 47, tabs, alarm-warmup 5, i18n 4, panels 13, home 17, multiwindow 21,
+    sftp, ai 24, transfer 39, update 14, server-address 6, menus, rdp). `development` `cf8b913` gönderildi, PR #5
+    https://github.com/metin-aydin/JumpDesk/pull/5 ("JumpDesk 0.2.3: server status strip"); birleştirme kullanıcıda.
+
+## Kullanıcı istekleri — 39. tur (2026-10-19): beş düzeltme
+1. **Her çip kendi ayrıntısı:** `ServerStatusCard` `focus` ('cpu' | 'mem' | 'disk' | 'load'); CPU: büyük yüzde, çekirdek,
+   alan grafiği (`HistoryChart`, %50/%80 çizgileri, ortalama/en yüksek), yük; RAM: yüzde, GB, çubuk, bellek geçmişi
+   (`memHistory` depoya eklendi), swap; Disk: tüm diskler; Load: 1/5/15 dk + çekirdek başına oran, çekirdek, açık kalma
+   süresi. Kart `data-server-status-card="<focus>"`.
+2. **Bağlanma gecikmesi:** yerelde kurulum 50–70 ms; gecikme JumpServer üzerinden taşınan veriden. Değişiklikler:
+   - Kurulum betiği gzip+base64 ile gönderilir (`buildSetupCommand` artık async, `CompressionStream`; sunucuda
+     `base64 -d | gzip -dc`); komut sonra `__jd_init <komut adları 1/0> <ölçüm aralığı>` çağırır. Satır 3890 → 1936 bayt.
+   - Geçmiş ve komut adları gzip'li yeni OSC türleriyle (h, k; `DecompressionStream`): 39,5 KB → 15,2 KB.
+   - Komut adları sunucu başına önbellekte (`stores/command-cache.ts`, kullanıcıya özel, 24 sa, en çok 20 sunucu);
+     tazeyse kurulumda istenmez.
+   - `SetupEchoGate`: ilk OSC'den sonra OSC'ler hemen yazılır, eski istem satırı yalnız görünür ilk çıktıdan (yeni
+     istem) hemen önce silinir → istem "gelip kaybolmaz". OSC parçalar arasında bölünürse durum korunur.
+   - Birim testi gerçek bash/zsh'de sıkıştırılmış kurulumu çalıştırır (I, h, k; önbellekte k yok).
+3. **Öneri ve yapay zeka pencereleri dar panelde:** ortak `features/terminal/CursorPopup.tsx` (portal; ayrı pencerede o
+   pencereye; `fixed`, imleç hücresine hizalı, uygulama penceresine sığdırılır, altta yer yoksa yukarı açılır,
+   `max-width: min(560px, 100vw-16px)`). `AutocompleteState`/`AiAnchor` artık `CursorAnchor` (x, y, height).
+   Test `dev/e2e/popups.mjs` (4 yan yana panel; etkin panel tıklamayla seçilir — liste yalnız etkin panelde açılır).
+4. **Güncelleme kurulurken donma:** electron-updater DebUpdater pkexec'i eşzamanlı çalıştırıyordu (ana süreç kilitli,
+   GNOME "yanıt vermiyor"). Artık `updater.ts` `installDeb`: `spawn('pkexec', ['/bin/sh','-c','dpkg -i "$1" ||
+   apt-get install -f -y', …])` eşzamansız; durum 'installing' ("Kuruluyor… Sistem parolanız sorulduysa girin."); 0 →
+   `app.relaunch()` + `quit`; 126/127 → "Parola penceresi kapatıldı…", yeniden denenebilir. İndirilen dosya
+   `update-downloaded` olayındaki `downloadedFile`. Test: `JUMPDESK_UPDATE_INSTALLER=deb` +
+   `JUMPDESK_TEST_DEB_INSTALLER=<betik>` (yalnız test adresiyle); update.mjs 19/19, kurulum sırasında ana süreç 1 ms.
+5. **Panel boyutu değişince düzen değişmiş sayılmıyordu:** boyutlar `use-tiling`'de yerel durumdaydı. Artık grupta
+   (`TabGroup.grow` {version, row, col}; `groupGrow` yalnız aynı `layoutVersion`'da geçerli; `setGroupGrow`); ana ve
+   ayrı pencere aynı boyutları görür. Düzen öğesi `sizes` {rows, cols (sunucu sırasına göre)} saklar (eşitse yazılmaz),
+   açılınca `openGroup` uygular; `isGroupDirty` normalize oranları %2 toleransla karşılaştırır. tools.mjs'e boyutlandırma,
+   kaydetme, yeniden açınca geri gelme denetimleri eklendi.
+6. **Tuzaklar (doğrulamada bulundu):**
+   - `CursorPopup` konum ölçülene kadar `opacity: 0` kullanır; `visibility: hidden` olursa içindeki `autoFocus` giriş
+     kutusu odak alamaz, yapay zeka sorusu terminale yazılıp komut olarak çalışır (ai.mjs bunu yakalar).
+   - tools.mjs boyutlandırma adımı: önce grup sekmesi (`named`) tıklanır (Ctrl+Shift+T sonrası etkin sekme yeni
+     bağlantıdır); ilk `role=separator` kenar çubuğununkidir, `[data-workspace] [role=separator][aria-orientation=horizontal]` seçilir.
+   - `pkill -f "out/main/index.js"` aynı Bash komutunun içindeyse kabuğun kendisini öldürür (çıkış 144); ayrı çalıştır.
+   - ESLint'te ~119 eski hata var (çoğu `components/ui/*` dönüş türü, `react-hooks/refs`); değişen dosyalar HEAD ile
+     aynı sayıda hata verir, yeni hata eklenmedi.
+   - Sonuç: ai 24/24, tools boyut adımları geçti, server-status 24/24, popups 4/4, update 19/19, server-stats birim
+     testi geçti, typecheck ve i18n 0 sorun. PR #5 (0.2.3) açık; düzeltmeler aynı PR'a eklenir.

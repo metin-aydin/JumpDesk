@@ -13,6 +13,8 @@ export interface ServerStats {
   cpu: number | null
   /** Son CPU değerleri (eskiden yeniye). */
   cpuHistory: number[]
+  /** Son bellek kullanım oranları (%; eskiden yeniye). */
+  memHistory: number[]
   /** Bayt. */
   memTotal: number
   memUsed: number
@@ -138,14 +140,20 @@ export function applySample(
       ? mem['MemFree'] + (mem['Buffers'] ?? 0) + (mem['Cached'] ?? 0)
       : undefined)
   const swapTotal = mem['SwapTotal'] ?? previous?.swapTotal ?? 0
+  const memUsed =
+    available !== undefined ? Math.max(0, memTotal - available) : (previous?.memUsed ?? 0)
   return {
     cpu,
     cpuHistory:
       cpu !== null && raw.cpu && previousCpu
         ? [...(previous?.cpuHistory ?? []), cpu].slice(-HISTORY)
         : (previous?.cpuHistory ?? []),
+    memHistory:
+      memTotal > 0 && available !== undefined
+        ? [...(previous?.memHistory ?? []), (memUsed / memTotal) * 100].slice(-HISTORY)
+        : (previous?.memHistory ?? []),
     memTotal,
-    memUsed: available !== undefined ? Math.max(0, memTotal - available) : (previous?.memUsed ?? 0),
+    memUsed,
     swapTotal,
     swapUsed:
       mem['SwapFree'] !== undefined

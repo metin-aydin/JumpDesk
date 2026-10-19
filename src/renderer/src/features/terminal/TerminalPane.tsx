@@ -17,11 +17,13 @@ import { usePreferences } from '@/stores/preferences'
 import { terminalFontSize, useFontSizes } from '@/stores/font-sizes'
 import { useSessionInfo } from '@/stores/session-info'
 import { clearStats, markStatsRequested, recordStats } from '@/stores/server-stats'
+import { cacheCommandNames, cachedCommandNames } from '@/stores/command-cache'
 import { broadcastPeers, findTab, useWorkspace } from '@/stores/workspace'
 import { aiAutocompleteReady, useAi } from '@/stores/ai'
 import { AiAssistPopup, type AiAnchor } from '@/features/ai/AiAssistPopup'
 import { useTheme } from '@/stores/theme'
 import { AutocompletePopup, type AutocompleteState } from './AutocompletePopup'
+import type { CursorAnchor } from './CursorPopup'
 import { computeSuggestions } from './autocomplete'
 import { paintInputLine } from './command-highlight'
 import { readInputLine } from './input-line'
@@ -274,6 +276,8 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       onCommandNames: (names) => {
         live.commandNames = names
         commandSet = new Set(names)
+        const assetId = findTab(useWorkspace.getState(), tabId)?.asset?.id
+        if (assetId) cacheCommandNames(assetId, names)
       },
       onStats: (payload) => recordStats(tabId, payload),
       onPromptEnd: (pos) => {
@@ -459,43 +463,28 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         closePopup()
         return
       }
-      const sr = screen.getBoundingClientRect()
-      const wr = wrap.getBoundingClientRect()
-      const cellW = sr.width / term.cols
-      const cellH = sr.height / term.rows
-      const left = Math.min(sr.left - wr.left + buf.cursorX * cellW, wr.width - 280)
-      const rowTop = sr.top - wr.top + buf.cursorY * cellH
-      const estimated = Math.max(items.length, 1) * 24 + 34
-      const above = rowTop + cellH + estimated > wr.height
       const previous = popupRef.current
       const sameItems =
         previous &&
         previous.items.map((i) => i.label).join('\n') === items.map((i) => i.label).join('\n')
-      setPopup({
-        items,
-        index: sameItems ? previous.index : 0,
-        left: Math.max(4, left),
-        top: above ? rowTop : rowTop + cellH + 2,
-        above
-      })
+      setPopup({ items, index: sameItems ? previous.index : 0, anchor: cursorAnchor(screen) })
+    }
+
+    /** İmlecin bulunduğu hücre (pencereye göre); öneri ve yapay zeka pencereleri buraya hizalanır. */
+    const cursorAnchor = (screen: Element): CursorAnchor => {
+      const sr = screen.getBoundingClientRect()
+      const buf = term.buffer.active
+      const cellW = sr.width / term.cols
+      const cellH = sr.height / term.rows
+      return { x: sr.left + buf.cursorX * cellW, y: sr.top + buf.cursorY * cellH, height: cellH }
     }
 
     /** Yapay zeka kipini imlecin hizasında açar (yalnız normal ekranda; tam ekran programlarda değil). */
     openAiRef.current = (): void => {
       const screen = term.element?.querySelector('.xterm-screen')
-      const wrap = wrapRef.current
-      const buf = term.buffer.active
-      if (!screen || !wrap || !commandLineOpen()) return
-      const sr = screen.getBoundingClientRect()
-      const wr = wrap.getBoundingClientRect()
-      const cellW = sr.width / term.cols
-      const cellH = sr.height / term.rows
-      const width = Math.min(560, wr.width * 0.92)
-      const left = Math.min(sr.left - wr.left + buf.cursorX * cellW, wr.width - width - 4)
-      const rowTop = sr.top - wr.top + buf.cursorY * cellH
-      const above = rowTop + cellH + 320 > wr.height
+      if (!screen || !commandLineOpen()) return
       closePopup()
-      setAiAnchor({ left: Math.max(4, left), top: above ? rowTop : rowTop + cellH + 2, above })
+      setAiAnchor(cursorAnchor(screen))
     }
 
     const scheduleRefresh = (): void => {
@@ -574,11 +563,19 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
           gate.start()
           const prefs = usePreferences.getState()
           if (prefs.serverStatus) markStatsRequested(tabId)
-          connRef.current?.input(
-            buildSetupCommand({
-              statsIntervalSec: prefs.serverStatus ? prefs.serverStatusInterval : 0
-            })
-          )
+          // Komut adları önbellekte tazeyse hemen kullanılır ve sunucudan istenmez.
+          const assetId = findTab(useWorkspace.getState(), tabId)?.asset?.id
+          const cached = assetId ? cachedCommandNames(assetId) : null
+          if (cached) {
+            live.commandNames = cached
+            commandSet = new Set(cached)
+          }
+          void buildSetupCommand({
+            statsIntervalSec: prefs.serverStatus ? prefs.serverStatusInterval : 0,
+            commandNames: !cached
+          }).then((command) => {
+            if (!disposed) connRef.current?.input(command)
+          })
         } else {
           runAutoCommands()
           armActivity()

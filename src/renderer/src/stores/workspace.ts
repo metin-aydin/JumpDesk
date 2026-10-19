@@ -56,6 +56,8 @@ export interface TabGroup {
   excluded: string[]
   /** Değiştikçe panel boyutları eşitlenir. */
   layoutVersion: number
+  /** Panel boyut oranları; yalnız kaydedildiği yerleşim sürümünde geçerlidir (bkz. `groupGrow`). */
+  grow?: GroupGrow
   /** Grup sekmesine dönüldüğünde odaklanacak panel. */
   focusedId: string
   /** Kayıtlı düzenden gelen ya da düzen olarak kaydedilen grubun adı; grup sekmesinde sunucu adı yerine gösterilir. */
@@ -63,6 +65,20 @@ export interface TabGroup {
   layoutId?: string
   /** Düzendeki öğenin sırası (düzen birden çok öğe içeriyorsa grubun karşılığı). */
   layoutItem?: number
+}
+
+/** Satır yükseklik oranları (satır sırasına göre) ve satır içi genişlik oranları (sekmeye göre); varsayılan 1. */
+export interface GroupGrow {
+  version: number
+  row: Record<number, number>
+  col: Record<string, number>
+}
+
+const NO_GROW = { row: {}, col: {} } as const
+
+/** Grubun geçerli panel oranları; yerleşim değişmişse (üye, mod, eşitleme) boş. */
+export function groupGrow(group: TabGroup): Pick<GroupGrow, 'row' | 'col'> {
+  return group.grow && group.grow.version === group.layoutVersion ? group.grow : NO_GROW
 }
 
 interface WorkspaceStore {
@@ -91,7 +107,13 @@ interface WorkspaceStore {
   openGroup: (
     assets: AssetRef[],
     mode: TileMode,
-    label?: { name: string; layoutId: string; layoutItem: number }
+    label?: {
+      name: string
+      layoutId: string
+      layoutItem: number
+      /** Düzende kayıtlı panel oranları: satırlar ve sunucu sırasına göre genişlikler. */
+      sizes?: { rows: number[]; cols: number[] }
+    }
   ) => void
   /** Grubu bir düzen adına bağlar (düzen olarak kaydedilince ya da düzen yeniden adlandırılınca). */
   nameGroup: (groupId: string, name: string, layoutId: string, layoutItem?: number) => void
@@ -153,6 +175,11 @@ interface WorkspaceStore {
   toggleZoom: (tabId?: string) => void
   toggleBroadcast: (groupId: string) => void
   toggleExcluded: (tabId: string) => void
+  /** Panel oranlarını günceller (tutamaçla boyutlandırma); `update` geçerli oranları alır. */
+  setGroupGrow: (
+    groupId: string,
+    update: (current: Pick<GroupGrow, 'row' | 'col'>) => Partial<Pick<GroupGrow, 'row' | 'col'>>
+  ) => void
   equalize: (groupId: string) => void
   toggleRightPanel: () => void
   setLeftPanelOpen: (open: boolean) => void
@@ -390,10 +417,17 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => ({
     const base = active?.kind === 'connect' ? tabs.filter((t) => t.id !== active.id) : tabs
     const at = active?.kind === 'connect' ? tabs.indexOf(active) : base.length
     const nextTabs = [...base.slice(0, at), ...created, ...base.slice(at)]
+    const { sizes, ...names } = label ?? {}
+    const group: TabGroup = { ...newGroup(ids, mode, ids[0]), ...(label ? names : {}) }
+    if (sizes)
+      group.grow = {
+        version: group.layoutVersion,
+        row: Object.fromEntries(sizes.rows.map((v, i) => [i, v])),
+        col: Object.fromEntries(ids.map((id, i) => [id, sizes.cols[i] ?? 1]))
+      }
     set((s) => ({
       tabs: nextTabs,
-      groups:
-        ids.length > 1 ? [...s.groups, { ...newGroup(ids, mode, ids[0]), ...label }] : s.groups,
+      groups: ids.length > 1 ? [...s.groups, group] : s.groups,
       activeId: ids[0],
       lastSessionId: ids[0]
     }))
@@ -744,6 +778,22 @@ export const useWorkspace = create<WorkspaceStore>((set, get) => ({
         }))
       }
     }),
+
+  setGroupGrow: (groupId, update) =>
+    set((s) => ({
+      groups: updateGroup(s.groups, groupId, (g) => {
+        const current = groupGrow(g)
+        const next = update(current)
+        return {
+          ...g,
+          grow: {
+            version: g.layoutVersion,
+            row: next.row ?? current.row,
+            col: next.col ?? current.col
+          }
+        }
+      })
+    })),
 
   equalize: (groupId) =>
     set((s) => ({

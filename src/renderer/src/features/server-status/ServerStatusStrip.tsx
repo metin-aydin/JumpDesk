@@ -16,7 +16,7 @@ import {
 } from '@/stores/server-stats'
 import { useSessionInfo } from '@/stores/session-info'
 import { LEVEL_CLASS, formatPercent } from './format'
-import { ServerStatusCard } from './ServerStatusCard'
+import { ServerStatusCard, type StatFocus } from './ServerStatusCard'
 
 /** Şeritteki kısa açık kalma süresi: gün, saat ya da dakika. */
 function shortUptime(t: ReturnType<typeof useT>, seconds: number): string {
@@ -34,10 +34,12 @@ const CHIP =
 function StatChip({
   tabId,
   stats,
+  focus,
   children
 }: {
   tabId: string
   stats: ServerStats
+  focus: StatFocus
   children: React.ReactNode
 }): React.JSX.Element {
   const t = useT()
@@ -49,7 +51,7 @@ function StatChip({
         {children}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 gap-0 p-3">
-        <ServerStatusCard tabId={tabId} stats={stats} />
+        <ServerStatusCard tabId={tabId} stats={stats} focus={focus} />
       </PopoverContent>
     </Popover>
   )
@@ -201,20 +203,20 @@ export function ServerStatusStrip({ tabId }: { tabId: string }): React.JSX.Eleme
       className="flex h-6 shrink-0 items-center border-b bg-muted/30 text-[11px]"
     >
       <ScrollRow>
-        <StatChip tabId={tabId} stats={stats}>
+        <StatChip tabId={tabId} stats={stats} focus="cpu">
           {t('CPU')} <span className={level(stats.cpu)}>{formatPercent(stats.cpu)}</span>
         </StatChip>
-        <StatChip tabId={tabId} stats={stats}>
+        <StatChip tabId={tabId} stats={stats} focus="mem">
           {t('RAM')} <span className={level(memPercent)}>{formatPercent(memPercent)}</span>
         </StatChip>
         {disk && (
-          <StatChip tabId={tabId} stats={stats}>
+          <StatChip tabId={tabId} stats={stats} focus="disk">
             {t('Disk')} <span className="text-muted-foreground">{disk.mount}</span>
             <span className={level(diskPercent)}>{formatPercent(diskPercent)}</span>
           </StatChip>
         )}
         {stats.load && (
-          <StatChip tabId={tabId} stats={stats}>
+          <StatChip tabId={tabId} stats={stats} focus="load">
             {t('Load')}{' '}
             <span className="text-muted-foreground">
               {new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 2 }).format(

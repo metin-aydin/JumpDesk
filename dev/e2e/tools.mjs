@@ -4,7 +4,7 @@ import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { importFixtureSnippets, login } from './helpers.mjs'
+import { importFixtureSnippets, login, runPalette } from './helpers.mjs'
 
 const out = process.argv[2] || path.join(os.tmpdir(), 'jumpdesk-tools-shots')
 fs.mkdirSync(out, { recursive: true })
@@ -482,6 +482,49 @@ try {
   await page.getByRole('menuitem', { name: 'Düzendeki Değişiklikleri Kaydet' }).click()
   await page.waitForTimeout(300)
   check('saving changes clears dirty dot', (await dirtyDot()) === 0)
+
+  // Panel boyutu değişince de düzen değişmiş sayılır; boyutlar düzende saklanır ve düzen açılınca geri gelir
+  const paneHeights = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('[data-workspace] > div.absolute')]
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0)
+        .map((r) => Math.round(r.height))
+    )
+  await named.click()
+  await page.waitForTimeout(400)
+  const separator = page
+    .locator('[data-workspace] [role="separator"][aria-orientation="horizontal"]:visible')
+    .first()
+  const sep = await separator.boundingBox()
+  await page.mouse.move(sep.x + sep.width / 2, sep.y + sep.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(sep.x + sep.width / 2, sep.y + sep.height / 2 + 90, { steps: 8 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  const resized = await paneHeights()
+  check('resizing panes shows dirty dot', (await dirtyDot()) === 1, resized.join(' / '))
+  await named.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Düzendeki Değişiklikleri Kaydet' }).click()
+  await page.waitForTimeout(300)
+  check('saving resized layout clears dirty dot', (await dirtyDot()) === 0)
+  const savedSizes = await page.evaluate(() => {
+    const entry = Object.entries(localStorage).find(([k]) => k.endsWith('/layouts'))
+    const layout = entry && JSON.parse(entry[1]).find((l) => l.name === 'Kirli Test')
+    return layout?.items[0]?.sizes ?? null
+  })
+  check('layout stores pane sizes', Boolean(savedSizes?.rows?.length), JSON.stringify(savedSizes))
+  await named.click({ button: 'middle' })
+  await page.waitForTimeout(400)
+  await runPalette(page, 'Kirli Test')
+  await named.waitFor({ timeout: 10000 })
+  await page.waitForTimeout(600)
+  const restored = await paneHeights()
+  check(
+    'reopened layout restores pane sizes',
+    restored.length === resized.length && restored.every((h, i) => Math.abs(h - resized[i]) <= 3),
+    `${resized.join(' / ')} → ${restored.join(' / ')}`
+  )
   await named.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Yan Yana Yerleştir' }).click()
   await page.waitForTimeout(300)

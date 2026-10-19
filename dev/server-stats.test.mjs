@@ -2,6 +2,7 @@
 // Kullanım: node dev/server-stats.test.mjs
 import { buildSync } from 'esbuild'
 import { execFileSync } from 'node:child_process'
+import zlib from 'node:zlib'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -82,8 +83,40 @@ for (const shell of ['bash', 'zsh']) {
 }
 
 // Kurulum komutu tek satır: satır düzenlemesi olmayan kabuklarda (kanonik kip) 4096 baytı aşan satır kesilir
-const setupLength = Buffer.byteLength(buildSetupCommand({ statsIntervalSec: 30 }))
+const setup = await buildSetupCommand({ statsIntervalSec: 30 })
+const setupLength = Buffer.byteLength(setup)
 check('setup command fits a 4096-byte terminal line', setupLength < 4096, `${setupLength} bayt`)
+
+// Sıkıştırılmış kurulum gerçek kabukta çalışır: I, sıkıştırılmış geçmiş (h) ve komut adları (k) gelir
+const oscs = (text) =>
+  [...text.matchAll(/\x1b\]6973;([A-Za-z]);([^\x07]*)\x07/g)].map((m) => ({
+    type: m[1],
+    data: m[2]
+  }))
+const gunzip = (b64) => zlib.gunzipSync(Buffer.from(b64, 'base64')).toString('utf8')
+for (const shell of ['bash', 'zsh']) {
+  try {
+    execFileSync('sh', ['-c', `command -v ${shell}`], { stdio: 'ignore' })
+  } catch {
+    continue
+  }
+  const full = oscs(
+    execFileSync(shell, ['-c', (await buildSetupCommand()).trim()], { encoding: 'utf8' })
+  )
+  const names = full.find((o) => o.type === 'k')
+  check(
+    `${shell}: compressed setup reports ip, history and command names`,
+    ['I', 'h', 'k'].every((t) => full.some((o) => o.type === t)) &&
+      gunzip(names.data).split('\n').includes('ls'),
+    full.map((o) => o.type).join('')
+  )
+  const cached = oscs(
+    execFileSync(shell, ['-c', (await buildSetupCommand({ commandNames: false })).trim()], {
+      encoding: 'utf8'
+    })
+  )
+  check(`${shell}: command names skipped when cached`, !cached.some((o) => o.type === 'k'))
+}
 
 // Eski çekirdek (MemAvailable yok), boşluklu bağlama noktası, bozuk satırlar
 const legacy = parseSample(

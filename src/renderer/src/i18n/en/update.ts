@@ -15,6 +15,8 @@ export const update: Dictionary = {
   'Sürüm {version} indirildi; kurmak için JumpDesk yeniden başlatılır.':
     'Version {version} is downloaded; JumpDesk restarts to install it.',
   'Denetlenemedi.': 'Could not check for updates.',
+  'Kuruluyor… Sistem parolanız sorulduysa girin.':
+    'Installing… Enter your system password if you are asked for it.',
   'Güncellemeleri Denetle': 'Check for Updates',
   'İndir ve Kur': 'Download and Install',
   'İndirme Sayfasını Aç': 'Open Download Page',

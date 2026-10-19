@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useWorkspace, type TabGroup } from '@/stores/workspace'
+import { groupGrow, useWorkspace, type TabGroup } from '@/stores/workspace'
 import { computeTileLayout, type Handle, type TileLayout } from './tile-layout'
 
 const MIN_PANE_PX = 160
@@ -40,23 +40,18 @@ export function useTiling(
   startPaneDrag: (e: React.PointerEvent, sourceId: string) => void
   startResize: (e: React.PointerEvent, handle: Handle) => void
 } {
-  const [grows, setGrows] = useState<
-    Record<string, { row: Record<number, number>; col: Record<string, number> }>
-  >({})
   const [paneDrag, setPaneDrag] = useState<PaneDrag | null>(null)
-  const growKey = group ? `${group.id}:${group.layoutVersion}` : ''
-  const rowGrow = useMemo(() => grows[growKey]?.row ?? {}, [grows, growKey])
-  const colGrow = useMemo(() => grows[growKey]?.col ?? {}, [grows, growKey])
-  const setRowGrow = (fn: (g: Record<number, number>) => Record<number, number>): void =>
-    setGrows((all) => ({
-      ...all,
-      [growKey]: { row: fn(all[growKey]?.row ?? {}), col: all[growKey]?.col ?? {} }
-    }))
-  const setColGrow = (fn: (g: Record<string, number>) => Record<string, number>): void =>
-    setGrows((all) => ({
-      ...all,
-      [growKey]: { row: all[growKey]?.row ?? {}, col: fn(all[growKey]?.col ?? {}) }
-    }))
+  // Oranlar grupla birlikte depoda tutulur: ana ve ayrı pencere aynı boyutları görür, düzen kaydında saklanır.
+  const grow = group ? groupGrow(group) : null
+  const rowGrow = useMemo(() => grow?.row ?? {}, [grow])
+  const colGrow = useMemo(() => grow?.col ?? {}, [grow])
+  const setGroupGrow = useWorkspace((s) => s.setGroupGrow)
+  const setRowGrow = (fn: (g: Record<number, number>) => Record<number, number>): void => {
+    if (group) setGroupGrow(group.id, (current) => ({ row: fn(current.row) }))
+  }
+  const setColGrow = (fn: (g: Record<string, number>) => Record<string, number>): void => {
+    if (group) setGroupGrow(group.id, (current) => ({ col: fn(current.col) }))
+  }
 
   const zoomedId = group ? group.zoomedId : null
   const tiledIds = group && !zoomedId ? (paneDrag?.order ?? group.ids).join('|') : ''
