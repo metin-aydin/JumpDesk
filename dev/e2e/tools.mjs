@@ -454,9 +454,9 @@ try {
     (await alarmCount()) === 0,
     String(await alarmCount())
   )
-  // Yeni alarm: ekrandaki panelin çerçevesi kırmızı yanıp söner (dört kenar da, ayırıcıya bitişik olan dahil), mavi
-  // odak çerçevesi o sırada gizlenir; bitince odak çerçevesi ayırıcıların üstünde görünür. Hareket azaltılınca çerçeve
-  // sabit çizilir, pikseller kesin ölçülür.
+  // Yeni alarm: ekrandaki panelin üzerine yarı saydam kırmızı katman gelir (ayırıcıya bitişik kenar dahil tüm panel),
+  // mavi odak çerçevesi o sırada gizlenir; bitince odak çerçevesi ayırıcıların üstünde görünür. Hareket azaltılınca
+  // katman sabit çizilir, pikseller kesin ölçülür.
   await page.emulateMedia({ reducedMotion: 'reduce' })
   /** Çerçevenin her kenarından `offset` piksel içeride (eksiyse dışarıda) ortadaki rengi döndürür. */
   const frameEdges = async (selector, offset) => {
@@ -506,16 +506,16 @@ try {
       focusFrame: document.querySelectorAll(`[data-pane-frame="${id}"] [data-focus-frame]`).length
     }
   })
-  const red = await frameEdges('[data-alarm-flash]', 0)
-  const isRed = ([r, g, b]) => r > 150 && g < 120 && b < 120
+  const red = await frameEdges('[data-alarm-flash]', 2)
+  const tinted = ([r, g, b]) => r > g + 20 && r > b + 20
   check(
-    'new alarm flashes only its pane frame without the blue ring',
+    'new alarm shows a translucent red overlay without the blue ring',
     flash.frames === 1 && flash.server && flash.focusFrame === 0,
     JSON.stringify(flash)
   )
   check(
-    'alarm frame is red on every side, also next to a separator',
-    Object.values(red).every(isRed),
+    'red overlay covers the whole pane, also next to a separator',
+    Object.values(red).every(tinted),
     JSON.stringify(red)
   )
   await shot('tools-06c-alarm-flash')

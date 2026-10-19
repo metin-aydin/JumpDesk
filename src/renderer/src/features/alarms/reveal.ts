@@ -11,7 +11,7 @@ export function revealAlarm(tabId: string, line?: string): void {
   const search = (): void => {
     if (line) terminalRegistry.get(tabId)?.openSearch(line.slice(0, 120))
   }
-  // Alarma gidilen oturumun çerçevesi yanıp sönmez; yalnız diğer paneller soluklaşır.
+  // Alarma gidilen oturumda kırmızı katman gösterilmez; yalnız diğer paneller soluklaşır.
   stopAlarmFlash(tabId)
   const ws = useWorkspace.getState()
   if (!ws.tabs.some((t) => t.id === tabId)) {

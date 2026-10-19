@@ -20,7 +20,7 @@ function isOnScreen(tabId: string): boolean {
 }
 
 /**
- * Alarm eşleşmesini kaydeder; yeni olayda oturum ekrandaysa çerçevesi kırmızı yanıp söner. Oturum odakta değilse (pencere odakta değil ya da başka sekme/panel odakta) sekmeye ve
+ * Alarm eşleşmesini kaydeder; yeni olayda oturum ekrandaysa üzerinde yarı saydam kırmızı katman gelip gider. Oturum odakta değilse (pencere odakta değil ya da başka sekme/panel odakta) sekmeye ve
  * grup içindeyse panel başlığına kırmızı rozet konur; rozet yalnız o oturuma odaklanınca kalkar. Oturum ekranda da
  * değilse yeni olay için masaüstü bildirimi gösterilir (Ayarlar → Bildirimler'de kapatılabilir); aynı sekme + kural
  * için bildirimler seyreltilir.

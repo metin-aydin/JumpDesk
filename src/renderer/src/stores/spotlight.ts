@@ -2,13 +2,16 @@ import { create } from 'zustand'
 
 /** Alarma gidilince gruptaki diğer panellerin soluk kaldığı süre. */
 export const SPOTLIGHT_MS = 2000
-/** Yeni alarmda çerçevenin yanıp sönme süresi: dört kez (`animate-alarm-flash`). */
+/** Yeni alarmda yarı saydam kırmızı katmanın gelip gitme süresi: dört kez (`animate-alarm-flash`). */
 export const ALARM_FLASH_MS = 2000
 
 interface SpotlightStore {
   /** Alarma gidilen oturum; gruptaki diğer paneller soluklaşır. Süre dolunca null. */
   tabId: string | null
-  /** Yeni alarm gelen oturumlar; çerçeveleri kırmızı yanıp söner. Değer her alarmda artar (animasyon baştan başlar). */
+  /**
+   * Yeni alarm gelen oturumlar; üzerlerinde kırmızı katman gelip gider. Değer her alarmda artar (animasyon baştan
+   * başlar).
+   */
   flashes: Record<string, number>
 }
 
@@ -28,7 +31,7 @@ export function spotlight(tabId: string): void {
   }, SPOTLIGHT_MS)
 }
 
-/** Oturumun çerçevesindeki alarm yanıp sönmesini hemen bitirir. */
+/** Oturumun üzerindeki alarm katmanını hemen kaldırır. */
 export function stopAlarmFlash(tabId: string): void {
   const timer = flashTimers.get(tabId)
   if (!timer) return
@@ -41,7 +44,7 @@ export function stopAlarmFlash(tabId: string): void {
   })
 }
 
-/** Yeni alarm gelen oturumun çerçevesini kırmızı yanıp söndürür (oturum ekrandaysa görünür). */
+/** Yeni alarm gelen oturumun üzerinde yarı saydam kırmızı katmanı dört kez gösterir (oturum ekrandaysa görünür). */
 export function flashAlarm(tabId: string): void {
   const previous = flashTimers.get(tabId)
   if (previous) clearTimeout(previous)

@@ -173,8 +173,8 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
       })}
       {paneDrag && <DragGhost drag={paneDrag} tab={tabs.find((t) => t.id === paneDrag.sourceId)} />}
       <TileHandles layout={layout} onResize={startResize} />
-      {/* Odak ve alarm çerçeveleri ayırıcıların üstünde çizilir: ayırıcının çizgisi panel kenarına denk gelir ve panelin
-          içindeki çerçeveyi örter. Katman tıklama almaz, ayırıcılar sürüklenebilir kalır. */}
+      {/* Odak çerçevesi ve alarm katmanı ayırıcıların üstünde çizilir: ayırıcının çizgisi panel kenarına denk gelir ve
+          panelin kenarını örter. Katman tıklama almaz, ayırıcılar sürüklenebilir kalır. */}
       {tabs.map((tab) => {
         const rect = layout?.rects.get(tab.id)
         const visible = rect ? true : zoomedId ? tab.id === zoomedId : tab.id === activeId
@@ -194,7 +194,7 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
               <div
                 key={flash}
                 data-alarm-flash
-                className="absolute inset-0 border-2 border-destructive animate-alarm-flash motion-reduce:animate-none"
+                className="absolute inset-0 bg-destructive/20 animate-alarm-flash motion-reduce:animate-none"
               />
             )}
           </div>

@@ -1094,3 +1094,9 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    tabs, smoke, group-perf 3×5: 35 ms). Commit `36eabb6` pushlandı, PR #5 sürüm notuna çerçeve düzeltmesi eklendi.
    Not: kullanıcı `npx electron-vite dev -- … --log-level=3 --remote-debugging-port=9222` ile açınca vaapi/NSS/vsync
    satırları kayboldu. Dev başlatmak `out/main` ve `out/preload`'ı yeniden yazar (e2e testleri `out/`'u kullanır).
+
+## Kullanıcı isteği — 44. tur (2026-10-19): kırmızı çerçeve yerine yarı saydam kırmızı katman
+- Kullanıcı kırmızı çerçeveden vazgeçti: yeni alarmda panelin üzerine `bg-destructive/20` katman (`data-alarm-flash`,
+  aynı `animate-alarm-flash` ile 4 kez gelip gider, hareket azaltmada sabit; çerçeve katmanında, ayırıcıların üstünde).
+  Odak halkası katman sırasında yine gizlenir. tools.mjs: "red overlay covers the whole pane, also next to a separator"
+  (kenarlardan 2 px içeride piksel [248,216,217]). tools 69/69. PR #5 sürüm notu güncellendi.
