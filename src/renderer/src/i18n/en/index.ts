@@ -4,6 +4,7 @@ import { app } from './app'
 import { common } from './common'
 import { panels } from './panels'
 import { terminal } from './terminal'
+import { serverStatus } from './server-status'
 import { tree } from './tree'
 import { update } from './update'
 import { workspace } from './workspace'
@@ -17,5 +18,6 @@ export const EN: Dictionary = {
   ...terminal,
   ...app,
   ...ai,
-  ...update
+  ...update,
+  ...serverStatus
 }

@@ -1,4 +1,5 @@
 import {
+  Activity,
   ArchiveRestore,
   Bell,
   Check,
@@ -43,14 +44,17 @@ import {
   type NotificationSettings
 } from '@/stores/notification-settings'
 import { useTheme } from '@/stores/theme'
+import { SERVER_STATUS_INTERVALS, usePreferences } from '@/stores/preferences'
 
-type SectionId = 'language' | 'fonts' | 'notifications' | 'ai' | 'backup' | 'updates'
+type SectionId =
+  'language' | 'fonts' | 'notifications' | 'serverStatus' | 'ai' | 'backup' | 'updates'
 
 /** Ayar grupları; adlar Türkçe kaynak metindir, ekranda `t()` ile çevrilir. */
 const SECTIONS: { id: SectionId; label: string; Icon: typeof Type }[] = [
   { id: 'language', label: 'Dil', Icon: Languages },
   { id: 'fonts', label: 'Yazı Boyutu', Icon: Type },
   { id: 'notifications', label: 'Bildirimler', Icon: Bell },
+  { id: 'serverStatus', label: 'Sunucu Durumu', Icon: Activity },
   { id: 'ai', label: 'Yapay Zeka', Icon: Sparkles },
   { id: 'backup', label: 'Dışa / İçe Aktarma', Icon: ArchiveRestore },
   { id: 'updates', label: 'Güncellemeler', Icon: RefreshCw }
@@ -413,6 +417,60 @@ function NotificationsSection(): React.JSX.Element {
   )
 }
 
+/** Sunucu durumu şeridi: aç/kapat ve yenileme aralığı (kullanıcıya özel, varsayılan kapalı). */
+function ServerStatusSection(): React.JSX.Element {
+  const t = useT()
+  const enabled = usePreferences((s) => s.serverStatus)
+  const interval = usePreferences((s) => s.serverStatusInterval)
+  const set = usePreferences((s) => s.set)
+  return (
+    <div className="space-y-5">
+      <div className="divide-y rounded-lg border">
+        <SettingRow
+          title={t('Sunucu Durum Şeridi')}
+          description={t(
+            'Linux sunucularda CPU, bellek, disk ve yük bilgisi başlığın altındaki şeritte gösterilir; çipe tıklayınca ayrıntılar açılır.'
+          )}
+        >
+          <Switch
+            checked={enabled}
+            onCheckedChange={(v) => set({ serverStatus: v })}
+            aria-label={t('Sunucu Durum Şeridi')}
+          />
+        </SettingRow>
+        <SettingRow
+          title={t('Yenileme Aralığı')}
+          description={t('Yeni bağlantılarda ve şeritten başlatılan ölçümlerde geçerlidir.')}
+        >
+          <div className="flex shrink-0 gap-1">
+            {SERVER_STATUS_INTERVALS.map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                aria-pressed={interval === sec}
+                onClick={() => set({ serverStatusInterval: sec })}
+                className={cn(
+                  'h-7 rounded-md border px-2.5 text-[12px] tabular-nums transition-colors',
+                  interval === sec
+                    ? 'border-primary/60 bg-primary/10 font-medium text-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+              >
+                {t('{n} sn', { n: sec })}
+              </button>
+            ))}
+          </div>
+        </SettingRow>
+      </div>
+      <p className="text-[11.5px] text-muted-foreground">
+        {t(
+          'Ölçümü, bağlanınca sunucuda arka planda çalışan küçük bir döngü yapar; sunucuya hiçbir şey kurulmaz ve bilgiler yalnız bu uygulamada gösterilir. Tam ekran programlar (vim, less, top) açıkken ölçüm durur. Ayarı açmadan önce bağlanılan oturumlarda şeritteki "Durumu Göster" ile başlatılır; ayar kapatılınca açık oturumlardaki ölçüm oturum bitene kadar sürer.'
+        )}
+      </p>
+    </div>
+  )
+}
+
 function BackupSection(): React.JSX.Element {
   const t = useT()
   const close = (): void => useDialogs.getState().setSettings(false)
@@ -503,6 +561,10 @@ const SECTION_INFO: Record<SectionId, { title: string; description: string }> = 
     title: 'Bildirimler',
     description: 'Alarm bildirimleri ve bağlantıdan sonra alarmların bekletildiği süreler.'
   },
+  serverStatus: {
+    title: 'Sunucu Durumu',
+    description: 'Bağlı sunucuların CPU, bellek, disk ve yük bilgisi.'
+  },
   ai: {
     title: 'Yapay Zeka',
     description: 'Yapay zeka sağlayıcısı ve yapay zeka ile çalışan özellikler.'
@@ -563,6 +625,7 @@ export function SettingsDialog(): React.JSX.Element {
           {section === 'language' && <LanguageSection />}
           {section === 'fonts' && <FontsSection />}
           {section === 'notifications' && <NotificationsSection />}
+          {section === 'serverStatus' && <ServerStatusSection />}
           {section === 'ai' && <AiSettingsSection />}
           {section === 'backup' && <BackupSection />}
           {section === 'updates' && <UpdatesSection />}

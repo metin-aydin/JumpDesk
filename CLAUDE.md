@@ -54,7 +54,7 @@ boşluk eklenmez.
 
 - `npm run mock` — mock JumpServer (127.0.0.1:18080)
 - `npm run dev:mock` / `npm run dev` — mock'a / gerçek sunucuya karşı geliştirme
-- `npm run typecheck`, `npm run build`, `node dev/e2e/{smoke,sftp,tabs,menus,panels,home,tools,rdp,windows,multiwindow,alarm-warmup,transfer,server-address,i18n,ai,update}.mjs <klasör>` — doğrulama (mock açıkken)
+- `npm run typecheck`, `npm run build`, `node dev/e2e/{smoke,sftp,tabs,menus,panels,home,tools,rdp,windows,multiwindow,alarm-warmup,transfer,server-address,i18n,ai,update,server-status}.mjs <klasör>` — doğrulama (mock açıkken)
 - e2e ortak adımları `dev/e2e/helpers.mjs`: giriş (önce sunucu adresi ekranı, sonra mock form), şifreli `.jumpdesk`
   fixture yazma/çözme, dosya penceresi taklidi, snippet fixture'ı içe aktarma (uygulamada yerleşik snippet yok).
 - Paketleme: `npm run build && npx electron-builder --linux` (AppImage + deb), `npx electron-builder --win portable
@@ -75,6 +75,8 @@ boşluk eklenmez.
   sürüm package.json'dan gelsin). Gerçek paketle: iki AppImage üretilir (`-c.directories.output=<klasör>`,
   yenisinde `-c.extraMetadata.version=X`), sonra `node dev/e2e/packaged-update.mjs <eski.AppImage> <yeni-klasör>`.
 - Sürüm hesabı ve sürüm notu birim testleri: `node dev/next-version.test.mjs`, `node dev/release-notes.test.mjs`.
+- Sunucu durumu birim testi: `node dev/server-stats.test.mjs` (kabuk betiği bash ve zsh'de bu makinenin `/proc`'uyla,
+  ayrıştırıcı, kurulum komutunun 4096 bayt sınırı). Kabuk entegrasyonu betiği değişince çalıştırılır.
 
 ## Dallar ve sürümler
 

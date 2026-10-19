@@ -838,3 +838,59 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    doğası). 14 terminal (12 WebGL + 2 DOM): geçiş ≤ 48 ms. font-perf artık DOM çizicide (WebGL kipinde yazı boyutu
    yalnız tuvalde; denetim `.xterm-rows` okur): en uzun 75 ms. windows.mjs'e geçmiş vurgusu ve fare seçimi/kopyalama
    denetimleri eklendi.
+7. **Gönderildi:** `development` `c3a2530`, PR #4 https://github.com/metin-aydin/JumpDesk/pull/4 ("JumpDesk 0.2.2:
+   faster tab switching", sürüm notu açıklamada). Kullanıcı "PR aç ve yeni sürümle yayına al" dedi; `gh pr merge`
+   izin denetiminde reddedildi ("Merge Without Review") → birleştirme kullanıcıda. Birleşince v0.2.2 yayımlanır.
+   Doğrulama: windows 47/47 (WebGL ve DOM), tools 53, panels 13, multiwindow 21, alarm-warmup 5, smoke, tabs, sftp,
+   font-perf, birim testleri, i18n 0 sorun.
+
+## Kullanıcı istekleri — 38. tur (2026-10-19): sunucu durum çubuğu (tartışma, kod yok)
+1. İstek: sekmenin tepesinde sunucunun RAM, CPU gibi bilgilerini gösteren bir çubuk; "önce tartışalım".
+2. Sunulan veri yolları: (1, önerilen) mevcut kabuk entegrasyonuna (OSC 6973, türler C/L/X/I/H/K/B) yeni tür (ör. M)
+   ve kurulum betiğinde arka planda 5 sn'de bir `/proc`'tan CPU/RAM/disk/load okuyan, `disown` edilmiş, kabuk ölünce
+   biten döngü; tam ekran programlar (vim, less, top…) öndeyken susar (çıktı arasına girip dizi bozmasın), yalnız
+   Linux; (2) sunucu başına ayrı gizli koko oturumu (JumpServer'da ikinci oturum, kayıt, parola soran hesapta çalışmaz);
+   (3) yalnız JumpServer'ın topladığı sabit bilgiler (gathered_info; canlı değil, boş olabilir).
+3. Yerleşim önerisi: tek sekmede terminalin üstünde ince şerit (şu an tek oturumda üst çubuk yok), grupta mevcut
+   `PaneHeader`'a kısa çipler; eşik renkleri; üzerine gelince ayrıntı kartı; ayarlarda aç/kapat ve aralık.
+4. Kullanıcıdan beklenen kararlar: veri yolu, varsayılan açık/kapalı, grupta yerleşim, gösterilecek değerler.
+   PR #4 (0.2.2) birleştirmesi hâlâ kullanıcıda.
+5. **Kullanıcı kararları (2026-10-19):** veri yolu 1 (aynı oturumda görünmez ölçüm döngüsü), varsayılan **kapalı**,
+   değerler yeterli (CPU, RAM, Disk, Load, açık kalma süresi). Tıklayınca ayrıntı: ayrı pencere ya da aşağı açılan
+   panel. Kullanıcı karar için görsel istedi → sohbette 4 maket gösterildi (show_widget): A grupta panel başlığında
+   çipler, B grupta başlık altında ayrı şerit, C tıklayınca süzülen ayrıntı kartı, D şeridin altında açılan panel
+   (terminali iter). Eşik: sarı %80, kırmızı %90. Seçim (A/B ve C/D) bekleniyor.
+6. Kullanıcı çipleri beğendi, çiplerin alt çubukta olduğu bir örnek istedi → 3 maket daha: E grupta her panelin
+   altında çip çubuğu (Load + açık kalma süresi de sığar), F tek sekmede terminalin altında çip çubuğu, çipe tıklayınca
+   kart yukarı açılır (CPU çipinde küçük çizgi grafik, "3 sn önce"), G grupta pencerenin altında tek ortak çubuk
+   (odaktaki panel; eşik aşan panelin başlığında kırmızı nokta). Seçim bekleniyor.
+7. Düzeltme: kullanıcının "alt bar"dan kastı **başlık çubuğunun hemen altı** (terminalin altı değil). Yeni maketler:
+   H grupta panel başlığının altında çip şeridi (CPU, RAM, Disk, Load çipleri + sağda açık kalma süresi), I tek
+   sekmede sekme çubuğunun altında çip şeridi, çipe tıklayınca ayrıntı kartı aşağı açılır (terminalin üstünde süzülür).
+   Önerilen: H + I (24 px şerit, her iki görünümde aynı yerde). Onay bekleniyor.
+8. **Son karar (2026-10-19):** H (başlığın hemen altında çip şeridi) hem grupta hem tek sekmede. Ek istekler: dar
+   panelde çipler yatay kayar; kaydırma çubuğu yer kaplamaz ve ince; tekerlek yatay kaydırır; sağdaki açık kalma süresi
+   sabit; çipe tıklayınca açılan kart sabit genişlikte ve dar panelde kırpılmaz.
+9. **Uygulama:**
+   - Kabuk: `shell-integration.ts` `STATS_SCRIPT` (`__jd_ss` güvenli an: kabuk önde ya da öndeki program tam ekran/uzak
+     bağlantı değil — `/proc/$$/stat` tpgid/pgrp + `/proc/<tpgid>/comm`; `__jd_sm` örnek; `__jd_sl` döngü, ilk örnekten
+     1 sn sonra ikinci örnek, sonra aralık; `__jd_stat_start <sn>` alt kabukta `$( (… & echo $!) )` ile başlatır: işlem
+     tablosuna girmez, iş iletisi basmaz, SIGINT'i yok sayar, `kill -0 $$` ile kabuk ölünce biter; `__jd_stat_stop`).
+     Disk (`df -Pkl`) ve çekirdek/OS ilk ve her 6. örnekte. Yeni OSC türü M. `SETUP_MARKER` `__ngj` → `__jd_`
+     (eski addan kalan iz; artık `__jd_` içeren komutlar geçmişe ve önerilere girmez).
+   - Kurulum komutu tek satır: 4096 bayt sınırı (satır düzenlemesiz `sh` hesaplarında aşılırsa kapanmamış tırnakla
+     `>` istemi kalır). Betik bu yüzden kısa: komut 3866 (kapalı) / 3890 (açık) bayt; birim testi sınırı denetler.
+   - Uygulama: `stores/server-stats.ts` (ayrıştırıcı, CPU yüzdesi önceki sayaçlarla, eski çekirdekte MemAvailable
+     yoksa MemFree+Buffers+Cached, 40 değerlik CPU geçmişi, `requested` bayrağı), `features/server-status/`
+     (`ServerStatusStrip` — ScrollRow: yerel kaydırma çubuğu gizli, 3 px sürüklenebilir gösterge, tekerlek yatay; her
+     çip ayrı Popover, kart `w-80` sayfaya çizilir, Base UI pencere kenarında içeri kaydırır; `ServerStatusCard`;
+     `format.ts`), `SessionView` (Linux SSH'de terminalin üstünde), tercihler `serverStatus` (varsayılan kapalı) ve
+     `serverStatusInterval` (5/10/30), Ayarlar → Sunucu Durumu, İngilizce sözlük `i18n/en/server-status.ts`.
+   - Ayar sonradan açılırsa açık oturumda "Durumu Göster" çipi `__jd_stat_start` komutunu (istemdeyken) gönderir;
+     kapatılınca çalışan döngüler oturum bitene kadar sürer (veri yok sayılır).
+10. **Doğrulama:** `dev/server-stats.test.mjs` (bash + zsh, gerçek /proc), `dev/e2e/server-status.mjs` 18/18 (DOM
+    çizicide; varsayılan kapalı, elle/kendiliğinden başlatma, jobs boş, dar panelde kaydırma/tekerlek/3 px gösterge/
+    sabit süre, kart 320 px ve pencere içinde, `less` sırasında güncelleme durur, kapatınca şerit gider).
+    Tuzak: kart açılış animasyonu (%95 ölçekten) sırasında genişlik 304 ölçülür; 400 ms beklenir.
+11. PR #4 kullanıcı tarafından birleştirildi (2026-10-17, `95dbea5`), **v0.2.2 yayımlandı**. Yeni `development` güncel
+    main'den açıldı; sunucu durumu işi onun üstünde.

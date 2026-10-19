@@ -24,6 +24,7 @@ import { useAuth } from '@/stores/auth'
 import { useSessionInfo } from '@/stores/session-info'
 import { useServerMeta } from '@/stores/server-meta'
 import { useWorkspace, type WorkspaceTab } from '@/stores/workspace'
+import { ServerStatusStrip } from '@/features/server-status/ServerStatusStrip'
 
 const TERMINAL_PROTOCOLS = ['ssh', 'telnet']
 const GRAPHICAL_PROTOCOLS = ['rdp', 'vnc']
@@ -558,15 +559,17 @@ export function SessionView({
     )
   }
 
+  const integrate = phase.protocol === 'ssh' && osKind(phase.detail.type?.value) === 'linux'
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      {integrate && <ServerStatusStrip tabId={tab.id} />}
       <TerminalPane
         key={phase.token.id}
         tabId={tab.id}
         wsUrl={wsUrlFor(server, phase.token.id)}
         visible={visible}
         active={active}
-        integrate={phase.protocol === 'ssh' && osKind(phase.detail.type?.value) === 'linux'}
+        integrate={integrate}
         autoRunCommands={autoRunCommands}
         onIps={onIps}
         onActivity={onActivity}

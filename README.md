@@ -36,6 +36,8 @@ when you need one. It works with JumpServer v4 (Community edition) on Linux, Win
 - **AI autocomplete (optional)**: ask a question in the terminal and pick a suggested command. Supports Anthropic,
   OpenAI, Google Gemini, Azure OpenAI and OpenAI-compatible servers (Ollama, LM Studio, vLLM). Only the question and the
   server type are sent; commands are written to the prompt and never run without your Enter.
+- **Server status strip (optional)**: CPU, memory, disk and load of Linux servers in a strip below the header, with
+  a details card; measured by a small background loop in the session, nothing is installed on the server.
 - **Encrypted export/import** of snippets, rules, highlights, layouts and settings (`.jumpdesk` files).
 - **In-app updates** from GitHub Releases for the AppImage, .deb, Windows installer and macOS builds; the portable
   Windows build links to the new version's download page.

@@ -16,6 +16,7 @@ import { previewRegistry } from '@/features/workspace/preview-registry'
 import { usePreferences } from '@/stores/preferences'
 import { terminalFontSize, useFontSizes } from '@/stores/font-sizes'
 import { useSessionInfo } from '@/stores/session-info'
+import { clearStats, markStatsRequested, recordStats } from '@/stores/server-stats'
 import { broadcastPeers, findTab, useWorkspace } from '@/stores/workspace'
 import { aiAutocompleteReady, useAi } from '@/stores/ai'
 import { AiAssistPopup, type AiAnchor } from '@/features/ai/AiAssistPopup'
@@ -274,6 +275,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         live.commandNames = names
         commandSet = new Set(names)
       },
+      onStats: (payload) => recordStats(tabId, payload),
       onPromptEnd: (pos) => {
         submittedFrom = null
         autoSuggest = true
@@ -570,7 +572,13 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         if (propsRef.current.integrate) {
           info.patch(tabId, { integration: 'pending' })
           gate.start()
-          connRef.current?.input(buildSetupCommand())
+          const prefs = usePreferences.getState()
+          if (prefs.serverStatus) markStatsRequested(tabId)
+          connRef.current?.input(
+            buildSetupCommand({
+              statsIntervalSec: prefs.serverStatus ? prefs.serverStatusInterval : 0
+            })
+          )
         } else {
           runAutoCommands()
           armActivity()
@@ -739,6 +747,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       connRef.current = null
       terminalRegistry.delete(tabId)
       previewRegistry.delete(tabId)
+      clearStats(tabId)
       forgetTerminal(term)
       term.dispose()
       termRef.current = null
