@@ -137,7 +137,7 @@ export function registerIpc(win: BrowserWindow): void {
     }
   })
   on(IPC.notifyShow, (raw) => {
-    const opts = raw as { title?: unknown; body?: unknown; tabId?: unknown }
+    const opts = raw as { title?: unknown; body?: unknown; tabId?: unknown; line?: unknown }
     if (process.env['JUMPDESK_NO_NOTIFY']) {
       const sink = globalThis as { __jumpdeskNotifications?: unknown[] }
       ;(sink.__jumpdeskNotifications ??= []).push(opts)
@@ -150,6 +150,7 @@ export function registerIpc(win: BrowserWindow): void {
       icon
     })
     const tabId = asString(opts.tabId, 'tabId')
+    const line = typeof opts.line === 'string' ? opts.line.slice(0, 1000) : ''
     shown.add({ tabId, notification: n })
     n.on('close', () => {
       for (const entry of shown) if (entry.notification === n) shown.delete(entry)
@@ -158,7 +159,7 @@ export function registerIpc(win: BrowserWindow): void {
       if (win.isMinimized()) win.restore()
       win.show()
       win.focus()
-      win.webContents.send(IPC.notifyClicked, tabId)
+      win.webContents.send(IPC.notifyClicked, { tabId, line })
     })
     n.show()
   })

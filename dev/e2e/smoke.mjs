@@ -304,7 +304,8 @@ async function run() {
   await shot('06b-zoomed')
   await page.keyboard.press('Control+Shift+Enter')
   await page.waitForTimeout(500)
-  await page.getByRole('button', { name: 'Grubu ayır' }).first().click()
+  await page.locator('[data-tab-strip] [role=tab]').first().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Grubu Ayır' }).click()
   await page.waitForTimeout(500)
   log(`tabs after ungroup: ${await page.getByRole('tab').count()}`)
   const tabOrder = async () =>

@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
 import { cn } from '@/lib/utils'
+import { MENU_TEXT, menuText } from './menu-text'
 import { usePortalContainer } from '@/lib/portal-container'
 import { ChevronRightIcon, CheckIcon } from 'lucide-react'
 
@@ -72,6 +73,7 @@ function DropdownMenuItem({
   className,
   inset,
   variant = 'default',
+  children,
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean
@@ -87,7 +89,9 @@ function DropdownMenuItem({
         className
       )}
       {...props}
-    />
+    >
+      {menuText(children)}
+    </MenuPrimitive.Item>
   )
 }
 
@@ -113,7 +117,7 @@ function DropdownMenuSubTrigger({
       )}
       {...props}
     >
-      {children}
+      {menuText(children)}
       <ChevronRightIcon className="ml-auto" />
     </MenuPrimitive.SubmenuTrigger>
   )
@@ -171,7 +175,7 @@ function DropdownMenuCheckboxItem({
           <CheckIcon />
         </MenuPrimitive.CheckboxItemIndicator>
       </span>
-      {children}
+      {menuText(children)}
     </MenuPrimitive.CheckboxItem>
   )
 }
@@ -206,7 +210,7 @@ function DropdownMenuRadioItem({
           <CheckIcon />
         </MenuPrimitive.RadioItemIndicator>
       </span>
-      {children}
+      {menuText(children)}
     </MenuPrimitive.RadioItem>
   )
 }
@@ -227,6 +231,7 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<'spa
       data-slot="dropdown-menu-shortcut"
       className={cn(
         'ml-auto text-[0.625rem] tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground',
+        MENU_TEXT,
         className
       )}
       {...props}

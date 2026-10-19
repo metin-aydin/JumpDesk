@@ -2,6 +2,13 @@ import type { Terminal } from '@xterm/xterm'
 
 type SelectionPoint = [number, number] | undefined
 
+/** xterm'in duraklatılmışken boyut değişikliğini beklettiği görev (`DebouncedIdleTask`). */
+interface PausedResizeTask {
+  set(task: () => void): void
+  flush(): void
+  _queue?: { clear?(): void }
+}
+
 /** xterm'in iç çizim hizmetinin bu yamada kullanılan alanları (xterm 6). */
 interface RenderServiceInternals {
   _isPaused: boolean
@@ -16,6 +23,16 @@ interface RenderServiceInternals {
   ): void
   handleBlur(): void
   handleFocus(): void
+  _pausedResizeTask?: PausedResizeTask
+  setRenderer?(renderer: unknown): void
+  handleCharSizeChanged?(): void
+  handleDevicePixelRatioChange?(): void
+}
+
+/** xterm'in kaydırma alanı (`Viewport`): kaydırma konumunu piksel olarak, satır yüksekliğiyle çarpıp tutar. */
+interface ViewportInternals {
+  _latestYDisp?: number
+  _sync(ydisp?: number): void
 }
 
 interface PatchState {
@@ -27,6 +44,12 @@ interface PatchState {
 
 const STATE = Symbol('jumpdesk.renderPatch')
 type PatchedService = RenderServiceInternals & { [STATE]?: PatchState }
+
+function viewport(term: Terminal): ViewportInternals | null {
+  const vp = (term as unknown as { _core?: { _viewport?: Partial<ViewportInternals> } })._core
+    ?._viewport
+  return vp && typeof vp._sync === 'function' ? (vp as ViewportInternals) : null
+}
 
 function renderService(term: Terminal): PatchedService | null {
   const core = (term as unknown as { _core?: { _renderService?: unknown } })._core
@@ -52,6 +75,16 @@ function renderService(term: Terminal): PatchedService | null {
  * yerleşimle yeniden ölçülür ve arayüz saniyelerce kilitlenir. Duraklatılmışken bu bildirimler saklanır; çizim
  * sürünce xterm tam çizimle birlikte uygular. Seçim hiç yokken gelen seçim bildirimi (görünür terminalde de her
  * kaydırmada tüm satırları yeniden çizdirir) atlanır.
+ *
+ * Duraklatılmışken gelen boyut değişikliğini xterm boşta çalışan bir göreve bırakır; görev terminal gizliyken de
+ * çalışır ve DOM çizicide aynı pahalı tam çizimi yapar (WebGL bağlamı bırakılan gizli terminal DOM çiziciye geçerken
+ * de boyut bildirimi alır). Görev yalnız saklanır; terminal görünür olunca xterm onu tam çizimden hemen önce çalıştırır.
+ *
+ * Kaydırma alanı konumu piksel olarak tutar ve yalnız görünen satır değişince yeniden hesaplar; WebGL ve DOM
+ * çizicilerin satır yüksekliği (kesirli yakınlaştırmada) birkaç binde bir piksel farklıdır. Çizici değişince eski
+ * piksel konumu yeni yükseklikle birkaç satır yukarıyı gösterir; sonraki kaydırma olayında xterm bunu kullanıcı yukarı
+ * kaydırmış gibi uygular (terminal yeni çıktıyı izlemeyi bırakır). Çizici, yazı boyutu ya da piksel oranı değişince
+ * konum görünen satırdan yeniden hesaplanır.
  *
  * `term.open` sonrasında çağrılır (çizim hizmeti açılışta kurulur); xterm'in iç yapısı beklenenden farklıysa hiçbir
  * şey değiştirilmez.
@@ -87,6 +120,39 @@ export function patchHiddenRendering(term: Terminal): void {
   service.handleBlur = () => {
     if (service._isPaused) state.pendingFocus = 'blur'
     else state.blur()
+  }
+  const vp = viewport(term)
+  const resync = (): void => {
+    if (!vp) return
+    vp._latestYDisp = undefined
+    vp._sync()
+  }
+  for (const name of [
+    'setRenderer',
+    'handleCharSizeChanged',
+    'handleDevicePixelRatioChange'
+  ] as const) {
+    const original = service[name]
+    if (typeof original !== 'function') continue
+    service[name] = ((...args: unknown[]) => {
+      ;(original as (...a: unknown[]) => void).apply(service, args)
+      resync()
+    }) as never
+  }
+  const resize = service._pausedResizeTask
+  if (resize && typeof resize.set === 'function' && typeof resize.flush === 'function') {
+    resize._queue?.clear?.()
+    let pending: (() => void) | null = null
+    service._pausedResizeTask = {
+      set: (task) => {
+        pending = task
+      },
+      flush: () => {
+        const task = pending
+        pending = null
+        task?.()
+      }
+    }
   }
   service[STATE] = state
 }

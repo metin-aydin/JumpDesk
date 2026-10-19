@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { revealAlarm } from '@/features/alarms/reveal'
 import {
   Bell,
   BellOff,
@@ -25,11 +26,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { openExport, openImport } from '@/features/transfer/actions'
 import { TransferContextMenu } from '@/features/transfer/TransferContextMenu'
-import { terminalRegistry } from '@/features/terminal/registry'
 import { currentLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { compileRule, useAlarms, type AlarmEvent } from '@/stores/alarms'
-import { focusDetached } from '@/features/windows/detached-windows'
 import { useWorkspace } from '@/stores/workspace'
 
 /** Olay saati geçerli dilin biçimiyle yazılır; biçimleyici her dil için bir kez oluşturulur. */
@@ -176,18 +175,9 @@ function RuleEditor(): React.JSX.Element {
   )
 }
 
-/** Olayın geldiği oturuma geçer ve terminalde o satırı aratır. */
+/** Olayın geldiği oturuma geçer, oturumu öne çıkarır ve terminalde o satırı aratır. */
 function revealEvent(event: AlarmEvent): void {
-  const ws = useWorkspace.getState()
-  if (!ws.tabs.some((t) => t.id === event.tabId)) {
-    if (focusDetached(event.tabId))
-      terminalRegistry.get(event.tabId)?.openSearch(event.line.slice(0, 120))
-    return
-  }
-  ws.activate(event.tabId)
-  requestAnimationFrame(() =>
-    terminalRegistry.get(event.tabId)?.openSearch(event.line.slice(0, 120))
-  )
+  revealAlarm(event.tabId, event.line)
 }
 
 function EventRow({ event, exists }: { event: AlarmEvent; exists: boolean }): React.JSX.Element {

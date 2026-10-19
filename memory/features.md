@@ -1000,3 +1000,74 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    UI yazı boyutu yok → yakınlık 1): simge merkezi = metin kutusu merkezi (0,25 px), vurgu kutusu içinde de ortalı;
    büyük harf merkezi simgeyle aynı, küçük harf gövdesi ~1,3 px aşağıda (Ubuntu yazı tipi ölçüleri). %110'da metin
    ~0,5 px yukarıda. Kullanıcının gördüğü fark doğrulanamadı → ekran görüntüsü istendi; değişiklik yapılmadı.
+7. **Donmanın kök nedeni (kullanıcının çalışan uygulamasından iz alındı):** kullanıcı dev'i
+   `--remote-debugging-port=9222` ile açtı; CDP ile (`chromium.connectOverCDP`, Profiler + Tracing renderer+GPU)
+   2 dk kayıt: 5–6,5 sn'lik uzun görevler art arda (tıklamadan sonra ~40 sn zincir). Profil: 63 sn `WidthCache._measure`
+   ← DOM çizici `renderRows/createRow` ← `DomRenderer.handleResize` ← xterm `_pausedResizeTask` (boşta görev,
+   `FireIdleCallback`). İz: görev başına ~1870 zorunlu stil hesabı, her biri ~3,3 ms (582 öğe).
+   Zincir: 15 terminal > WebGL havuzu (12) → grup geçişinde LRU bağlam bırakır → WebGL eklentisi dispose'da
+   `setRenderer(DOM)` + `handleResize(cols, rows)` çağırır → duraklatılmış terminalde xterm boyutu boşta çalışan göreve
+   bırakır → görev gizli (display:none) terminalin tüm satırlarını çizer; genişlik 0 ölçüldüğü için önbelleğe girmez,
+   her metin parçası zorunlu stil hesabıyla yeniden ölçülür. Ayrıca LRU, açılmakta olan grubun henüz bağlam almamış
+   **görünür** bir üyesini bırakabiliyordu (eşzamanlı 2 sn DOM çizimi).
+8. **Düzeltme:** (a) `xterm-patches.ts` `_pausedResizeTask`'ı saklayan bir nesneyle değiştirir (`set` görevi yalnız
+   saklar, `flush` — xterm görünür olunca tam çizimden önce çağırır — çalıştırır); (b) `webgl-pool.ts` `shown` kümesi
+   (`setWebglVisible`): görünen terminalin bağlamı bırakılmaz, hepsi görünürse yeni terminal DOM'da kalır;
+   `needsWebgl`; (c) `TerminalPane`: görünür olan terminal bağlam bekliyorsa çizim, bağlam alındıktan sonra (pasif
+   etkide) sürdürülür; açılışta `setWebglVisible`.
+9. **Neden testte görünmüyordu:** ekran dışı testte aynı yol çalışıyor ama ölçüm başına stil hesabı ucuz; ayrıca
+   önceki testler sürekli log akıttığı için tarayıcı boşta kalmıyordu. Zamanlama yerine kesin denetim eklendi:
+   `group-perf.mjs` "hidden terminals without WebGL are not drawn while hidden" (gizli DOM terminalinin `.xterm-rows`
+   metni boş olmalı; eski kod: [872, 868, 867] karakter → FAIL, yeni: [0,0,0]) ve "shown group draws with WebGL
+   again". Yeni seçenekler: `PERF_STREAM=0`, `PERF_ZOOM`. requestIdleCallback ekran dışında da çalışıyor (ölçüldü).
+10. **Menü dikey hizası (kök neden):** kullanıcının arayüz yazı boyutu 11 px (yakınlaştırma 11/13 = 0,846). Taban
+    çizgisi tam cihaz pikseline yuvarlandığı için metin simgeden 1 cihaz pikseli yukarıda (piksel ölçümü). Düzeltme:
+    `components/ui/menu-text.tsx` `menuText()` öğedeki ardışık düz metni tek `<span>`e alır, `MENU_TEXT` =
+    `relative top-[0.25px] [text-box:trim-both_cap_alphabetic]`; context/dropdown menü Item, SubTrigger,
+    CheckboxItem, RadioItem ve Shortcut'ta. 10–16 px arayüz boyutlarında fark en çok 0,5 px (0,25 kaydırma deneysel
+    seçildi: 0 → 11 px'te −1; 0,5 → 13 px'te +1). menus.mjs piksel denetimi (11/13/15 px): eski −1 → FAIL, yeni 0/0/0,5.
+11. **Disk çipinde bağlama noktası yazmaz** ("Disk 82%"); server-status e2e buna göre.
+12. Tuzak: ayrı klasöre derleme proje dışındaysa pencere açılmaz; `npx electron-vite build --outDir out-<ad>` proje
+    içinde kullanılır ve sonra silinir. Kullanıcının dev uygulaması açıkken kaynak kaydetmek HMR ile ona da gider
+    (ölçüm sırasında dosya kaydetme).
+13. **"En Alta Kaydır" bandı en alttayken görünüyordu (kök neden):** xterm `Viewport` kaydırma konumunu piksel
+    (`ydisp × satır yüksekliği`) olarak tutar ve yalnız görünen satır değişince (`_sync`, `e !== _latestYDisp`)
+    yeniden hesaplar; çizici değişimine (`setRenderer`) abone değildir. WebGL ve DOM çizicinin satır yüksekliği
+    kesirli yakınlaştırmada farklı (kullanıcıda 23,6363 / 23,6304; testte 20,0909 / 20,0833). Gizli DOM terminaline
+    çıktı gelince konum DOM yüksekliğiyle yazılır; görününce WebGL'e geçer ve konum güncellenmez; sonraki herhangi
+    bir kaydırma olayında `_handleScroll` `round(scrollTop / yeniYükseklik)` = ydisp−1/−2 bulur → `scrollLines(<0)` →
+    `isUserScrolling = true` → bant görünür ve terminal yeni çıktıyı izlemez (kaydırma çubuğu 5000 satırda yine en
+    altta görünür). Dev modda (kullanıcının Vite sunucusu, `import('/src/...')` ile modüllere erişim) birebir üretildi:
+    DOM + çıktı + WebGL + kaydırma olayı → ydisp 5000→4998, `isUserScrolling` true.
+14. **Düzeltme:** `xterm-patches.ts` `setRenderer`, `handleCharSizeChanged`, `handleDevicePixelRatioChange`
+    sonrasında `_latestYDisp = undefined` + `_sync()` (konum görünen satırdan yeniden hesaplanır). Aynı üretimde
+    düzeltmeden sonra ydisp 5000'de kalır. UI'dan güvenilir üretilemedi (en altta tekerlekle aşağı kaydırma en alt
+    sınıra oturup kendini düzeltir; sürekli çıktı her satırda konumu yeniler) → kalıcı test eklenmedi; group-perf'e
+    "no scroll-to-bottom band after switching" sağlık denetimi kaldı.
+
+## Kullanıcı istekleri — 42. tur (2026-10-19): alarm görünürlüğü, grup sekmesi kapatma, log gürültüsü
+1. **Alarm oturumunu öne çıkarma:** `stores/spotlight.ts`: `spotlight(tabId)` (alarma gidilince gruptaki diğer
+   paneller 2 sn `opacity-15`), `flashAlarm(tabId)` (yeni alarm olayında — `record` yeni olay döndürünce — panelin
+   çerçevesi `animate-alarm-flash` ile 4 kez kırmızı yanıp söner; `data-alarm-flash`), `stopAlarmFlash`. Kullanıcı
+   isteği: **tıklayınca çerçeve yanıp sönmez**, yalnız diğer paneller soluklaşır; yanıp sönme yalnız yeni hatada.
+   Yanıp sönerken panelin mavi odak halkası (`ring-1 ring-primary/60`) gizlenir (kırmızının yanında mavi kenar
+   kalıyordu). `motion-reduce` için sabit kırmızı çerçeve. Keyframes `globals.css` `@theme inline` içinde.
+2. **`features/alarms/reveal.ts` `revealAlarm(tabId, line)`**: Alarmlar paneli ve masaüstü bildirimi ortak; sekmeye
+   geçer, spotlight, satırı arar. Bildirime tıklama önceden yalnız sekmeyi etkinleştiriyordu (satır aranmıyordu):
+   IPC `notify:show` artık `line` taşır, `notify:clicked` `{ tabId, line }` gönderir.
+3. **Arama etkin eşleşmesi turuncu görünmüyordu (fareyle tıklayana kadar):** xterm arama eklentisi etkin eşleşmeyi
+   seçer ve rengini alt katman süslemesi yapar; WebGL `CellColorResolver` seçim rengini alt katmanın üstüne boyar.
+   `search-decorations.ts` `raiseActiveMatch(term)`: `term.registerDecoration` sarılır, etkin eşleşme renkleri
+   (`SEARCH_DECORATIONS` activeMatchBackground) `layer: 'top'` alır. Piksel ölçümü: 172 → 1363 turuncu piksel;
+   tools.mjs "active search match is orange without clicking".
+4. **Grup sekmesi:** "Grubu Ayır" düğmesi yerine çarpı (`aria-label` "Grubu kapat", `closeGroup`, düzen değiştiyse
+   sorar); "Grubu Ayır" sağ tık menüsünde kaldı. Grup menüsünde kapatma seçenekleri sekmeyle aynı: "Kapat",
+   "Diğerlerini Kapat" (`closeOthersSafely(group.ids[0])`, grup korunur), "Tüm Sekmeleri Kapat". Sekme menüsü ve komut
+   paletinde "Tümünü Kapat" → "Tüm Sekmeleri Kapat". Kaldırılan çeviriler: "Grubu ayır", "Grubu Ayır (Sekmelere Dön)",
+   "Gruptaki {n} Oturumu Kapat", "Tümünü Kapat". smoke/tabs/tools e2e güncellendi.
+5. **`GetVSyncParametersIfAvailable() failed` log gürültüsü:** XWayland'de GPU süreci ekran yenileme zamanını
+   okuyamayınca basar (zararsız). `app.commandLine.appendSwitch('log-level')` ana süreçten **etkisiz** (Electron günlük
+   düzeyini yalnız başlatma komut satırından okur; denendi). `--log-level=3` `npm run dev/dev:mock/start` betiklerine
+   ve Linux paket başlatıcısına (`build/after-pack.cjs`, `JUMPDESK_CHROMIUM_LOGS=1` ile kapatılır) eklendi; ölçüm:
+   bayraksız 10 sn'de 2 ileti, bayrakla 0. Chromium bu iletiyi açılışta en çok 3 kez basıp susar (kullanıcının terminalinde 1-2-3 sonra yalnız HMR satırları); vaapi/NSS ERROR satırları da aynı bayrakla gizlenir.
+6. Kullanıcı yeniden başlattıktan sonra donma ve kaydırma bandı düzeldi ("düzgün çalışıyor").

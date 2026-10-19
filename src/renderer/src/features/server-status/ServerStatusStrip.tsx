@@ -237,7 +237,7 @@ export function ServerStatusStrip({
         </StatChip>
         {disk && (
           <StatChip tabId={tabId} stats={stats} focus="disk">
-            {t('Disk')} <span className="text-muted-foreground">{disk.mount}</span>
+            {t('Disk')}{' '}
             <ChipValue className={level(diskPercent)}>{formatPercent(diskPercent)}</ChipValue>
           </StatChip>
         )}

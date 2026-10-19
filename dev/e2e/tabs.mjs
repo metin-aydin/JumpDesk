@@ -85,7 +85,7 @@ try {
   )
 
   await groupTabs().first().click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Tümünü Kapat' }).click()
+  await page.getByRole('menuitem', { name: 'Tüm Sekmeleri Kapat' }).click()
   await page.waitForTimeout(500)
   log(`after close all: ${await tabOrder()}`)
 
@@ -104,7 +104,7 @@ try {
   await shot('tabs-04-overflow')
 
   await page.getByRole('tab').first().click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Tümünü Kapat' }).click()
+  await page.getByRole('menuitem', { name: 'Tüm Sekmeleri Kapat' }).click()
   await page.getByRole('tree').getByText('Prod', { exact: true }).click()
   await page.waitForTimeout(300)
   for (const name of ['web-02', 'app-01', 'jump-ops']) {
@@ -158,7 +158,7 @@ try {
 
   await groupTabs().last().click({ button: 'right' })
   log(
-    `group close label: ${await page.getByRole('menuitem', { name: /^Gruptaki 2 Oturumu Kapat$/ }).count()}`
+    `group close items like a tab: ${(await page.getByRole('menuitem', { name: 'Kapat', exact: true }).count()) === 1 && (await page.getByRole('menuitem', { name: 'Diğerlerini Kapat' }).count()) === 1 && (await page.getByRole('menuitem', { name: 'Tüm Sekmeleri Kapat' }).count()) === 1}`
   )
   await page.keyboard.press('Escape')
   log(`before group drag: ${await tabOrder()}`)

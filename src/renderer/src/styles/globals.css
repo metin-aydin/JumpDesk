@@ -135,6 +135,18 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Yeni alarm gelen oturumun çerçevesi dört kez yanıp söner (stores/spotlight ALARM_FLASH_MS). */
+  --animate-alarm-flash: alarm-flash 0.5s ease-in-out 4;
+  @keyframes alarm-flash {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
 }
 
 @layer base {

@@ -796,12 +796,12 @@ function GroupTab({
         )}
         <button
           type="button"
-          aria-label={t('Grubu ayır')}
-          title={t('Grubu Ayır (Sekmelere Dön)')}
+          aria-label={t('Grubu kapat')}
+          title={t('Grubu Kapat')}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation()
-            void ungroupSafely(group.id)
+            void closeGroup(group.id)
           }}
           className={cn(
             'inline-flex size-4.5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 hover:text-foreground group-hover/tab:opacity-100',
@@ -810,7 +810,7 @@ function GroupTab({
             compact && 'hidden'
           )}
         >
-          <Ungroup className="size-3" />
+          <X className="size-3" />
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent className="min-w-60">
@@ -832,12 +832,15 @@ function GroupTab({
           alone={alone}
         />
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onClick={() => void closeGroup(group.id)}>
-          <X /> {t('Gruptaki {n} Oturumu Kapat', { n: members.length })}
+        <ContextMenuItem onClick={() => void closeGroup(group.id)}>
+          <X /> {t('Kapat')}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => void closeOthersSafely(group.ids[0])}>
+          {t('Diğerlerini Kapat')}
         </ContextMenuItem>
         {main && (
           <ContextMenuItem variant="destructive" onClick={() => void closeAllSafely()}>
-            <XSquare /> {t('Tümünü Kapat')}
+            <XSquare /> {t('Tüm Sekmeleri Kapat')}
           </ContextMenuItem>
         )}
         {main && <ContextMenuSeparator />}
@@ -1134,7 +1137,7 @@ export function TabStrip({ windowId = MAIN_WINDOW }: { windowId?: string }): Rea
                 {main && (
                   <>
                     <ContextMenuItem variant="destructive" onClick={() => void closeAllSafely()}>
-                      <XSquare /> {t('Tümünü Kapat')}
+                      <XSquare /> {t('Tüm Sekmeleri Kapat')}
                     </ContextMenuItem>
                     {/* Boş "Yeni Bağlantı" sekmesinde kaydedilecek oturum yoktur. */}
                     {tab.asset && (

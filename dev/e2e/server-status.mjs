@@ -295,22 +295,20 @@ try {
       await shot('status-03b-card-mem')
     }
     if (focus === 'disk') {
-      const chipMount = (await chip.innerText())
-        .replace(/^Disk\s*/, '')
-        .replace(/\s*\d+%$/, '')
-        .trim()
+      const chipText = (await chip.innerText()).replace(/\s+/g, ' ').trim()
       const sizes = await card.evaluate((el) =>
         [...el.querySelectorAll('[title]')].map((m) => ({
           mount: m.getAttribute('title'),
-          size: Number(m.nextElementSibling.innerText.match(/\/\s*([\d.,]+)/)[1].replace(',', '.'))
+          size: Number(m.nextElementSibling.innerText.match(/\/\s*([\d.,]+)/)[1].replace(',', '.')),
+          percent: m.nextElementSibling.innerText.match(/(\d+)%/)[1]
         }))
       )
       check(
-        'disk chip shows the largest disk, listed first',
+        'disk chip shows the largest disk usage without its mount, listed first',
         sizes.length > 0 &&
-          sizes[0].mount === chipMount &&
+          chipText === `Disk ${sizes[0].percent}%` &&
           sizes.every((d) => d.size <= sizes[0].size),
-        `${chipMount} · ${sizes.map((d) => `${d.mount} ${d.size}`).join(', ')}`
+        `${chipText} · ${sizes.map((d) => `${d.mount} ${d.size} ${d.percent}%`).join(', ')}`
       )
     }
     if (focus === 'load') {

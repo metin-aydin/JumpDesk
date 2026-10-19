@@ -205,6 +205,59 @@ try {
     notes.length === 1,
     JSON.stringify(notes.map((n) => n.title))
   )
+  // Bildirime tıklama: oturuma geçer, satırı arar ve oturumu öne çıkarır (kırmızı çerçeve)
+  await app.evaluate(({ BrowserWindow }, note) => {
+    BrowserWindow.getAllWindows()[0].webContents.send('notify:clicked', {
+      tabId: note.tabId,
+      line: note.line
+    })
+  }, notes[0])
+  const alarmSearch = page.getByPlaceholder('Terminalde ara')
+  await alarmSearch.waitFor({ timeout: 5000 })
+  check(
+    'notification click opens session and searches the line',
+    (await page.locator('[role=tab][aria-selected=true]').getAttribute('aria-label')) ===
+      'jump-ops' && (await alarmSearch.inputValue()).includes('NullPointerException'),
+    await alarmSearch.inputValue()
+  )
+  // Etkin eşleşme turuncu görünür (seçim rengi altında kalmaz; terminale tıklamak gerekmez)
+  await page.waitForTimeout(400)
+  const activeMatchPixels = await (async () => {
+    const b64 = await app.evaluate(async ({ BrowserWindow }) =>
+      (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString('base64')
+    )
+    return page.evaluate(async (b64) => {
+      const bin = atob(b64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const img = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+      const g = new OffscreenCanvas(img.width, img.height).getContext('2d')
+      g.drawImage(img, 0, 0)
+      const screen = [...document.querySelectorAll('.xterm-screen')]
+        .find((s) => s.getBoundingClientRect().width > 0)
+        .getBoundingClientRect()
+      const { data } = g.getImageData(
+        Math.round(screen.x),
+        Math.round(screen.y),
+        Math.round(screen.width),
+        Math.round(screen.height)
+      )
+      let n = 0
+      for (let i = 0; i < data.length; i += 4)
+        if (data[i] > 180 && data[i + 1] > 100 && data[i + 1] < 210 && data[i + 2] < 90) n++
+      return n
+    }, b64)
+  })()
+  check(
+    'active search match is orange without clicking',
+    activeMatchPixels > 300,
+    `${activeMatchPixels} px`
+  )
+  check(
+    'clicking an alarm does not flash the frame',
+    (await page.locator('[data-alarm-flash]').count()) === 0
+  )
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Sağ paneli aç/kapat' }).click()
   await page.getByRole('button', { name: 'Alarmlar' }).click()
   await page.waitForTimeout(300)
@@ -282,7 +335,7 @@ try {
     afterSave.join(' | ')
   )
   await page.keyboard.press('Control+Shift+P')
-  await page.keyboard.type('Tümünü Kapat')
+  await page.keyboard.type('Tüm Sekmeleri Kapat')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(600)
   const layoutCard = page.getByRole('button', { name: /^Test Düzeni/ })
@@ -401,6 +454,27 @@ try {
     (await alarmCount()) === 0,
     String(await alarmCount())
   )
+  // Yeni alarm: ekrandaki panelin çerçevesi kırmızı yanıp söner, mavi odak çerçevesi o sırada gizlenir
+  await page.keyboard.type('sleep 4; echo "Exception F"\n')
+  const flashFrame = page.locator('[data-alarm-flash]')
+  await flashFrame.waitFor({ timeout: 9000 })
+  const flash = await page.evaluate(() => {
+    const frame = document.querySelector('[data-alarm-flash]')
+    const pane = frame.parentElement
+    return {
+      frames: document.querySelectorAll('[data-alarm-flash]').length,
+      server: pane.textContent.includes('jump-ops'),
+      ring: getComputedStyle(pane).boxShadow
+    }
+  })
+  check(
+    'new alarm flashes only its pane frame without the blue ring',
+    flash.frames === 1 && flash.server && flash.ring === 'none',
+    JSON.stringify(flash)
+  )
+  await shot('tools-06c-alarm-flash')
+  await page.waitForTimeout(2300)
+  check('alarm flash ends', (await flashFrame.count()) === 0)
   const clearsAfter = await app.evaluate(() => globalThis.__jumpdeskNotificationClears ?? [])
   check(
     "focusing clears that server's notifications",
@@ -452,6 +526,45 @@ try {
   await page.waitForTimeout(3500)
   check('background alarm badges group tab', (await named.getByLabel('Alarm').count()) === 1)
   await page.getByRole('button', { name: 'Alarmlar' }).click()
+  // Gruptaki oturumun alarmına gidilince diğer paneller soluklaşır, oturumun çerçevesi yanıp söner
+  await page
+    .locator('[title="Oturuma Git Ve Satırı Bul"]', { hasText: 'Exception Z' })
+    .first()
+    .click()
+  await page.waitForTimeout(450)
+  const spot = await page.evaluate(() => {
+    const panes = [...document.querySelectorAll('[data-workspace] > div.absolute')].filter(
+      (p) => p.getBoundingClientRect().width > 50
+    )
+    const opacity = (p) => Number(getComputedStyle(p).opacity)
+    const target = panes.find((p) => p.textContent.includes('jump-ops'))
+    return {
+      frame: document.querySelectorAll('[data-alarm-flash]').length,
+      target: target ? opacity(target) : null,
+      others: panes.filter((p) => p !== target).map(opacity)
+    }
+  })
+  check(
+    'going to an alarm in a group dims the other panes only',
+    spot.frame === 0 &&
+      spot.target >= 0.8 &&
+      spot.others.length > 0 &&
+      spot.others.every((o) => o <= 0.2),
+    JSON.stringify(spot)
+  )
+  await shot('tools-07b-alarm-spotlight')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(2300)
+  const afterSpot = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-workspace] > div.absolute')]
+      .filter((p) => p.getBoundingClientRect().width > 50)
+      .map((p) => Number(getComputedStyle(p).opacity))
+  )
+  check(
+    'panes return to normal after the spotlight',
+    afterSpot.every((o) => o >= 0.8),
+    afterSpot.join(', ')
+  )
   await page.getByRole('button', { name: 'Alarmları Temizle' }).click()
   await page.waitForTimeout(300)
   check(
@@ -532,10 +645,32 @@ try {
   await page.mouse.up()
   await page.waitForTimeout(300)
   check('a 2 px resize shows dirty dot', (await dirtyDot()) === 1)
+  // Grup sekmesinin menüsünde sekmedekiyle aynı kapatma seçenekleri; "Diğerlerini Kapat" yalnız grubu bırakır
+  await page.keyboard.press('Control+Shift+T')
+  await page.waitForTimeout(300)
+  await named.click({ button: 'right' })
+  const groupMenu = {
+    close: await page.getByRole('menuitem', { name: 'Kapat', exact: true }).count(),
+    others: await page.getByRole('menuitem', { name: 'Diğerlerini Kapat' }).count(),
+    all: await page.getByRole('menuitem', { name: 'Tüm Sekmeleri Kapat' }).count()
+  }
+  check(
+    'group menu has the same close items as a tab',
+    groupMenu.close === 1 && groupMenu.others === 1 && groupMenu.all === 1,
+    JSON.stringify(groupMenu)
+  )
+  await page.getByRole('menuitem', { name: 'Diğerlerini Kapat' }).click()
+  await page.waitForTimeout(400)
+  check(
+    'close others on a group keeps only the group',
+    (await page.locator('[data-tab-strip] [role=tab]').count()) === 1 && (await named.count()) === 1
+  )
   await named.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Yan Yana Yerleştir' }).click()
   await page.waitForTimeout(300)
-  await named.click({ button: 'middle' })
+  // Grup sekmesindeki çarpı grubu kapatır (değişiklik varsa sorar)
+  await named.hover()
+  await named.getByRole('button', { name: 'Grubu kapat' }).click()
   const confirmText = page.getByText(
     'Düzende yaptığınız değişiklikler kaybolacaktır. Devam etmek istiyor musunuz?'
   )

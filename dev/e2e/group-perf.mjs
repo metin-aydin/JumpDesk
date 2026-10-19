@@ -11,6 +11,8 @@
 //   PERF_APP        açılacak ana süreç dosyası (varsayılan out/main/index.js; başka klasöre derlenmiş sürümü ölçmek için)
 //   PERF_GROUPS     açılacak grup sayısı (varsayılan 1); 1'den fazlaysa gruplar arası geçiş ölçülür
 //   PERF_STATUS=1   sunucu durum şeridi açılır (her oturumda ölçüm döngüsü)
+//   PERF_ZOOM=0.85  arayüz yakınlaştırması (Ayarlar'daki arayüz yazı boyutuyla aynı etki)
+//   PERF_STREAM=0   geçmiş doldurulur ama sürekli log akmaz (boşta terminaller; tarayıcının boşta görevleri çalışır)
 //   JUMPDESK_DISABLE_WEBGL=1  terminaller DOM çiziciyle çizilir (WebGL olmayan makineler)
 import { _electron as electron } from 'playwright-core'
 import { spawn } from 'node:child_process'
@@ -154,11 +156,26 @@ async function printProfile(cdp, name) {
   for (const [k, v] of top) console.log(`  ${v.toFixed(1).padStart(8)}  ${k}`)
 }
 
+/** Görünen terminallerde "En Alta Kaydır" bandı (kimse yukarı kaydırmadı; çıkmamalı). */
+const visibleBands = () =>
+  page.evaluate(
+    () =>
+      [...document.querySelectorAll('.bg-terminal')].filter(
+        (pane) =>
+          pane.getBoundingClientRect().width > 0 &&
+          [...pane.querySelectorAll('button')].some((b) => b.textContent.includes('En Alta Kaydır'))
+      ).length
+  )
+let bandsSeen = 0
+
 /** Geçiş ölçümü: tıklama → ilk kare, sonra 1,5 sn boyunca uzun görevler ve en uzun kare boşluğu. */
 async function measure(label, target) {
   await startWatch()
   const firstFrame = await timedClick(target)
-  await page.waitForTimeout(1500)
+  await page.waitForTimeout(300)
+  bandsSeen += await visibleBands()
+  await page.waitForTimeout(1200)
+  bandsSeen += await visibleBands()
   const { long, maxGap } = await stopWatch()
   const blocked = long.reduce((a, b) => a + b, 0)
   console.log(
@@ -191,6 +208,8 @@ try {
     })
   )
   await page.waitForTimeout(800)
+  if (process.env.PERF_ZOOM)
+    await page.evaluate((z) => window.jumpdesk.ui.setZoom(z), Number(process.env.PERF_ZOOM))
   if (process.env.PERF_STATUS === '1') {
     await page.keyboard.press('Control+,')
     const dialog = page.getByRole('dialog')
@@ -231,7 +250,9 @@ try {
   // Geri kaydırma arabelleği dolar (5000 satır), ardından her terminalde saniyede ~50 satır log akar.
   const fill =
     'for i in $(seq 1 6000); do printf "%s INFO [w-%d] GET /api/orders/%d 200 WARN slow ERROR none\\n" "$EPOCHREALTIME" $i $RANDOM; done; ' +
-    'while :; do for j in 1 2 3 4 5; do printf "%s INFO [w-%d] GET /api/orders 200 WARN slow ERROR timeout\\n" "$EPOCHREALTIME" $RANDOM; done; sleep 0.1; done\n'
+    (process.env.PERF_STREAM === '0'
+      ? '\n'
+      : 'while :; do for j in 1 2 3 4 5; do printf "%s INFO [w-%d] GET /api/orders 200 WARN slow ERROR timeout\\n" "$EPOCHREALTIME" $RANDOM; done; sleep 0.1; done\n')
   const groupTabs = '[data-tab-strip] [role=tab]'
   for (let g = 0; g < groups; g++) {
     // Her grubun terminalleri görünürken komutu alır (odak yalnız görünen terminalde çalışır)
@@ -289,6 +310,43 @@ try {
     })
     await page.waitForTimeout(500)
   }
+  // WebGL bağlamı bırakılıp DOM çiziciye geçen gizli terminaller gizliyken çizilmemeli: gizli (display:none)
+  // terminalde karakter genişlikleri ölçülemez, her çizim tüm satırları harf harf ölçer (gerçek ortamda saniyeler).
+  const webgl = process.env.JUMPDESK_DISABLE_WEBGL !== '1'
+  const hiddenDrawn = await page.evaluate(() =>
+    [...document.querySelectorAll('.xterm-screen')]
+      .filter((s) => s.getBoundingClientRect().width === 0 && !s.querySelector('canvas'))
+      .map((s) => (s.querySelector('.xterm-rows')?.textContent ?? '').trim().length)
+  )
+  if (webgl)
+    check(
+      'hidden terminals without WebGL are not drawn while hidden',
+      hiddenDrawn.every((n) => n === 0),
+      `${hiddenDrawn.length} gizli DOM terminali, çizilmiş metin: [${hiddenDrawn.join(', ')}]`
+    )
+  if (groups > 1) {
+    // Bağlamı bırakılmış bir grubu yeniden gösterip ekran görüntüsü alınır (içerik doğru çizilmeli)
+    await page.locator(groupTabs).nth(0).click()
+    await page.waitForTimeout(800)
+    const b64 = await app.evaluate(async ({ BrowserWindow }) =>
+      (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString('base64')
+    )
+    fs.writeFileSync(path.join(out, 'group-1-after-switching.png'), Buffer.from(b64, 'base64'))
+    const r = await renderer()
+    const shown = await page.evaluate(
+      () =>
+        [...document.querySelectorAll('.xterm-screen')].filter(
+          (s) => s.getBoundingClientRect().width > 0 && s.querySelector('canvas')
+        ).length
+    )
+    if (webgl)
+      check(
+        'shown group draws with WebGL again',
+        shown === servers,
+        `${shown}/${servers} (${r.webgl} WebGL)`
+      )
+  }
+  check('no scroll-to-bottom band after switching', bandsSeen === 0, `${bandsSeen} kez görüldü`)
   const worst = Math.max(...results.map((r) => Math.max(r.maxGap, r.firstFrame)))
   check(`switching tabs stays responsive (< ${maxAllowed} ms)`, worst < maxAllowed, `${worst} ms`)
 } catch (err) {

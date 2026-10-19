@@ -37,8 +37,15 @@ import { reportAlarm } from '@/features/alarms/report'
 import { terminalRegistry, type TerminalHandle } from './registry'
 import { SetupEchoGate, attachIntegration, buildSetupCommand } from './shell-integration'
 import { TerminalSearchBar } from './TerminalSearchBar'
+import { raiseActiveMatch } from './search-decorations'
 import { terminalTheme } from './themes'
-import { acquireWebgl, forgetTerminal, releaseWebgl } from './webgl-pool'
+import {
+  acquireWebgl,
+  forgetTerminal,
+  needsWebgl,
+  releaseWebgl,
+  setWebglVisible
+} from './webgl-pool'
 import { patchHiddenRendering, setRenderingPaused } from './xterm-patches'
 
 export const TERMINAL_FONT =
@@ -228,6 +235,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     term.loadAddon(serializer)
     const searchAddon = new SearchAddon()
     term.loadAddon(searchAddon)
+    raiseActiveMatch(term)
     setSearch(searchAddon)
     previewRegistry.set(tabId, () => {
       if (!term.element) return null
@@ -597,6 +605,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       if (disposed) return
       term.open(host)
       patchHiddenRendering(term)
+      setWebglVisible(term, visibleRef.current)
       if (!visibleRef.current) setRenderingPaused(term, true)
       // Terminale tıklanınca yapay zeka kipi kapanır.
       term.textarea?.addEventListener('focus', () => setAiAnchor(null))
@@ -759,9 +768,14 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   }, [tabId, wsUrl])
 
   // Çizim, sekme gizlendiği anda (aynı işlemdeki odak değişikliğinden önce) duraklatılır, görünür olunca sürdürülür.
+  // WebGL bağlamı bekleyen terminal, bağlamı aldıktan sonra sürdürülür (aşağıdaki etki); önce sürdürülse bekleyen tam
+  // çizim bir kez de DOM çiziciyle yapılır.
   useLayoutEffect(() => {
     const term = termRef.current
-    if (term?.element) setRenderingPaused(term, !visible)
+    if (!term?.element) return
+    setWebglVisible(term, visible)
+    if (!visible) setRenderingPaused(term, true)
+    else if (!needsWebgl(term)) setRenderingPaused(term, false)
   }, [visible])
 
   // Gizlenen terminal WebGL çizicisini korur: bırakılırsa xterm DOM çiziciye geçer ve gizliyken çıktı aktıkça satırları
@@ -773,6 +787,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     if (!visible) return
     syncFontRef.current()
     acquireWebgl(term)
+    setRenderingPaused(term, false)
     requestAnimationFrame(() => {
       const dims = fitRef.current?.proposeDimensions()
       if (dims && (dims.cols !== term.cols || dims.rows !== term.rows)) {

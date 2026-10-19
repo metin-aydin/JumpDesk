@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu'
 import { cn } from '@/lib/utils'
+import { MENU_TEXT, menuText } from './menu-text'
 import { usePortalContainer } from '@/lib/portal-container'
 import { ChevronRightIcon, CheckIcon } from 'lucide-react'
 
@@ -80,6 +81,7 @@ function ContextMenuItem({
   className,
   inset,
   variant = 'default',
+  children,
   ...props
 }: ContextMenuPrimitive.Item.Props & {
   inset?: boolean
@@ -95,7 +97,9 @@ function ContextMenuItem({
         className
       )}
       {...props}
-    />
+    >
+      {menuText(children)}
+    </ContextMenuPrimitive.Item>
   )
 }
 
@@ -121,7 +125,7 @@ function ContextMenuSubTrigger({
       )}
       {...props}
     >
-      {children}
+      {menuText(children)}
       <ChevronRightIcon className="ml-auto" />
     </ContextMenuPrimitive.SubmenuTrigger>
   )
@@ -163,7 +167,7 @@ function ContextMenuCheckboxItem({
           <CheckIcon />
         </ContextMenuPrimitive.CheckboxItemIndicator>
       </span>
-      {children}
+      {menuText(children)}
     </ContextMenuPrimitive.CheckboxItem>
   )
 }
@@ -195,7 +199,7 @@ function ContextMenuRadioItem({
           <CheckIcon />
         </ContextMenuPrimitive.RadioItemIndicator>
       </span>
-      {children}
+      {menuText(children)}
     </ContextMenuPrimitive.RadioItem>
   )
 }
@@ -216,6 +220,7 @@ function ContextMenuShortcut({ className, ...props }: React.ComponentProps<'span
       data-slot="context-menu-shortcut"
       className={cn(
         'ml-auto text-[0.625rem] tracking-widest text-muted-foreground group-focus/context-menu-item:text-accent-foreground',
+        MENU_TEXT,
         className
       )}
       {...props}
