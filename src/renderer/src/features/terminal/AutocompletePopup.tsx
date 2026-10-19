@@ -2,6 +2,7 @@ import { FileText, Folder, History, Rocket, Sparkles, SquareTerminal } from 'luc
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { Suggestion, SuggestionKind } from './autocomplete'
+import { CursorPopup, type CursorAnchor } from './CursorPopup'
 
 const ICONS: Record<SuggestionKind, typeof History> = {
   history: History,
@@ -14,9 +15,7 @@ const ICONS: Record<SuggestionKind, typeof History> = {
 export interface AutocompleteState {
   items: Suggestion[]
   index: number
-  left: number
-  top: number
-  above: boolean
+  anchor: CursorAnchor
 }
 
 export function AutocompletePopup({
@@ -31,13 +30,9 @@ export function AutocompletePopup({
 }): React.JSX.Element {
   const t = useT()
   return (
-    <div
-      className="absolute z-30 w-max max-w-[min(560px,90%)] min-w-64 overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
-      style={{
-        left: state.left,
-        top: state.above ? undefined : state.top,
-        bottom: state.above ? `calc(100% - ${state.top}px)` : undefined
-      }}
+    <CursorPopup
+      anchor={state.anchor}
+      className="w-max max-w-[min(560px,calc(100vw-16px))] min-w-64 rounded-lg border bg-popover text-popover-foreground shadow-lg"
       onMouseDown={(e) => e.preventDefault()}
     >
       {onAi && (
@@ -91,6 +86,6 @@ export function AutocompletePopup({
       <div className="border-t px-2.5 py-1 text-[10.5px] text-muted-foreground">
         {t('Tab / → kabul · ↑↓ seç · Esc kapat · Ctrl+Space aç')}
       </div>
-    </div>
+    </CursorPopup>
   )
 }

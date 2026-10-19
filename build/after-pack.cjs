@@ -19,6 +19,8 @@ exports.default = async function afterPack(context) {
       '#!/bin/sh',
       'HERE="$(dirname "$(readlink -f "$0")")"',
       'if [ "$XDG_SESSION_TYPE" = wayland ] && [ -z "$JUMPDESK_WAYLAND" ]; then set -- --ozone-platform=x11 "$@"; fi',
+      // Chromium yalnız ölümcül iletileri yazar (XWayland'de GPU süreci her karede ekran yenileme zamanı hatası basar).
+      'if [ -z "$JUMPDESK_CHROMIUM_LOGS" ]; then set -- --log-level=3 "$@"; fi',
       `if [ -n "$APPIMAGE" ]; then exec "$HERE/${name}-bin" --no-sandbox "$@"; fi`,
       `exec "$HERE/${name}-bin" "$@"`,
       ''

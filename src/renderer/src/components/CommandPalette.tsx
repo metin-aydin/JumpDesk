@@ -211,7 +211,7 @@ function buildCommands(
         }),
         {
           id: 'close-all',
-          label: t('Tümünü Kapat'),
+          label: t('Tüm Sekmeleri Kapat'),
           Icon: XSquare,
           run: () => void closeAllSafely()
         },

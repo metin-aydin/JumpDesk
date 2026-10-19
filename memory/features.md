@@ -838,3 +838,267 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    doğası). 14 terminal (12 WebGL + 2 DOM): geçiş ≤ 48 ms. font-perf artık DOM çizicide (WebGL kipinde yazı boyutu
    yalnız tuvalde; denetim `.xterm-rows` okur): en uzun 75 ms. windows.mjs'e geçmiş vurgusu ve fare seçimi/kopyalama
    denetimleri eklendi.
+7. **Gönderildi:** `development` `c3a2530`, PR #4 https://github.com/metin-aydin/JumpDesk/pull/4 ("JumpDesk 0.2.2:
+   faster tab switching", sürüm notu açıklamada). Kullanıcı "PR aç ve yeni sürümle yayına al" dedi; `gh pr merge`
+   izin denetiminde reddedildi ("Merge Without Review") → birleştirme kullanıcıda. Birleşince v0.2.2 yayımlanır.
+   Doğrulama: windows 47/47 (WebGL ve DOM), tools 53, panels 13, multiwindow 21, alarm-warmup 5, smoke, tabs, sftp,
+   font-perf, birim testleri, i18n 0 sorun.
+
+## Kullanıcı istekleri — 38. tur (2026-10-19): sunucu durum çubuğu (tartışma, kod yok)
+1. İstek: sekmenin tepesinde sunucunun RAM, CPU gibi bilgilerini gösteren bir çubuk; "önce tartışalım".
+2. Sunulan veri yolları: (1, önerilen) mevcut kabuk entegrasyonuna (OSC 6973, türler C/L/X/I/H/K/B) yeni tür (ör. M)
+   ve kurulum betiğinde arka planda 5 sn'de bir `/proc`'tan CPU/RAM/disk/load okuyan, `disown` edilmiş, kabuk ölünce
+   biten döngü; tam ekran programlar (vim, less, top…) öndeyken susar (çıktı arasına girip dizi bozmasın), yalnız
+   Linux; (2) sunucu başına ayrı gizli koko oturumu (JumpServer'da ikinci oturum, kayıt, parola soran hesapta çalışmaz);
+   (3) yalnız JumpServer'ın topladığı sabit bilgiler (gathered_info; canlı değil, boş olabilir).
+3. Yerleşim önerisi: tek sekmede terminalin üstünde ince şerit (şu an tek oturumda üst çubuk yok), grupta mevcut
+   `PaneHeader`'a kısa çipler; eşik renkleri; üzerine gelince ayrıntı kartı; ayarlarda aç/kapat ve aralık.
+4. Kullanıcıdan beklenen kararlar: veri yolu, varsayılan açık/kapalı, grupta yerleşim, gösterilecek değerler.
+   PR #4 (0.2.2) birleştirmesi hâlâ kullanıcıda.
+5. **Kullanıcı kararları (2026-10-19):** veri yolu 1 (aynı oturumda görünmez ölçüm döngüsü), varsayılan **kapalı**,
+   değerler yeterli (CPU, RAM, Disk, Load, açık kalma süresi). Tıklayınca ayrıntı: ayrı pencere ya da aşağı açılan
+   panel. Kullanıcı karar için görsel istedi → sohbette 4 maket gösterildi (show_widget): A grupta panel başlığında
+   çipler, B grupta başlık altında ayrı şerit, C tıklayınca süzülen ayrıntı kartı, D şeridin altında açılan panel
+   (terminali iter). Eşik: sarı %80, kırmızı %90. Seçim (A/B ve C/D) bekleniyor.
+6. Kullanıcı çipleri beğendi, çiplerin alt çubukta olduğu bir örnek istedi → 3 maket daha: E grupta her panelin
+   altında çip çubuğu (Load + açık kalma süresi de sığar), F tek sekmede terminalin altında çip çubuğu, çipe tıklayınca
+   kart yukarı açılır (CPU çipinde küçük çizgi grafik, "3 sn önce"), G grupta pencerenin altında tek ortak çubuk
+   (odaktaki panel; eşik aşan panelin başlığında kırmızı nokta). Seçim bekleniyor.
+7. Düzeltme: kullanıcının "alt bar"dan kastı **başlık çubuğunun hemen altı** (terminalin altı değil). Yeni maketler:
+   H grupta panel başlığının altında çip şeridi (CPU, RAM, Disk, Load çipleri + sağda açık kalma süresi), I tek
+   sekmede sekme çubuğunun altında çip şeridi, çipe tıklayınca ayrıntı kartı aşağı açılır (terminalin üstünde süzülür).
+   Önerilen: H + I (24 px şerit, her iki görünümde aynı yerde). Onay bekleniyor.
+8. **Son karar (2026-10-19):** H (başlığın hemen altında çip şeridi) hem grupta hem tek sekmede. Ek istekler: dar
+   panelde çipler yatay kayar; kaydırma çubuğu yer kaplamaz ve ince; tekerlek yatay kaydırır; sağdaki açık kalma süresi
+   sabit; çipe tıklayınca açılan kart sabit genişlikte ve dar panelde kırpılmaz.
+9. **Uygulama:**
+   - Kabuk: `shell-integration.ts` `STATS_SCRIPT` (`__jd_ss` güvenli an: kabuk önde ya da öndeki program tam ekran/uzak
+     bağlantı değil — `/proc/$$/stat` tpgid/pgrp + `/proc/<tpgid>/comm`; `__jd_sm` örnek; `__jd_sl` döngü, ilk örnekten
+     1 sn sonra ikinci örnek, sonra aralık; `__jd_stat_start <sn>` alt kabukta `$( (… & echo $!) )` ile başlatır: işlem
+     tablosuna girmez, iş iletisi basmaz, SIGINT'i yok sayar, `kill -0 $$` ile kabuk ölünce biter; `__jd_stat_stop`).
+     Disk (`df -Pkl`) ve çekirdek/OS ilk ve her 6. örnekte. Yeni OSC türü M. `SETUP_MARKER` `__ngj` → `__jd_`
+     (eski addan kalan iz; artık `__jd_` içeren komutlar geçmişe ve önerilere girmez).
+   - Kurulum komutu tek satır: 4096 bayt sınırı (satır düzenlemesiz `sh` hesaplarında aşılırsa kapanmamış tırnakla
+     `>` istemi kalır). Betik bu yüzden kısa: komut 3866 (kapalı) / 3890 (açık) bayt; birim testi sınırı denetler.
+   - Uygulama: `stores/server-stats.ts` (ayrıştırıcı, CPU yüzdesi önceki sayaçlarla, eski çekirdekte MemAvailable
+     yoksa MemFree+Buffers+Cached, 40 değerlik CPU geçmişi, `requested` bayrağı), `features/server-status/`
+     (`ServerStatusStrip` — ScrollRow: yerel kaydırma çubuğu gizli, 3 px sürüklenebilir gösterge, tekerlek yatay; her
+     çip ayrı Popover, kart `w-80` sayfaya çizilir, Base UI pencere kenarında içeri kaydırır; `ServerStatusCard`;
+     `format.ts`), `SessionView` (Linux SSH'de terminalin üstünde), tercihler `serverStatus` (varsayılan kapalı) ve
+     `serverStatusInterval` (5/10/30), Ayarlar → Sunucu Durumu, İngilizce sözlük `i18n/en/server-status.ts`.
+   - Ayar sonradan açılırsa açık oturumda "Durumu Göster" çipi `__jd_stat_start` komutunu (istemdeyken) gönderir;
+     kapatılınca çalışan döngüler oturum bitene kadar sürer (veri yok sayılır).
+10. **Doğrulama:** `dev/server-stats.test.mjs` (bash + zsh, gerçek /proc), `dev/e2e/server-status.mjs` 18/18 (DOM
+    çizicide; varsayılan kapalı, elle/kendiliğinden başlatma, jobs boş, dar panelde kaydırma/tekerlek/3 px gösterge/
+    sabit süre, kart 320 px ve pencere içinde, `less` sırasında güncelleme durur, kapatınca şerit gider).
+    Tuzak: kart açılış animasyonu (%95 ölçekten) sırasında genişlik 304 ölçülür; 400 ms beklenir.
+11. PR #4 kullanıcı tarafından birleştirildi (2026-10-17, `95dbea5`), **v0.2.2 yayımlandı**. Yeni `development` güncel
+    main'den açıldı; sunucu durumu işi onun üstünde.
+12. Tam regresyon geçti (smoke, tools 53, windows 47, tabs, alarm-warmup 5, i18n 4, panels 13, home 17, multiwindow 21,
+    sftp, ai 24, transfer 39, update 14, server-address 6, menus, rdp). `development` `cf8b913` gönderildi, PR #5
+    https://github.com/metin-aydin/JumpDesk/pull/5 ("JumpDesk 0.2.3: server status strip"); birleştirme kullanıcıda.
+
+## Kullanıcı istekleri — 39. tur (2026-10-19): beş düzeltme
+1. **Her çip kendi ayrıntısı:** `ServerStatusCard` `focus` ('cpu' | 'mem' | 'disk' | 'load'); CPU: büyük yüzde, çekirdek,
+   alan grafiği (`HistoryChart`, %50/%80 çizgileri, ortalama/en yüksek), yük; RAM: yüzde, GB, çubuk, bellek geçmişi
+   (`memHistory` depoya eklendi), swap; Disk: tüm diskler; Load: 1/5/15 dk + çekirdek başına oran, çekirdek, açık kalma
+   süresi. Kart `data-server-status-card="<focus>"`.
+2. **Bağlanma gecikmesi:** yerelde kurulum 50–70 ms; gecikme JumpServer üzerinden taşınan veriden. Değişiklikler:
+   - Kurulum betiği gzip+base64 ile gönderilir (`buildSetupCommand` artık async, `CompressionStream`; sunucuda
+     `base64 -d | gzip -dc`); komut sonra `__jd_init <komut adları 1/0> <ölçüm aralığı>` çağırır. Satır 3890 → 1936 bayt.
+   - Geçmiş ve komut adları gzip'li yeni OSC türleriyle (h, k; `DecompressionStream`): 39,5 KB → 15,2 KB.
+   - Komut adları sunucu başına önbellekte (`stores/command-cache.ts`, kullanıcıya özel, 24 sa, en çok 20 sunucu);
+     tazeyse kurulumda istenmez.
+   - `SetupEchoGate`: ilk OSC'den sonra OSC'ler hemen yazılır, eski istem satırı yalnız görünür ilk çıktıdan (yeni
+     istem) hemen önce silinir → istem "gelip kaybolmaz". OSC parçalar arasında bölünürse durum korunur.
+   - Birim testi gerçek bash/zsh'de sıkıştırılmış kurulumu çalıştırır (I, h, k; önbellekte k yok).
+3. **Öneri ve yapay zeka pencereleri dar panelde:** ortak `features/terminal/CursorPopup.tsx` (portal; ayrı pencerede o
+   pencereye; `fixed`, imleç hücresine hizalı, uygulama penceresine sığdırılır, altta yer yoksa yukarı açılır,
+   `max-width: min(560px, 100vw-16px)`). `AutocompleteState`/`AiAnchor` artık `CursorAnchor` (x, y, height).
+   Test `dev/e2e/popups.mjs` (4 yan yana panel; etkin panel tıklamayla seçilir — liste yalnız etkin panelde açılır).
+4. **Güncelleme kurulurken donma:** electron-updater DebUpdater pkexec'i eşzamanlı çalıştırıyordu (ana süreç kilitli,
+   GNOME "yanıt vermiyor"). Artık `updater.ts` `installDeb`: `spawn('pkexec', ['/bin/sh','-c','dpkg -i "$1" ||
+   apt-get install -f -y', …])` eşzamansız; durum 'installing' ("Kuruluyor… Sistem parolanız sorulduysa girin."); 0 →
+   `app.relaunch()` + `quit`; 126/127 → "Parola penceresi kapatıldı…", yeniden denenebilir. İndirilen dosya
+   `update-downloaded` olayındaki `downloadedFile`. Test: `JUMPDESK_UPDATE_INSTALLER=deb` +
+   `JUMPDESK_TEST_DEB_INSTALLER=<betik>` (yalnız test adresiyle); update.mjs 19/19, kurulum sırasında ana süreç 1 ms.
+5. **Panel boyutu değişince düzen değişmiş sayılmıyordu:** boyutlar `use-tiling`'de yerel durumdaydı. Artık grupta
+   (`TabGroup.grow` {version, row, col}; `groupGrow` yalnız aynı `layoutVersion`'da geçerli; `setGroupGrow`); ana ve
+   ayrı pencere aynı boyutları görür. Düzen öğesi `sizes` {rows, cols (sunucu sırasına göre)} saklar (eşitse yazılmaz),
+   açılınca `openGroup` uygular; `isGroupDirty` normalize oranları %2 toleransla karşılaştırır. tools.mjs'e boyutlandırma,
+   kaydetme, yeniden açınca geri gelme denetimleri eklendi.
+6. **Tuzaklar (doğrulamada bulundu):**
+   - `CursorPopup` konum ölçülene kadar `opacity: 0` kullanır; `visibility: hidden` olursa içindeki `autoFocus` giriş
+     kutusu odak alamaz, yapay zeka sorusu terminale yazılıp komut olarak çalışır (ai.mjs bunu yakalar).
+   - tools.mjs boyutlandırma adımı: önce grup sekmesi (`named`) tıklanır (Ctrl+Shift+T sonrası etkin sekme yeni
+     bağlantıdır); ilk `role=separator` kenar çubuğununkidir, `[data-workspace] [role=separator][aria-orientation=horizontal]` seçilir.
+   - `pkill -f "out/main/index.js"` aynı Bash komutunun içindeyse kabuğun kendisini öldürür (çıkış 144); ayrı çalıştır.
+   - ESLint'te ~119 eski hata var (çoğu `components/ui/*` dönüş türü, `react-hooks/refs`); değişen dosyalar HEAD ile
+     aynı sayıda hata verir, yeni hata eklenmedi.
+   - Mock sunucu kabuk geçmişi kalıcıdır (`/tmp/jumpdesk-mock-hosts/<sunucu>/.bash_history`): bir testte terminale
+     yanlışlıkla yazılan Türkçe metin sonraki i18n.mjs'de "Turkish text on English screens" (geçmiş paneli) olarak
+     düşer; satır dosyadan silinir.
+   - Sonuç: tam e2e (18 test) geçti — tools 57, ai 24, windows 47, transfer 39, server-status 24, multiwindow 21,
+     update 19, home 17, panels 13, server-address 6, alarm-warmup 5, popups 4, i18n 4; smoke/tabs/sftp/menus/rdp
+     çıkış 0. typecheck, i18n-check 0 sorun, server-stats birim testi geçti.
+   - Commit `0bdbaaa` `development`'a pushlandı; PR #5 başlığı "JumpDesk 0.2.3: server status strip, faster session
+     setup", açıklaması (sürüm notu) beş düzeltmeyi içerecek şekilde güncellendi. Birleştirmeyi kullanıcı yapar.
+
+## Kullanıcı istekleri — 40. tur (2026-10-19): şerit ayrıntıları, işlemler, yeniden bağlanma
+1. **Disk çipi en büyük diski gösterir** (`largestDisk`, boyuta göre; eski `fullestDisk` kaldırıldı). Disk kartı da
+   boyuta göre sıralı (çipteki disk ilk satır).
+2. **Load kartı:** 1/5/15 ortalamaları yok; çekirdek başına CPU kullanımı (`cpu0`…`cpuN`) her satırda çizgi grafikle
+   (`Sparkline`, `role=img` "cpu{n} Geçmişi") ve yüzdeyle; çok çekirdekte liste `max-h-72` kayar; altta açık kalma süresi.
+   Betik `/proc/stat`'taki tüm `cpu*` satırlarını yayar; depo `coreUsage`, `coreHistory` (çekirdek sayısı değişince
+   sıfırlanır). `applySample` ikinci parametresi artık `CpuSnapshot {all, cores}`.
+3. **En çok kullanan 5 işlem (CPU ve RAM kartları):** `__jd_pr` tüm işlemlerin `/proc/[0-9]*/stat` sayaçlarını (pid,
+   utime+stime tik, rss sayfa, ad) tek `cat|awk` ile çıkarır; döngü önceki görüntüyü `p` değişkeninde tutar, `__jd_tp`
+   farkı alıp `pc <tik> <pid> <ad>` (ilk örnekte yok) ve `pm <sayfa> <pid> <ad>` satırlarını üretir. Renderer CPU payını
+   aynı aralıktaki toplam CPU tikine oranlar (tüm makineye göre %, kartın CPU değeriyle tutarlı; top'taki çekirdek
+   başına % değil), 0 tikliler atılır; bellek = sayfa × `pg` (getconf PAGESIZE, ilk/6. örnekte). `top -bn1` kendisini
+   listeler ve çok kısa aralık ölçer, `ps pcpu` ömür boyu ortalama — ikisi de seçilmedi.
+4. **Durum iletisi gzip'li `m` türünde** (`__jd_sm…|gzip -c|__jd_b64`); renderer sırayla açar (söz zinciri), kapanmış
+   terminalde gelen örnek yok sayılır. Kurulum komutu 2316 bayt.
+5. **Kaydırma göstergesi yalnız fare şeritteyken** görünür (opacity 0 → 1).
+6. **Şeritle terminal arasında boşluk yok:** terminal tam satırlardan oluşur, artık alan (≤1 satır) şerit varken altta,
+   yokken üstte (`TerminalPane` `belowBar`: `pt-0.5` + `justify-start`). Ölçüm: önceden 9–22 px, şimdi 2 px.
+   Görünürlük tek kaynaktan: `features/server-status/use-status-bar.ts` `useStatusBarVisible` (şerit ve terminal).
+7. **Panel boyutu: her değişiklik kirli sayılır** (`isGroupDirty` toleransı 0,02 → 1e-6); tools.mjs "a 2 px resize".
+8. **"Durumu Göster" tam genişlikte düğme;** tıklayınca onay ("Yeniden Bağlantı Gerekiyor", Evet/Hayır); Evet →
+   `SessionView.reconnect()` (yeni token, yeni TerminalPane, kurulum ölçümü başlatır). `buildStatsStartCommand`
+   kaldırıldı. Yeni oturum ayar açıksa mount'ta `markStatsRequested` (yeniden bağlanırken düğme yanıp sönmez).
+   Ayar açıklaması ve "Yenileme Aralığı" notu buna göre güncellendi.
+9. Testler: server-stats birim 48/48 (gerçek bash/zsh'de çekirdekler, sayfa boyutu, meşgul `sh` en üstte, gzip'li
+   örnek; sentetik pay %20, boşluklu ad, çekirdek sayısı değişimi); server-status e2e 33/33 (Hayır/Evet, tam genişlik,
+   2 px boşluk, hover göstergesi, CPU/RAM işlem listeleri, en büyük disk, 8 çekirdek 8 grafik).
+10. **Aynı turda ek istekler:** Load kartında açık kalma süresi yok (kullanıcı istemedi; şeridin sağında zaten var;
+    `longUptime` ve ilgili çeviriler kaldırıldı). Kart altındaki "Son güncelleme" çizgisinin üstü ve altı eşit:
+    `PopoverContent` `p-3 pb-2` (çizgi üstü `pt-2`). Çip değerleri `ChipValue` (`min-w-[4.5ch]`, sağa hizalı,
+    `tabular-nums`; "100%" sığar), yük her zaman iki ondalık → hane sayısı değişince çip boyu sabit (e2e "chip widths do
+    not change", 8%/88%/100%/…/1,56/12,34 aynı genişlik).
+11. Tam e2e (18 test) geçti; sonra yalnız şerit/kart değişti, server-status 34 denetim geçti. Commit `a17c97b`
+    pushlandı, PR #5 açıklaması güncellendi (başlık aynı). Birleştirmeyi kullanıcı yapar.
+
+## Kullanıcı istekleri — 41. tur (2026-10-19): 3×5 düzende donma, menü hizası
+1. **Şikâyet:** 3 tane 5 sekmeli düzen açınca uygulama yavaşlıyor, sekme geçişinde sürekli donuyor. Kullanıcı
+   `npm run dev` (electron-vite dev, profil `~/.config/JumpDesk`) kullanıyordu; örnek alındığında ~1 sa 55 dk açıktı ve
+   o sürede bu oturumdaki değişikliklerle onlarca sıcak yenileme (HMR) almıştı. Örnekleme anında süreç boştaydı (%0).
+2. **Ölçüm (yeniden üretilemedi):** `group-perf.mjs` artık `PERF_GROUPS` (çok grup, gruplar arası geçiş),
+   `PERF_STATUS=1` (durum şeridi), `PERF_PROFILE=switch`, grup açılış süresi, hata anında ekran görüntüsü/durum ve GPU adı
+   yazar. Ekran dışı kip de gerçek GPU'yu kullanır (ANGLE AMD Radeon Pro WX 3100, radeonsi). 3×5 + şerit: üretim
+   derlemesi geçiş ≤35 ms, kullanıcının Vite geliştirme sunucusuna bağlı renderer (`ELECTRON_RENDERER_URL=
+   http://127.0.0.1:5173`) ≤28 ms; 15 terminalin 12'si WebGL (havuz sınırı) ve LRU değişimi ekran dışında maliyetsiz.
+3. **Görünür ölçüm güvenilmez:** kullanıcının masaüstünde (GNOME Wayland + XWayland) pencere örtülünce kareler tam 1 sn
+   aralıkla gelir (XWayland'in örtülü pencere için 1 Hz geri çekilmesi), bir kez oturumlar 60 sn "bağlanıyor"da kaldı
+   (kare üretilmeyince ResizeObserver/fit çalışmıyor). `setAlwaysOnTop` da yetmedi. Görünür testi kullanıcı ekranda
+   çalışırken koşmak hem ölçümü bozar hem kullanıcıyı rahatsız eder.
+4. **Sonraki adım (kullanıcıdan):** dev'i `npx electron-vite dev -- --ozone-platform=x11 --remote-debugging-port=9222`
+   ile yeniden başlatıp 3 düzeni açması; donarsa 9222 üzerinden CDP ile iz (Tracing, gpu/cc/viz kategorileri) alınacak.
+5. **"Düzeni Kaydet…" boş "Yeni Bağlantı" sekmesinin sağ tık menüsünde gösterilmez** (`tab.asset` yoksa); menus.mjs
+   denetimi eklendi. Commit `686a3c8`.
+6. **Menü dikey hizası:** kullanıcı "tüm menü öğelerinde metin yukarıya yakın" dedi. Ölçüm (yakınlaştırma 1, kayıtlı
+   UI yazı boyutu yok → yakınlık 1): simge merkezi = metin kutusu merkezi (0,25 px), vurgu kutusu içinde de ortalı;
+   büyük harf merkezi simgeyle aynı, küçük harf gövdesi ~1,3 px aşağıda (Ubuntu yazı tipi ölçüleri). %110'da metin
+   ~0,5 px yukarıda. Kullanıcının gördüğü fark doğrulanamadı → ekran görüntüsü istendi; değişiklik yapılmadı.
+7. **Donmanın kök nedeni (kullanıcının çalışan uygulamasından iz alındı):** kullanıcı dev'i
+   `--remote-debugging-port=9222` ile açtı; CDP ile (`chromium.connectOverCDP`, Profiler + Tracing renderer+GPU)
+   2 dk kayıt: 5–6,5 sn'lik uzun görevler art arda (tıklamadan sonra ~40 sn zincir). Profil: 63 sn `WidthCache._measure`
+   ← DOM çizici `renderRows/createRow` ← `DomRenderer.handleResize` ← xterm `_pausedResizeTask` (boşta görev,
+   `FireIdleCallback`). İz: görev başına ~1870 zorunlu stil hesabı, her biri ~3,3 ms (582 öğe).
+   Zincir: 15 terminal > WebGL havuzu (12) → grup geçişinde LRU bağlam bırakır → WebGL eklentisi dispose'da
+   `setRenderer(DOM)` + `handleResize(cols, rows)` çağırır → duraklatılmış terminalde xterm boyutu boşta çalışan göreve
+   bırakır → görev gizli (display:none) terminalin tüm satırlarını çizer; genişlik 0 ölçüldüğü için önbelleğe girmez,
+   her metin parçası zorunlu stil hesabıyla yeniden ölçülür. Ayrıca LRU, açılmakta olan grubun henüz bağlam almamış
+   **görünür** bir üyesini bırakabiliyordu (eşzamanlı 2 sn DOM çizimi).
+8. **Düzeltme:** (a) `xterm-patches.ts` `_pausedResizeTask`'ı saklayan bir nesneyle değiştirir (`set` görevi yalnız
+   saklar, `flush` — xterm görünür olunca tam çizimden önce çağırır — çalıştırır); (b) `webgl-pool.ts` `shown` kümesi
+   (`setWebglVisible`): görünen terminalin bağlamı bırakılmaz, hepsi görünürse yeni terminal DOM'da kalır;
+   `needsWebgl`; (c) `TerminalPane`: görünür olan terminal bağlam bekliyorsa çizim, bağlam alındıktan sonra (pasif
+   etkide) sürdürülür; açılışta `setWebglVisible`.
+9. **Neden testte görünmüyordu:** ekran dışı testte aynı yol çalışıyor ama ölçüm başına stil hesabı ucuz; ayrıca
+   önceki testler sürekli log akıttığı için tarayıcı boşta kalmıyordu. Zamanlama yerine kesin denetim eklendi:
+   `group-perf.mjs` "hidden terminals without WebGL are not drawn while hidden" (gizli DOM terminalinin `.xterm-rows`
+   metni boş olmalı; eski kod: [872, 868, 867] karakter → FAIL, yeni: [0,0,0]) ve "shown group draws with WebGL
+   again". Yeni seçenekler: `PERF_STREAM=0`, `PERF_ZOOM`. requestIdleCallback ekran dışında da çalışıyor (ölçüldü).
+10. **Menü dikey hizası (kök neden):** kullanıcının arayüz yazı boyutu 11 px (yakınlaştırma 11/13 = 0,846). Taban
+    çizgisi tam cihaz pikseline yuvarlandığı için metin simgeden 1 cihaz pikseli yukarıda (piksel ölçümü). Düzeltme:
+    `components/ui/menu-text.tsx` `menuText()` öğedeki ardışık düz metni tek `<span>`e alır, `MENU_TEXT` =
+    `relative top-[0.25px] [text-box:trim-both_cap_alphabetic]`; context/dropdown menü Item, SubTrigger,
+    CheckboxItem, RadioItem ve Shortcut'ta. 10–16 px arayüz boyutlarında fark en çok 0,5 px (0,25 kaydırma deneysel
+    seçildi: 0 → 11 px'te −1; 0,5 → 13 px'te +1). menus.mjs piksel denetimi (11/13/15 px): eski −1 → FAIL, yeni 0/0/0,5.
+11. **Disk çipinde bağlama noktası yazmaz** ("Disk 82%"); server-status e2e buna göre.
+12. Tuzak: ayrı klasöre derleme proje dışındaysa pencere açılmaz; `npx electron-vite build --outDir out-<ad>` proje
+    içinde kullanılır ve sonra silinir. Kullanıcının dev uygulaması açıkken kaynak kaydetmek HMR ile ona da gider
+    (ölçüm sırasında dosya kaydetme).
+13. **"En Alta Kaydır" bandı en alttayken görünüyordu (kök neden):** xterm `Viewport` kaydırma konumunu piksel
+    (`ydisp × satır yüksekliği`) olarak tutar ve yalnız görünen satır değişince (`_sync`, `e !== _latestYDisp`)
+    yeniden hesaplar; çizici değişimine (`setRenderer`) abone değildir. WebGL ve DOM çizicinin satır yüksekliği
+    kesirli yakınlaştırmada farklı (kullanıcıda 23,6363 / 23,6304; testte 20,0909 / 20,0833). Gizli DOM terminaline
+    çıktı gelince konum DOM yüksekliğiyle yazılır; görününce WebGL'e geçer ve konum güncellenmez; sonraki herhangi
+    bir kaydırma olayında `_handleScroll` `round(scrollTop / yeniYükseklik)` = ydisp−1/−2 bulur → `scrollLines(<0)` →
+    `isUserScrolling = true` → bant görünür ve terminal yeni çıktıyı izlemez (kaydırma çubuğu 5000 satırda yine en
+    altta görünür). Dev modda (kullanıcının Vite sunucusu, `import('/src/...')` ile modüllere erişim) birebir üretildi:
+    DOM + çıktı + WebGL + kaydırma olayı → ydisp 5000→4998, `isUserScrolling` true.
+14. **Düzeltme:** `xterm-patches.ts` `setRenderer`, `handleCharSizeChanged`, `handleDevicePixelRatioChange`
+    sonrasında `_latestYDisp = undefined` + `_sync()` (konum görünen satırdan yeniden hesaplanır). Aynı üretimde
+    düzeltmeden sonra ydisp 5000'de kalır. UI'dan güvenilir üretilemedi (en altta tekerlekle aşağı kaydırma en alt
+    sınıra oturup kendini düzeltir; sürekli çıktı her satırda konumu yeniler) → kalıcı test eklenmedi; group-perf'e
+    "no scroll-to-bottom band after switching" sağlık denetimi kaldı.
+
+## Kullanıcı istekleri — 42. tur (2026-10-19): alarm görünürlüğü, grup sekmesi kapatma, log gürültüsü
+1. **Alarm oturumunu öne çıkarma:** `stores/spotlight.ts`: `spotlight(tabId)` (alarma gidilince gruptaki diğer
+   paneller 2 sn `opacity-15`), `flashAlarm(tabId)` (yeni alarm olayında — `record` yeni olay döndürünce — panelin
+   çerçevesi `animate-alarm-flash` ile 4 kez kırmızı yanıp söner; `data-alarm-flash`), `stopAlarmFlash`. Kullanıcı
+   isteği: **tıklayınca çerçeve yanıp sönmez**, yalnız diğer paneller soluklaşır; yanıp sönme yalnız yeni hatada.
+   Yanıp sönerken panelin mavi odak halkası (`ring-1 ring-primary/60`) gizlenir (kırmızının yanında mavi kenar
+   kalıyordu). `motion-reduce` için sabit kırmızı çerçeve. Keyframes `globals.css` `@theme inline` içinde.
+2. **`features/alarms/reveal.ts` `revealAlarm(tabId, line)`**: Alarmlar paneli ve masaüstü bildirimi ortak; sekmeye
+   geçer, spotlight, satırı arar. Bildirime tıklama önceden yalnız sekmeyi etkinleştiriyordu (satır aranmıyordu):
+   IPC `notify:show` artık `line` taşır, `notify:clicked` `{ tabId, line }` gönderir.
+3. **Arama etkin eşleşmesi turuncu görünmüyordu (fareyle tıklayana kadar):** xterm arama eklentisi etkin eşleşmeyi
+   seçer ve rengini alt katman süslemesi yapar; WebGL `CellColorResolver` seçim rengini alt katmanın üstüne boyar.
+   `search-decorations.ts` `raiseActiveMatch(term)`: `term.registerDecoration` sarılır, etkin eşleşme renkleri
+   (`SEARCH_DECORATIONS` activeMatchBackground) `layer: 'top'` alır. Piksel ölçümü: 172 → 1363 turuncu piksel;
+   tools.mjs "active search match is orange without clicking".
+4. **Grup sekmesi:** "Grubu Ayır" düğmesi yerine çarpı (`aria-label` "Grubu kapat", `closeGroup`, düzen değiştiyse
+   sorar); "Grubu Ayır" sağ tık menüsünde kaldı. Grup menüsünde kapatma seçenekleri sekmeyle aynı: "Kapat",
+   "Diğerlerini Kapat" (`closeOthersSafely(group.ids[0])`, grup korunur), "Tüm Sekmeleri Kapat". Sekme menüsü ve komut
+   paletinde "Tümünü Kapat" → "Tüm Sekmeleri Kapat". Kaldırılan çeviriler: "Grubu ayır", "Grubu Ayır (Sekmelere Dön)",
+   "Gruptaki {n} Oturumu Kapat", "Tümünü Kapat". smoke/tabs/tools e2e güncellendi.
+5. **`GetVSyncParametersIfAvailable() failed` log gürültüsü:** XWayland'de GPU süreci ekran yenileme zamanını
+   okuyamayınca basar (zararsız). `app.commandLine.appendSwitch('log-level')` ana süreçten **etkisiz** (Electron günlük
+   düzeyini yalnız başlatma komut satırından okur; denendi). `--log-level=3` `npm run dev/dev:mock/start` betiklerine
+   ve Linux paket başlatıcısına (`build/after-pack.cjs`, `JUMPDESK_CHROMIUM_LOGS=1` ile kapatılır) eklendi; ölçüm:
+   bayraksız 10 sn'de 2 ileti, bayrakla 0. Chromium bu iletiyi açılışta en çok 3 kez basıp susar (kullanıcının terminalinde 1-2-3 sonra yalnız HMR satırları); vaapi/NSS ERROR satırları da aynı bayrakla gizlenir.
+6. Kullanıcı yeniden başlattıktan sonra donma ve kaydırma bandı düzeldi ("düzgün çalışıyor").
+7. **Doğrulama ve gönderim (42. tur):** tam e2e 18 test + font-perf + group-perf (boşta/akışlı/DOM, 3×5) geçti;
+   group-perf'te WebGL denetimleri DOM kipinde atlanır. Commit `8ee1b24` `development`'a pushlandı; PR #5 başlığı
+   "JumpDesk 0.2.3: server status strip, faster sessions, alarm spotlight", açıklaması (sürüm notu) güncellendi.
+   Birleştirmeyi kullanıcı yapar.
+
+## Kullanıcı istekleri — 43. tur (2026-10-19): çerçeveler ayırıcının altında kalıyordu
+1. Şikâyet: gruptaki odak panelinin sağ çerçevesi mavi değil; alarm gelen panel ilk panel değilse sol kenarı kırmızı
+   değil. **Neden:** `TileHandles` ayırıcıları (z-20) panel sınırına 1 px `bg-border` çizgi çizer; odak halkası
+   (`ring-1`, panelin 1 px dışı) ve panel içindeki kırmızı çerçevenin ilk sütunu bu çizginin altında kalıyordu (panel
+   z-10 / z-yok).
+2. **Düzeltme:** odak ve alarm çerçeveleri `WindowWorkspace`'te ayrı katman: `data-pane-frame` (z-30,
+   `pointer-events-none`, panelin `pct(rect)` konumu), içinde `data-focus-frame` (`ring-1 ring-primary/60`) ve
+   `data-alarm-flash`. Panel kabı artık halka/z-10 taşımaz, `data-pane={tabId}` taşır. Paneli ayırıcının üstüne almak
+   tutamacın yarısını tıklanamaz yapardı; katman tıklama almadığı için ayırıcılar sürüklenebilir kalır.
+3. Testler: tools.mjs alarmı sağdaki panelde (test-01) üretir; hareket azaltma (`page.emulateMedia({reducedMotion:
+   'reduce'})`) ile çerçeve sabit çizilir, piksel ölçümüyle dört kenar kırmızı (sol kenar ayırıcıya bitişik:
+   [220,61,67]) ve odak halkası ayırıcı tarafında mavi ([130,169,244]). Testlerde panel seçici
+   `[data-workspace] > [data-pane]` (eskiden `div.absolute`, artık çerçeve katmanını da yakalıyordu). tools 69/69,
+   popups 4/4.
+4. Panelle ilgili testler geçti (windows 47, multiwindow 21, panels 13, menus 3, server-status 34, alarm-warmup 5,
+   tabs, smoke, group-perf 3×5: 35 ms). Commit `36eabb6` pushlandı, PR #5 sürüm notuna çerçeve düzeltmesi eklendi.
+   Not: kullanıcı `npx electron-vite dev -- … --log-level=3 --remote-debugging-port=9222` ile açınca vaapi/NSS/vsync
+   satırları kayboldu. Dev başlatmak `out/main` ve `out/preload`'ı yeniden yazar (e2e testleri `out/`'u kullanır).
+
+## Kullanıcı isteği — 44. tur (2026-10-19): kırmızı çerçeve yerine yarı saydam kırmızı katman
+- Kullanıcı kırmızı çerçeveden vazgeçti: yeni alarmda panelin üzerine `bg-destructive/20` katman (`data-alarm-flash`,
+  aynı `animate-alarm-flash` ile 4 kez gelip gider, hareket azaltmada sabit; çerçeve katmanında, ayırıcıların üstünde).
+  Odak halkası katman sırasında yine gizlenir. tools.mjs: "red overlay covers the whole pane, also next to a separator"
+  (kenarlardan 2 px içeride piksel [248,216,217]). tools 69/69. PR #5 sürüm notu güncellendi.
+- Kullanıcı "hepsi tamam, commitle pushla, main'e PR aç" dedi: her şey zaten commitli ve pushlıydı (`dcd818a`); PR #5
+  (development → main) açık, CI 5 geçti / 1 atlandı, MERGEABLE/CLEAN. Yeni PR açılmadı; birleştirme kullanıcıda.

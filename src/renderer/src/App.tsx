@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { revealAlarm } from '@/features/alarms/reveal'
 import { TitleBar } from '@/components/titlebar/TitleBar'
 import { useT } from '@/lib/i18n'
 import { jumpdesk } from '@/lib/jumpdesk'
@@ -20,7 +21,6 @@ import { ExportDialog } from '@/features/transfer/ExportDialog'
 import { ImportDialog } from '@/features/transfer/ImportDialog'
 import { Workspace } from '@/features/workspace/Workspace'
 import { DetachedWindows } from '@/features/windows/DetachedWindows'
-import { focusDetached } from '@/features/windows/detached-windows'
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts'
 import { usePanelWidth } from '@/hooks/use-panel-width'
 import { useAuth } from '@/stores/auth'
@@ -30,15 +30,7 @@ function Main(): React.JSX.Element {
   const t = useT()
   const rightPanelOpen = useWorkspace((s) => s.rightPanelOpen)
   useEffect(() => startNotificationSync(), [])
-  useEffect(
-    () =>
-      jumpdesk.notify.onClick((tabId) => {
-        const ws = useWorkspace.getState()
-        if (ws.tabs.some((tab) => tab.id === tabId)) ws.activate(tabId)
-        else focusDetached(tabId)
-      }),
-    []
-  )
+  useEffect(() => jumpdesk.notify.onClick(({ tabId, line }) => revealAlarm(tabId, line)), [])
   const right = usePanelWidth('rightPanelWidth', 320, 260, 640, 'left')
   return (
     <div className="flex min-h-0 flex-1">

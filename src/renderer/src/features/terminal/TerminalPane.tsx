@@ -16,11 +16,15 @@ import { previewRegistry } from '@/features/workspace/preview-registry'
 import { usePreferences } from '@/stores/preferences'
 import { terminalFontSize, useFontSizes } from '@/stores/font-sizes'
 import { useSessionInfo } from '@/stores/session-info'
+import { clearStats, markStatsRequested, recordStats } from '@/stores/server-stats'
+import { cacheCommandNames, cachedCommandNames } from '@/stores/command-cache'
 import { broadcastPeers, findTab, useWorkspace } from '@/stores/workspace'
 import { aiAutocompleteReady, useAi } from '@/stores/ai'
 import { AiAssistPopup, type AiAnchor } from '@/features/ai/AiAssistPopup'
+import { useStatusBarVisible } from '@/features/server-status/use-status-bar'
 import { useTheme } from '@/stores/theme'
 import { AutocompletePopup, type AutocompleteState } from './AutocompletePopup'
+import type { CursorAnchor } from './CursorPopup'
 import { computeSuggestions } from './autocomplete'
 import { paintInputLine } from './command-highlight'
 import { readInputLine } from './input-line'
@@ -33,8 +37,15 @@ import { reportAlarm } from '@/features/alarms/report'
 import { terminalRegistry, type TerminalHandle } from './registry'
 import { SetupEchoGate, attachIntegration, buildSetupCommand } from './shell-integration'
 import { TerminalSearchBar } from './TerminalSearchBar'
+import { raiseActiveMatch } from './search-decorations'
 import { terminalTheme } from './themes'
-import { acquireWebgl, forgetTerminal, releaseWebgl } from './webgl-pool'
+import {
+  acquireWebgl,
+  forgetTerminal,
+  needsWebgl,
+  releaseWebgl,
+  setWebglVisible
+} from './webgl-pool'
 import { patchHiddenRendering, setRenderingPaused } from './xterm-patches'
 
 export const TERMINAL_FONT =
@@ -114,6 +125,7 @@ function LinkHint({ hint }: { hint: LinkHintState }): React.JSX.Element {
 
 export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   const { tabId, wsUrl, visible, active } = props
+  const belowBar = useStatusBarVisible(tabId) && props.integrate
   const hostRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [popup, setPopup] = useState<AutocompleteState | null>(null)
@@ -154,6 +166,9 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const host = hostRef.current
     if (!host) return
     let disposed = false
+    // Ayar açıksa ölçüm kurulumla başlar; şeridin "Durumu Göster" düğmesi bu oturumda çizilmez.
+    if (propsRef.current.integrate && usePreferences.getState().serverStatus)
+      markStatsRequested(tabId)
     let resizeTimer: ReturnType<typeof setTimeout> | null = null
     let idleTimer: ReturnType<typeof setInterval> | null = null
     let ro: ReturnType<typeof observeSize> | null = null
@@ -220,6 +235,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     term.loadAddon(serializer)
     const searchAddon = new SearchAddon()
     term.loadAddon(searchAddon)
+    raiseActiveMatch(term)
     setSearch(searchAddon)
     previewRegistry.set(tabId, () => {
       if (!term.element) return null
@@ -273,6 +289,11 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       onCommandNames: (names) => {
         live.commandNames = names
         commandSet = new Set(names)
+        const assetId = findTab(useWorkspace.getState(), tabId)?.asset?.id
+        if (assetId) cacheCommandNames(assetId, names)
+      },
+      onStats: (payload) => {
+        if (!disposed) recordStats(tabId, payload)
       },
       onPromptEnd: (pos) => {
         submittedFrom = null
@@ -457,43 +478,28 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         closePopup()
         return
       }
-      const sr = screen.getBoundingClientRect()
-      const wr = wrap.getBoundingClientRect()
-      const cellW = sr.width / term.cols
-      const cellH = sr.height / term.rows
-      const left = Math.min(sr.left - wr.left + buf.cursorX * cellW, wr.width - 280)
-      const rowTop = sr.top - wr.top + buf.cursorY * cellH
-      const estimated = Math.max(items.length, 1) * 24 + 34
-      const above = rowTop + cellH + estimated > wr.height
       const previous = popupRef.current
       const sameItems =
         previous &&
         previous.items.map((i) => i.label).join('\n') === items.map((i) => i.label).join('\n')
-      setPopup({
-        items,
-        index: sameItems ? previous.index : 0,
-        left: Math.max(4, left),
-        top: above ? rowTop : rowTop + cellH + 2,
-        above
-      })
+      setPopup({ items, index: sameItems ? previous.index : 0, anchor: cursorAnchor(screen) })
+    }
+
+    /** İmlecin bulunduğu hücre (pencereye göre); öneri ve yapay zeka pencereleri buraya hizalanır. */
+    const cursorAnchor = (screen: Element): CursorAnchor => {
+      const sr = screen.getBoundingClientRect()
+      const buf = term.buffer.active
+      const cellW = sr.width / term.cols
+      const cellH = sr.height / term.rows
+      return { x: sr.left + buf.cursorX * cellW, y: sr.top + buf.cursorY * cellH, height: cellH }
     }
 
     /** Yapay zeka kipini imlecin hizasında açar (yalnız normal ekranda; tam ekran programlarda değil). */
     openAiRef.current = (): void => {
       const screen = term.element?.querySelector('.xterm-screen')
-      const wrap = wrapRef.current
-      const buf = term.buffer.active
-      if (!screen || !wrap || !commandLineOpen()) return
-      const sr = screen.getBoundingClientRect()
-      const wr = wrap.getBoundingClientRect()
-      const cellW = sr.width / term.cols
-      const cellH = sr.height / term.rows
-      const width = Math.min(560, wr.width * 0.92)
-      const left = Math.min(sr.left - wr.left + buf.cursorX * cellW, wr.width - width - 4)
-      const rowTop = sr.top - wr.top + buf.cursorY * cellH
-      const above = rowTop + cellH + 320 > wr.height
+      if (!screen || !commandLineOpen()) return
       closePopup()
-      setAiAnchor({ left: Math.max(4, left), top: above ? rowTop : rowTop + cellH + 2, above })
+      setAiAnchor(cursorAnchor(screen))
     }
 
     const scheduleRefresh = (): void => {
@@ -570,7 +576,21 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         if (propsRef.current.integrate) {
           info.patch(tabId, { integration: 'pending' })
           gate.start()
-          connRef.current?.input(buildSetupCommand())
+          const prefs = usePreferences.getState()
+          if (prefs.serverStatus) markStatsRequested(tabId)
+          // Komut adları önbellekte tazeyse hemen kullanılır ve sunucudan istenmez.
+          const assetId = findTab(useWorkspace.getState(), tabId)?.asset?.id
+          const cached = assetId ? cachedCommandNames(assetId) : null
+          if (cached) {
+            live.commandNames = cached
+            commandSet = new Set(cached)
+          }
+          void buildSetupCommand({
+            statsIntervalSec: prefs.serverStatus ? prefs.serverStatusInterval : 0,
+            commandNames: !cached
+          }).then((command) => {
+            if (!disposed) connRef.current?.input(command)
+          })
         } else {
           runAutoCommands()
           armActivity()
@@ -585,6 +605,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       if (disposed) return
       term.open(host)
       patchHiddenRendering(term)
+      setWebglVisible(term, visibleRef.current)
       if (!visibleRef.current) setRenderingPaused(term, true)
       // Terminale tıklanınca yapay zeka kipi kapanır.
       term.textarea?.addEventListener('focus', () => setAiAnchor(null))
@@ -739,6 +760,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       connRef.current = null
       terminalRegistry.delete(tabId)
       previewRegistry.delete(tabId)
+      clearStats(tabId)
       forgetTerminal(term)
       term.dispose()
       termRef.current = null
@@ -746,9 +768,14 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   }, [tabId, wsUrl])
 
   // Çizim, sekme gizlendiği anda (aynı işlemdeki odak değişikliğinden önce) duraklatılır, görünür olunca sürdürülür.
+  // WebGL bağlamı bekleyen terminal, bağlamı aldıktan sonra sürdürülür (aşağıdaki etki); önce sürdürülse bekleyen tam
+  // çizim bir kez de DOM çiziciyle yapılır.
   useLayoutEffect(() => {
     const term = termRef.current
-    if (term?.element) setRenderingPaused(term, !visible)
+    if (!term?.element) return
+    setWebglVisible(term, visible)
+    if (!visible) setRenderingPaused(term, true)
+    else if (!needsWebgl(term)) setRenderingPaused(term, false)
   }, [visible])
 
   // Gizlenen terminal WebGL çizicisini korur: bırakılırsa xterm DOM çiziciye geçer ve gizliyken çıktı aktıkça satırları
@@ -760,6 +787,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     if (!visible) return
     syncFontRef.current()
     acquireWebgl(term)
+    setRenderingPaused(term, false)
     requestAnimationFrame(() => {
       const dims = fitRef.current?.proposeDimensions()
       if (dims && (dims.cols !== term.cols || dims.rows !== term.rows)) {
@@ -778,9 +806,22 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   }, [resolvedTheme])
 
   return (
-    <div ref={wrapRef} className="@container relative min-h-0 flex-1 bg-terminal px-2 pt-1.5">
-      {/* Terminal tam satırlardan oluşur; satıra tamamlanmayan artık alan altta değil üstte kalır. */}
-      <div ref={hostRef} className="selectable flex h-full w-full flex-col justify-end" />
+    <div
+      ref={wrapRef}
+      className={cn(
+        '@container relative min-h-0 flex-1 bg-terminal px-2',
+        belowBar ? 'pt-0.5' : 'pt-1.5'
+      )}
+    >
+      {/* Terminal tam satırlardan oluşur; satıra tamamlanmayan artık alan üstte kalır, durum şeridi varsa şeritle
+          terminal arasında boşluk kalmasın diye altta. */}
+      <div
+        ref={hostRef}
+        className={cn(
+          'selectable flex h-full w-full flex-col',
+          belowBar ? 'justify-start' : 'justify-end'
+        )}
+      />
       {scrolledUp && (
         <button
           type="button"

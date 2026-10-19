@@ -7,6 +7,7 @@ import { HostSlot } from '@/features/windows/HostSlot'
 import { useDetachedWindows } from '@/features/windows/detached-windows'
 import { tabHost } from '@/features/windows/tab-hosts'
 import { usePreferences } from '@/stores/preferences'
+import { useSpotlight } from '@/stores/spotlight'
 import {
   MAIN_WINDOW,
   activeOfWindow,
@@ -108,6 +109,8 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
   const group = useWorkspace((s) => groupOf(s.groups, activeOfWindow(s, windowId)))
   const activate = useWorkspace((s) => s.activate)
   const dimInactive = usePreferences((s) => s.dimInactivePanes)
+  const spotlightId = useSpotlight((s) => s.tabId)
+  const flashes = useSpotlight((s) => s.flashes)
   const containerRef = useRef<HTMLDivElement>(null)
   const { layout, paneDrag, startPaneDrag, startResize } = useTiling(group, containerRef)
   const groupActive = Boolean(group)
@@ -125,19 +128,26 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
         const visible = rect ? true : zoomedId ? tab.id === zoomedId : tab.id === activeId
         const focused = tab.id === activeId
         const showHeader = inGroupView && visible
+        // Alarma gidilince gruptaki diğer paneller kısa süre belirgin biçimde soluklaşır.
+        const outshone = Boolean(
+          rect && spotlightId && spotlightId !== tab.id && group?.ids.includes(spotlightId)
+        )
         return (
           <div
             key={tab.id}
+            data-pane={tab.id}
             onPointerDownCapture={() => rect && !focused && activate(tab.id)}
             className={cn(
               'absolute flex-col overflow-hidden',
               visible ? 'flex' : 'hidden',
-              rect && focused && !paneDrag && 'z-10 ring-1 ring-primary/60',
+              rect && 'transition-opacity duration-300',
               rect &&
                 !focused &&
                 dimInactive &&
                 !paneDrag &&
-                'opacity-[0.82] transition-opacity hover:opacity-95',
+                !outshone &&
+                'opacity-[0.82] hover:opacity-95',
+              outshone && 'opacity-15',
               paneDrag && rect && 'transition-[left,top,width,height] duration-200 ease-out'
             )}
             style={rect ? pct(rect) : { inset: 0 }}
@@ -163,6 +173,33 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
       })}
       {paneDrag && <DragGhost drag={paneDrag} tab={tabs.find((t) => t.id === paneDrag.sourceId)} />}
       <TileHandles layout={layout} onResize={startResize} />
+      {/* Odak çerçevesi ve alarm katmanı ayırıcıların üstünde çizilir: ayırıcının çizgisi panel kenarına denk gelir ve
+          panelin kenarını örter. Katman tıklama almaz, ayırıcılar sürüklenebilir kalır. */}
+      {tabs.map((tab) => {
+        const rect = layout?.rects.get(tab.id)
+        const visible = rect ? true : zoomedId ? tab.id === zoomedId : tab.id === activeId
+        const flash = visible ? flashes[tab.id] : undefined
+        const ring = Boolean(rect && tab.id === activeId && !paneDrag && flash === undefined)
+        if (!ring && flash === undefined) return null
+        return (
+          <div
+            key={`frame-${tab.id}`}
+            data-pane-frame={tab.id}
+            aria-hidden
+            className="pointer-events-none absolute z-30"
+            style={rect ? pct(rect) : { inset: 0 }}
+          >
+            {ring && <div data-focus-frame className="absolute inset-0 ring-1 ring-primary/60" />}
+            {flash !== undefined && (
+              <div
+                key={flash}
+                data-alarm-flash
+                className="absolute inset-0 bg-destructive/20 animate-alarm-flash motion-reduce:animate-none"
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

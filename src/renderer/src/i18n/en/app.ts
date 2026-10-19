@@ -148,7 +148,7 @@ export const app: Dictionary = {
   'Grubu Yeni Pencerede Aç': 'Open Group in New Window',
   'Sekmeyi Yeni Pencerede Aç': 'Open Tab in New Window',
   'Ana Pencereye Geri Al: {name}': 'Move Back to Main Window: {name}',
-  'Tümünü Kapat': 'Close All',
+  'Tüm Sekmeleri Kapat': 'Close All Tabs',
   'Sekmeye Geç: {title}': 'Switch to Tab: {title}',
   'Sunucu Ağacını Aç/Kapat': 'Toggle Server Tree',
   'Sağ Paneli Aç/Kapat': 'Toggle Right Panel',

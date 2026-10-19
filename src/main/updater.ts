@@ -1,4 +1,5 @@
 import { app, net, type BrowserWindow } from 'electron'
+import { spawn } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
@@ -10,6 +11,7 @@ import {
 } from 'electron-updater'
 import { IPC } from '@shared/api'
 import { compareVersions, type UpdateInstaller, type UpdateState } from '@shared/update'
+import { mt } from './i18n'
 import { store } from './store'
 
 /** Sürümlerin yayımlandığı GitHub deposu (electron-builder.yml `publish` ile aynı). */
@@ -29,6 +31,8 @@ const releasesApi =
 let target: BrowserWindow | null = null
 let updater: AppUpdater | null = null
 let installing = false
+/** İndirilen paketin yolu (.deb kurulumu bunu kendisi kurar). */
+let downloadedFile: string | null = null
 let state: UpdateState = {
   currentVersion: app.getVersion(),
   installer: null,
@@ -52,6 +56,7 @@ const message = (err: unknown): string =>
  */
 function detectInstaller(): UpdateInstaller | null {
   if (!app.isPackaged && !testFeed) return null
+  if (testFeed && process.env['JUMPDESK_UPDATE_INSTALLER'] === 'deb') return 'deb'
   if (process.platform === 'win32') return process.env['PORTABLE_EXECUTABLE_DIR'] ? null : 'nsis'
   if (process.platform === 'darwin')
     return existsSync(join(process.resourcesPath, 'app-update.yml')) ? 'mac' : null
@@ -87,6 +92,9 @@ function createUpdater(kind: UpdateInstaller): AppUpdater {
     u.updateConfigPath = config
     u.forceDevUpdateConfig = true
   }
+  u.on('update-downloaded', (info: { downloadedFile?: string }) => {
+    downloadedFile = info.downloadedFile ?? null
+  })
   u.on('download-progress', (p: { percent: number }) =>
     set({ status: 'downloading', percent: Math.floor(p.percent) })
   )
@@ -126,7 +134,7 @@ async function checkLatestRelease(): Promise<void> {
 }
 
 export async function checkForUpdates(): Promise<UpdateState> {
-  if (['checking', 'downloading', 'downloaded'].includes(state.status)) return state
+  if (['checking', 'downloading', 'downloaded', 'installing'].includes(state.status)) return state
   set({ status: 'checking', error: undefined })
   try {
     if (updater) {
@@ -155,12 +163,51 @@ export async function downloadUpdate(): Promise<UpdateState> {
   return state
 }
 
+/**
+ * .deb paketi `pkexec` ile kurulur. Parola penceresi açıkken ana süreç beklemez (electron-updater'ın kurulumu
+ * eşzamanlıdır ve pencereyi "yanıt vermiyor" durumuna düşürür); kurulum bitince uygulama yeniden açılır. Bağımlılık
+ * eksikse `apt-get install -f` aynı yetkiyle çalışır. Testlerde `JUMPDESK_TEST_DEB_INSTALLER` pkexec yerine çalışır.
+ */
+function installDeb(file: string): void {
+  set({ status: 'installing', error: undefined })
+  const testInstaller = testFeed ? process.env['JUMPDESK_TEST_DEB_INSTALLER'] : undefined
+  const child = testInstaller
+    ? spawn(testInstaller, [file], { stdio: 'ignore' })
+    : spawn(
+        'pkexec',
+        ['/bin/sh', '-c', 'dpkg -i "$1" || apt-get install -f -y', 'jumpdesk-update', file],
+        { stdio: 'ignore' }
+      )
+  const fail = (error: string): void => {
+    installing = false
+    set({ status: 'downloaded', error })
+  }
+  child.once('error', (err) =>
+    fail(mt('Kurulum başlatılamadı: {message}', { message: message(err) }))
+  )
+  child.once('exit', (code) => {
+    if (code === 0) {
+      store.flushNow()
+      app.relaunch()
+      app.quit()
+    } else if (code === 126 || code === 127) {
+      fail(mt('Parola penceresi kapatıldı ya da yetki verilmedi; güncelleme kurulmadı.'))
+    } else {
+      fail(mt('Güncelleme kurulamadı (çıkış kodu {code}).', { code: code ?? '?' }))
+    }
+  })
+}
+
 /** İndirilen sürümü kurar ve uygulamayı yeniden açar (.deb için sistem parolası sorulur). */
 export function installUpdate(): void {
   if (!updater || state.status !== 'downloaded' || installing) return
   installing = true
   set({ error: undefined })
   store.flushNow()
+  if (state.installer === 'deb' && downloadedFile) {
+    installDeb(downloadedFile)
+    return
+  }
   const u = updater
   setImmediate(() => u.quitAndInstall(false, true))
 }

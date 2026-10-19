@@ -18,12 +18,18 @@ const NEW_VERSION = '9.9.9'
 const payload = crypto.randomBytes(4 * 1024 * 1024)
 const sha512 = crypto.createHash('sha512').update(payload).digest('base64')
 const fileName = `JumpDesk-${NEW_VERSION}.AppImage`
+const debName = `jumpdesk_${NEW_VERSION}_amd64.deb`
+const debPayload = crypto.randomBytes(1024 * 1024)
+const debSha512 = crypto.createHash('sha512').update(debPayload).digest('base64')
 const latestYml = [
   `version: ${NEW_VERSION}`,
   'files:',
   `  - url: ${fileName}`,
   `    sha512: ${sha512}`,
   `    size: ${payload.length}`,
+  `  - url: ${debName}`,
+  `    sha512: ${debSha512}`,
+  `    size: ${debPayload.length}`,
   `path: ${fileName}`,
   `sha512: ${sha512}`,
   "releaseDate: '2026-10-16T12:00:00.000Z'",
@@ -44,6 +50,12 @@ const server = http.createServer((req, res) => {
       'content-length': payload.length
     })
     res.end(payload)
+  } else if (url === `/feed/${debName}`) {
+    res.writeHead(200, {
+      'content-type': 'application/octet-stream',
+      'content-length': debPayload.length
+    })
+    res.end(debPayload)
   } else if (url === '/api/latest') {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ tag_name: latestTag, html_url: 'https://example.com/release' }))
@@ -192,6 +204,56 @@ const shotOf = (app) => async (name) => {
     failed = true
     console.log(`FAIL: ${err.message}`)
     await shot('update-error-b').catch(() => undefined)
+  } finally {
+    await app.close()
+  }
+}
+
+// 3. .deb kurulumu: parola penceresi (sahte kurucu, 2 sn bekleyip iptal koduyla çıkar) açıkken uygulama yanıt verir;
+// iptal edilince hata gösterilir ve yeniden denenebilir.
+{
+  const record = path.join(work, 'deb-installer.log')
+  const installer = path.join(work, 'fake-pkexec.sh')
+  fs.writeFileSync(installer, `#!/bin/sh\necho "$1" > "${record}"\nsleep 2\nexit 126\n`, {
+    mode: 0o755
+  })
+  const app = await launch({
+    JUMPDESK_USER_DATA: path.join(work, 'user-c'),
+    JUMPDESK_UPDATE_URL: `${base}/feed/`,
+    JUMPDESK_UPDATE_INSTALLER: 'deb',
+    JUMPDESK_TEST_DEB_INSTALLER: installer
+  })
+  const page = await app.firstWindow()
+  const shot = shotOf(app)
+  try {
+    await login(app, page)
+    await page.getByText(`JumpDesk ${NEW_VERSION} yayımlandı`).waitFor({ timeout: 15000 })
+    await page.getByRole('button', { name: 'Güncelle', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    const install = dialog.getByRole('button', { name: 'Yeniden Başlat ve Kur' })
+    await install.waitFor({ timeout: 20000 })
+    check(
+      'deb package downloaded',
+      requests.some((u) => u.startsWith(`/feed/${debName}`))
+    )
+    await install.click()
+    await dialog.getByText(/Kuruluyor…/).waitFor({ timeout: 3000 })
+    const t0 = Date.now()
+    await app.evaluate(() => 1)
+    const mainLag = Date.now() - t0
+    check('main process responds while the password dialog is open', mainLag < 300, `${mainLag} ms`)
+    await shot('update-04-installing')
+    await dialog.getByText(/Parola penceresi kapatıldı/).waitFor({ timeout: 8000 })
+    check('cancelled install reports an error', true)
+    check(
+      'installer got the downloaded package',
+      fs.existsSync(record) && fs.readFileSync(record, 'utf8').trim().endsWith('.deb')
+    )
+    check('install can be retried', (await install.count()) === 1)
+  } catch (err) {
+    failed = true
+    console.log(`FAIL: ${err.message}`)
+    await shot('update-error-c').catch(() => undefined)
   } finally {
     await app.close()
   }

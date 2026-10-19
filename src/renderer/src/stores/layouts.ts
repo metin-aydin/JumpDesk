@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { t } from '@/lib/i18n'
 import { onUserScope, readUserJson, writeUserJson } from '@/lib/user-storage'
+import { tileRows } from '@/features/workspace/tile-layout'
 import {
+  groupGrow,
   groupOf,
   useWorkspace,
   type AssetRef,
@@ -13,7 +15,25 @@ import {
 /** Düzendeki bir öğe: tek oturum sekmesi ya da döşenmiş grup. Sıra, sekme şeridindeki sıradır. */
 export type LayoutItem =
   | { type: 'tab'; asset: AssetRef; view?: 'files' }
-  | { type: 'group'; mode: TileMode; assets: AssetRef[] }
+  | {
+      type: 'group'
+      mode: TileMode
+      assets: AssetRef[]
+      /** Panel oranları: satır sırasına göre yükseklikler, sunucu sırasına göre satır içi genişlikler (yoksa eşit). */
+      sizes?: LayoutSizes
+    }
+
+export interface LayoutSizes {
+  rows: number[]
+  cols: number[]
+}
+
+const validSizes = (v: unknown): v is LayoutSizes => {
+  const s = v as LayoutSizes
+  const ok = (a: unknown): boolean =>
+    Array.isArray(a) && a.every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0)
+  return Boolean(s) && ok(s.rows) && ok(s.cols)
+}
 
 export interface SavedLayout {
   id: string
@@ -34,14 +54,19 @@ export function sanitizeLayouts(raw: unknown): SavedLayout[] {
   for (const l of raw as Partial<SavedLayout>[]) {
     if (!l || typeof l.id !== 'string' || typeof l.name !== 'string' || !Array.isArray(l.items))
       continue
-    const items = l.items.filter((i): i is LayoutItem =>
-      i?.type === 'tab'
-        ? validAsset(i.asset)
-        : i?.type === 'group' &&
-          ['vertical', 'horizontal', 'grid'].includes(i.mode) &&
-          Array.isArray(i.assets) &&
-          i.assets.every(validAsset)
-    )
+    const items = l.items
+      .filter((i): i is LayoutItem =>
+        i?.type === 'tab'
+          ? validAsset(i.asset)
+          : i?.type === 'group' &&
+            ['vertical', 'horizontal', 'grid'].includes(i.mode) &&
+            Array.isArray(i.assets) &&
+            i.assets.every(validAsset)
+      )
+      .map((i) => {
+        if (i.type !== 'group' || i.sizes === undefined || validSizes(i.sizes)) return i
+        return { type: 'group' as const, mode: i.mode, assets: i.assets }
+      })
     if (items.length)
       out.push({
         id: l.id,
@@ -61,6 +86,41 @@ function write(layouts: SavedLayout[]): void {
   writeUserJson(KEY, layouts)
 }
 
+/** Grubun panel oranları (hepsi eşitse yok). */
+function sizesOf(group: TabGroup): LayoutSizes | undefined {
+  const grow = groupGrow(group)
+  const rows = tileRows(group.ids, group.mode).map((_r, i) => grow.row[i] ?? 1)
+  const cols = group.ids.map((id) => grow.col[id] ?? 1)
+  return [...rows, ...cols].every((v) => v === 1) ? undefined : { rows, cols }
+}
+
+/** Grubun düzen öğesi: sunucular, yerleşim ve panel oranları. */
+function groupItem(group: TabGroup, tabs: WorkspaceTab[]): LayoutItem {
+  const assets = group.ids
+    .map((id) => tabs.find((t) => t.id === id)?.asset)
+    .filter((a): a is AssetRef => Boolean(a))
+  const sizes = sizesOf(group)
+  return sizes
+    ? { type: 'group', mode: group.mode, assets, sizes }
+    : { type: 'group', mode: group.mode, assets }
+}
+
+/** Satır ağırlıklarını ve satır içi genişlik ağırlıklarını oranlara çevirir (karşılaştırma için). */
+function fractions(ids: string[], mode: TileMode, sizes: LayoutSizes | undefined): number[] {
+  const rows = tileRows(ids, mode)
+  const rowWeights = rows.map((_r, i) => sizes?.rows[i] ?? 1)
+  const rowTotal = rowWeights.reduce((a, b) => a + b, 0)
+  const out = rowWeights.map((w) => w / rowTotal)
+  let index = 0
+  for (const row of rows) {
+    const weights = row.map((_id, c) => sizes?.cols[index + c] ?? 1)
+    const total = weights.reduce((a, b) => a + b, 0)
+    out.push(...weights.map((w) => w / total))
+    index += row.length
+  }
+  return out
+}
+
 /** Açık oturum sekmelerini ve grupları (düzen, sıra) düzen öğelerine çevirir; "Yeni Bağlantı" sekmeleri atlanır. */
 export function captureLayout(): LayoutItem[] {
   const { tabs, groups } = useWorkspace.getState()
@@ -72,10 +132,7 @@ export function captureLayout(): LayoutItem[] {
     if (group) {
       if (seen.has(group.id)) continue
       seen.add(group.id)
-      const assets = group.ids
-        .map((id) => tabs.find((t) => t.id === id)?.asset)
-        .filter((a): a is AssetRef => Boolean(a))
-      items.push({ type: 'group', mode: group.mode, assets })
+      items.push(groupItem(group, tabs))
     } else {
       items.push({ type: 'tab', asset: tab.asset, view: tab.view })
     }
@@ -88,10 +145,7 @@ export function captureGroup(groupId: string): LayoutItem[] {
   const { tabs, groups } = useWorkspace.getState()
   const group = groups.find((g) => g.id === groupId)
   if (!group) return []
-  const assets = group.ids
-    .map((id) => tabs.find((t) => t.id === id)?.asset)
-    .filter((a): a is AssetRef => Boolean(a))
-  return [{ type: 'group', mode: group.mode, assets }]
+  return [groupItem(group, tabs)]
 }
 
 export function countServers(items: LayoutItem[]): number {
@@ -111,7 +165,8 @@ export function openLayout(layout: SavedLayout): void {
       ws.openGroup(item.assets, item.mode, {
         name: layout.name,
         layoutId: layout.id,
-        layoutItem: index
+        layoutItem: index,
+        sizes: item.sizes
       })
       continue
     }
@@ -228,8 +283,8 @@ export const useLayoutDialog = create<LayoutDialogStore>((set) => ({
 }))
 
 /**
- * Grup bağlı olduğu düzenden farklı mı: sunucular, sıraları ya da yerleşim (yan yana / alt alta / ızgara) değişmişse.
- * Düzene bağlı olmayan grup hiçbir zaman "değişmiş" sayılmaz.
+ * Grup bağlı olduğu düzenden farklı mı: sunucular, sıraları, yerleşim (yan yana / alt alta / ızgara) ya da panel
+ * boyutları (%2'den fazla) değişmişse. Düzene bağlı olmayan grup hiçbir zaman "değişmiş" sayılmaz.
  */
 export function isGroupDirty(
   group: TabGroup,
@@ -241,5 +296,10 @@ export function isGroupDirty(
   const item = layout?.items[group.layoutItem ?? 0]
   if (!item || item.type !== 'group') return Boolean(layout)
   const current = group.ids.map((id) => tabs.find((t) => t.id === id)?.asset?.id ?? '')
-  return item.mode !== group.mode || item.assets.map((a) => a.id).join('|') !== current.join('|')
+  if (item.mode !== group.mode || item.assets.map((a) => a.id).join('|') !== current.join('|'))
+    return true
+  const saved = fractions(group.ids, group.mode, item.sizes)
+  const now = fractions(group.ids, group.mode, sizesOf(group))
+  // Kayan nokta farkı dışındaki her oran değişikliği (bir piksellik sürükleme dahil) değişiklik sayılır.
+  return saved.some((v, i) => Math.abs(v - now[i]) > 1e-6)
 }

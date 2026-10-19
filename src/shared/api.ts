@@ -223,9 +223,9 @@ export interface JumpDeskApi {
     resolve(host: string): Promise<string | null>
   }
   notify: {
-    /** Masaüstü bildirimi; tıklanınca pencere öne gelir ve `onClick` sekme kimliğiyle çağrılır. */
-    show(opts: { title: string; body: string; tabId: string }): void
-    onClick(cb: (tabId: string) => void): () => void
+    /** Masaüstü bildirimi; tıklanınca pencere öne gelir ve `onClick` sekme kimliği ve alarm satırıyla çağrılır. */
+    show(opts: { title: string; body: string; tabId: string; line: string }): void
+    onClick(cb: (target: { tabId: string; line: string }) => void): () => void
     /** Gösterilmiş bildirimleri bildirim merkezinden kaldırır (verilirse yalnız o sekmeninkileri). */
     clear(tabId?: string): void
   }

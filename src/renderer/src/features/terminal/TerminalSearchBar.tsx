@@ -4,21 +4,7 @@ import { ArrowDown, ArrowUp, CaseSensitive, Regex, X } from 'lucide-react'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/stores/theme'
-
-const DECORATIONS = {
-  dark: {
-    matchBackground: '#5c4a12',
-    activeMatchBackground: '#c27c0e',
-    matchOverviewRuler: '#d4a017',
-    activeMatchColorOverviewRuler: '#f59e0b'
-  },
-  light: {
-    matchBackground: '#ffe9a8',
-    activeMatchBackground: '#fbbf24',
-    matchOverviewRuler: '#d4a017',
-    activeMatchColorOverviewRuler: '#f59e0b'
-  }
-}
+import { SEARCH_DECORATIONS } from './search-decorations'
 
 /**
  * Terminal geri kaydırma arabelleğinde arama: tüm eşleşmeler vurgulanır, etkin eşleşme görünür alana getirilir.
@@ -55,7 +41,7 @@ export function TerminalSearchBar({
     caseSensitive,
     regex,
     incremental,
-    decorations: DECORATIONS[resolved]
+    decorations: SEARCH_DECORATIONS[resolved]
   })
 
   useEffect(() => {

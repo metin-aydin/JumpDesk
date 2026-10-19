@@ -25,6 +25,7 @@ jobs:
           node dev/ai-providers.test.mjs
           node dev/next-version.test.mjs
           node dev/release-notes.test.mjs
+          node dev/server-stats.test.mjs
       - name: Build
         run: npx electron-vite build
 
