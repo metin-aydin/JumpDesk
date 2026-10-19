@@ -978,3 +978,25 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
     not change", 8%/88%/100%/…/1,56/12,34 aynı genişlik).
 11. Tam e2e (18 test) geçti; sonra yalnız şerit/kart değişti, server-status 34 denetim geçti. Commit `a17c97b`
     pushlandı, PR #5 açıklaması güncellendi (başlık aynı). Birleştirmeyi kullanıcı yapar.
+
+## Kullanıcı istekleri — 41. tur (2026-10-19): 3×5 düzende donma, menü hizası
+1. **Şikâyet:** 3 tane 5 sekmeli düzen açınca uygulama yavaşlıyor, sekme geçişinde sürekli donuyor. Kullanıcı
+   `npm run dev` (electron-vite dev, profil `~/.config/JumpDesk`) kullanıyordu; örnek alındığında ~1 sa 55 dk açıktı ve
+   o sürede bu oturumdaki değişikliklerle onlarca sıcak yenileme (HMR) almıştı. Örnekleme anında süreç boştaydı (%0).
+2. **Ölçüm (yeniden üretilemedi):** `group-perf.mjs` artık `PERF_GROUPS` (çok grup, gruplar arası geçiş),
+   `PERF_STATUS=1` (durum şeridi), `PERF_PROFILE=switch`, grup açılış süresi, hata anında ekran görüntüsü/durum ve GPU adı
+   yazar. Ekran dışı kip de gerçek GPU'yu kullanır (ANGLE AMD Radeon Pro WX 3100, radeonsi). 3×5 + şerit: üretim
+   derlemesi geçiş ≤35 ms, kullanıcının Vite geliştirme sunucusuna bağlı renderer (`ELECTRON_RENDERER_URL=
+   http://127.0.0.1:5173`) ≤28 ms; 15 terminalin 12'si WebGL (havuz sınırı) ve LRU değişimi ekran dışında maliyetsiz.
+3. **Görünür ölçüm güvenilmez:** kullanıcının masaüstünde (GNOME Wayland + XWayland) pencere örtülünce kareler tam 1 sn
+   aralıkla gelir (XWayland'in örtülü pencere için 1 Hz geri çekilmesi), bir kez oturumlar 60 sn "bağlanıyor"da kaldı
+   (kare üretilmeyince ResizeObserver/fit çalışmıyor). `setAlwaysOnTop` da yetmedi. Görünür testi kullanıcı ekranda
+   çalışırken koşmak hem ölçümü bozar hem kullanıcıyı rahatsız eder.
+4. **Sonraki adım (kullanıcıdan):** dev'i `npx electron-vite dev -- --ozone-platform=x11 --remote-debugging-port=9222`
+   ile yeniden başlatıp 3 düzeni açması; donarsa 9222 üzerinden CDP ile iz (Tracing, gpu/cc/viz kategorileri) alınacak.
+5. **"Düzeni Kaydet…" boş "Yeni Bağlantı" sekmesinin sağ tık menüsünde gösterilmez** (`tab.asset` yoksa); menus.mjs
+   denetimi eklendi. Commit `686a3c8`.
+6. **Menü dikey hizası:** kullanıcı "tüm menü öğelerinde metin yukarıya yakın" dedi. Ölçüm (yakınlaştırma 1, kayıtlı
+   UI yazı boyutu yok → yakınlık 1): simge merkezi = metin kutusu merkezi (0,25 px), vurgu kutusu içinde de ortalı;
+   büyük harf merkezi simgeyle aynı, küçük harf gövdesi ~1,3 px aşağıda (Ubuntu yazı tipi ölçüleri). %110'da metin
+   ~0,5 px yukarıda. Kullanıcının gördüğü fark doğrulanamadı → ekran görüntüsü istendi; değişiklik yapılmadı.
