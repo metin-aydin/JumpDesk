@@ -454,27 +454,80 @@ try {
     (await alarmCount()) === 0,
     String(await alarmCount())
   )
-  // Yeni alarm: ekrandaki panelin çerçevesi kırmızı yanıp söner, mavi odak çerçevesi o sırada gizlenir
+  // Yeni alarm: ekrandaki panelin çerçevesi kırmızı yanıp söner (dört kenar da, ayırıcıya bitişik olan dahil), mavi
+  // odak çerçevesi o sırada gizlenir; bitince odak çerçevesi ayırıcıların üstünde görünür. Hareket azaltılınca çerçeve
+  // sabit çizilir, pikseller kesin ölçülür.
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  /** Çerçevenin her kenarından `offset` piksel içeride (eksiyse dışarıda) ortadaki rengi döndürür. */
+  const frameEdges = async (selector, offset) => {
+    const b64 = await app.evaluate(async ({ BrowserWindow }) =>
+      (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString('base64')
+    )
+    return page.evaluate(
+      async ({ b64, selector, offset }) => {
+        const bin = atob(b64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        const img = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+        const g = new OffscreenCanvas(img.width, img.height).getContext('2d')
+        g.drawImage(img, 0, 0)
+        const r = document.querySelector(selector).getBoundingClientRect()
+        const area = document.querySelector('[data-workspace]').getBoundingClientRect()
+        const px = (x, y) => [
+          ...g.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)
+        ]
+        const midX = (r.left + r.right) / 2
+        const midY = (r.top + r.bottom) / 2
+        const edges = {
+          left: [r.left + offset, midY, r.left > area.left + 1],
+          right: [r.right - 1 - offset, midY, r.right < area.right - 1],
+          bottom: [midX, r.bottom - 1 - offset, r.bottom < area.bottom - 1]
+        }
+        return Object.fromEntries(
+          Object.entries(edges)
+            .filter(([, [, , inner]]) => offset >= 0 || inner)
+            .map(([k, [x, y]]) => [k, px(x, y)])
+        )
+      },
+      { b64, selector, offset }
+    )
+  }
+  // Alarm sağdaki panelde (ilk panel değil): sol kenarı ayırıcıya bitişik
+  await header('test-01').click()
+  await page.waitForTimeout(300)
   await page.keyboard.type('sleep 4; echo "Exception F"\n')
   const flashFrame = page.locator('[data-alarm-flash]')
   await flashFrame.waitFor({ timeout: 9000 })
   const flash = await page.evaluate(() => {
-    const frame = document.querySelector('[data-alarm-flash]')
-    const pane = frame.parentElement
+    const id = document.querySelector('[data-alarm-flash]').parentElement.dataset.paneFrame
     return {
       frames: document.querySelectorAll('[data-alarm-flash]').length,
-      server: pane.textContent.includes('jump-ops'),
-      ring: getComputedStyle(pane).boxShadow
+      server: document.querySelector(`[data-pane="${id}"]`).textContent.includes('test-01'),
+      focusFrame: document.querySelectorAll(`[data-pane-frame="${id}"] [data-focus-frame]`).length
     }
   })
+  const red = await frameEdges('[data-alarm-flash]', 0)
+  const isRed = ([r, g, b]) => r > 150 && g < 120 && b < 120
   check(
     'new alarm flashes only its pane frame without the blue ring',
-    flash.frames === 1 && flash.server && flash.ring === 'none',
+    flash.frames === 1 && flash.server && flash.focusFrame === 0,
     JSON.stringify(flash)
+  )
+  check(
+    'alarm frame is red on every side, also next to a separator',
+    Object.values(red).every(isRed),
+    JSON.stringify(red)
   )
   await shot('tools-06c-alarm-flash')
   await page.waitForTimeout(2300)
   check('alarm flash ends', (await flashFrame.count()) === 0)
+  const blue = await frameEdges('[data-focus-frame]', -1)
+  check(
+    'focus frame is blue next to other panes (above separators)',
+    Object.keys(blue).length > 0 && Object.values(blue).every(([r, , b]) => b > r + 40),
+    JSON.stringify(blue)
+  )
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   const clearsAfter = await app.evaluate(() => globalThis.__jumpdeskNotificationClears ?? [])
   check(
     "focusing clears that server's notifications",
@@ -533,7 +586,7 @@ try {
     .click()
   await page.waitForTimeout(450)
   const spot = await page.evaluate(() => {
-    const panes = [...document.querySelectorAll('[data-workspace] > div.absolute')].filter(
+    const panes = [...document.querySelectorAll('[data-workspace] > [data-pane]')].filter(
       (p) => p.getBoundingClientRect().width > 50
     )
     const opacity = (p) => Number(getComputedStyle(p).opacity)
@@ -556,7 +609,7 @@ try {
   await page.keyboard.press('Escape')
   await page.waitForTimeout(2300)
   const afterSpot = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-workspace] > div.absolute')]
+    [...document.querySelectorAll('[data-workspace] > [data-pane]')]
       .filter((p) => p.getBoundingClientRect().width > 50)
       .map((p) => Number(getComputedStyle(p).opacity))
   )
@@ -599,7 +652,7 @@ try {
   // Panel boyutu değişince de düzen değişmiş sayılır; boyutlar düzende saklanır ve düzen açılınca geri gelir
   const paneHeights = () =>
     page.evaluate(() =>
-      [...document.querySelectorAll('[data-workspace] > div.absolute')]
+      [...document.querySelectorAll('[data-workspace] > [data-pane]')]
         .map((el) => el.getBoundingClientRect())
         .filter((r) => r.width > 0 && r.height > 0)
         .map((r) => Math.round(r.height))

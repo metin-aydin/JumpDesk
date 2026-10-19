@@ -52,7 +52,7 @@ try {
   await page.waitForTimeout(1200)
 
   const panes = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-workspace] > div.absolute')]
+    [...document.querySelectorAll('[data-workspace] > [data-pane]')]
       .map((el) => el.getBoundingClientRect())
       .filter((r) => r.width > 50)
       .map((r) => ({ left: r.left, right: r.right }))

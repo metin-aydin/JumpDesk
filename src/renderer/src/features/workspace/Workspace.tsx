@@ -132,15 +132,14 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
         const outshone = Boolean(
           rect && spotlightId && spotlightId !== tab.id && group?.ids.includes(spotlightId)
         )
-        const flash = visible ? flashes[tab.id] : undefined
         return (
           <div
             key={tab.id}
+            data-pane={tab.id}
             onPointerDownCapture={() => rect && !focused && activate(tab.id)}
             className={cn(
               'absolute flex-col overflow-hidden',
               visible ? 'flex' : 'hidden',
-              rect && focused && !paneDrag && flash === undefined && 'z-10 ring-1 ring-primary/60',
               rect && 'transition-opacity duration-300',
               rect &&
                 !focused &&
@@ -166,14 +165,6 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
               tabId={tab.id}
               onPointerDownCapture={() => rect && !focused && activate(tab.id)}
             />
-            {flash !== undefined && (
-              <div
-                key={flash}
-                data-alarm-flash
-                aria-hidden
-                className="pointer-events-none absolute inset-0 z-40 border-2 border-destructive animate-alarm-flash motion-reduce:animate-none"
-              />
-            )}
             {paneDrag && rect && paneDrag.sourceId === tab.id && (
               <div className="pointer-events-none absolute inset-0 z-30 m-1 rounded-md border-2 border-dashed border-primary/60 bg-background" />
             )}
@@ -182,6 +173,33 @@ export function WindowWorkspace({ windowId }: { windowId: string }): React.JSX.E
       })}
       {paneDrag && <DragGhost drag={paneDrag} tab={tabs.find((t) => t.id === paneDrag.sourceId)} />}
       <TileHandles layout={layout} onResize={startResize} />
+      {/* Odak ve alarm çerçeveleri ayırıcıların üstünde çizilir: ayırıcının çizgisi panel kenarına denk gelir ve panelin
+          içindeki çerçeveyi örter. Katman tıklama almaz, ayırıcılar sürüklenebilir kalır. */}
+      {tabs.map((tab) => {
+        const rect = layout?.rects.get(tab.id)
+        const visible = rect ? true : zoomedId ? tab.id === zoomedId : tab.id === activeId
+        const flash = visible ? flashes[tab.id] : undefined
+        const ring = Boolean(rect && tab.id === activeId && !paneDrag && flash === undefined)
+        if (!ring && flash === undefined) return null
+        return (
+          <div
+            key={`frame-${tab.id}`}
+            data-pane-frame={tab.id}
+            aria-hidden
+            className="pointer-events-none absolute z-30"
+            style={rect ? pct(rect) : { inset: 0 }}
+          >
+            {ring && <div data-focus-frame className="absolute inset-0 ring-1 ring-primary/60" />}
+            {flash !== undefined && (
+              <div
+                key={flash}
+                data-alarm-flash
+                className="absolute inset-0 border-2 border-destructive animate-alarm-flash motion-reduce:animate-none"
+              />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

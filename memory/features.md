@@ -1075,3 +1075,18 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    group-perf'te WebGL denetimleri DOM kipinde atlanır. Commit `8ee1b24` `development`'a pushlandı; PR #5 başlığı
    "JumpDesk 0.2.3: server status strip, faster sessions, alarm spotlight", açıklaması (sürüm notu) güncellendi.
    Birleştirmeyi kullanıcı yapar.
+
+## Kullanıcı istekleri — 43. tur (2026-10-19): çerçeveler ayırıcının altında kalıyordu
+1. Şikâyet: gruptaki odak panelinin sağ çerçevesi mavi değil; alarm gelen panel ilk panel değilse sol kenarı kırmızı
+   değil. **Neden:** `TileHandles` ayırıcıları (z-20) panel sınırına 1 px `bg-border` çizgi çizer; odak halkası
+   (`ring-1`, panelin 1 px dışı) ve panel içindeki kırmızı çerçevenin ilk sütunu bu çizginin altında kalıyordu (panel
+   z-10 / z-yok).
+2. **Düzeltme:** odak ve alarm çerçeveleri `WindowWorkspace`'te ayrı katman: `data-pane-frame` (z-30,
+   `pointer-events-none`, panelin `pct(rect)` konumu), içinde `data-focus-frame` (`ring-1 ring-primary/60`) ve
+   `data-alarm-flash`. Panel kabı artık halka/z-10 taşımaz, `data-pane={tabId}` taşır. Paneli ayırıcının üstüne almak
+   tutamacın yarısını tıklanamaz yapardı; katman tıklama almadığı için ayırıcılar sürüklenebilir kalır.
+3. Testler: tools.mjs alarmı sağdaki panelde (test-01) üretir; hareket azaltma (`page.emulateMedia({reducedMotion:
+   'reduce'})`) ile çerçeve sabit çizilir, piksel ölçümüyle dört kenar kırmızı (sol kenar ayırıcıya bitişik:
+   [220,61,67]) ve odak halkası ayırıcı tarafında mavi ([130,169,244]). Testlerde panel seçici
+   `[data-workspace] > [data-pane]` (eskiden `div.absolute`, artık çerçeve katmanını da yakalıyordu). tools 69/69,
+   popups 4/4.
