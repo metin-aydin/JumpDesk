@@ -21,6 +21,7 @@ import { cacheCommandNames, cachedCommandNames } from '@/stores/command-cache'
 import { broadcastPeers, findTab, useWorkspace } from '@/stores/workspace'
 import { aiAutocompleteReady, useAi } from '@/stores/ai'
 import { AiAssistPopup, type AiAnchor } from '@/features/ai/AiAssistPopup'
+import { useStatusBarVisible } from '@/features/server-status/use-status-bar'
 import { useTheme } from '@/stores/theme'
 import { AutocompletePopup, type AutocompleteState } from './AutocompletePopup'
 import type { CursorAnchor } from './CursorPopup'
@@ -117,6 +118,7 @@ function LinkHint({ hint }: { hint: LinkHintState }): React.JSX.Element {
 
 export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   const { tabId, wsUrl, visible, active } = props
+  const belowBar = useStatusBarVisible(tabId) && props.integrate
   const hostRef = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [popup, setPopup] = useState<AutocompleteState | null>(null)
@@ -157,6 +159,9 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const host = hostRef.current
     if (!host) return
     let disposed = false
+    // Ayar açıksa ölçüm kurulumla başlar; şeridin "Durumu Göster" düğmesi bu oturumda çizilmez.
+    if (propsRef.current.integrate && usePreferences.getState().serverStatus)
+      markStatsRequested(tabId)
     let resizeTimer: ReturnType<typeof setTimeout> | null = null
     let idleTimer: ReturnType<typeof setInterval> | null = null
     let ro: ReturnType<typeof observeSize> | null = null
@@ -279,7 +284,9 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         const assetId = findTab(useWorkspace.getState(), tabId)?.asset?.id
         if (assetId) cacheCommandNames(assetId, names)
       },
-      onStats: (payload) => recordStats(tabId, payload),
+      onStats: (payload) => {
+        if (!disposed) recordStats(tabId, payload)
+      },
       onPromptEnd: (pos) => {
         submittedFrom = null
         autoSuggest = true
@@ -784,9 +791,22 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   }, [resolvedTheme])
 
   return (
-    <div ref={wrapRef} className="@container relative min-h-0 flex-1 bg-terminal px-2 pt-1.5">
-      {/* Terminal tam satırlardan oluşur; satıra tamamlanmayan artık alan altta değil üstte kalır. */}
-      <div ref={hostRef} className="selectable flex h-full w-full flex-col justify-end" />
+    <div
+      ref={wrapRef}
+      className={cn(
+        '@container relative min-h-0 flex-1 bg-terminal px-2',
+        belowBar ? 'pt-0.5' : 'pt-1.5'
+      )}
+    >
+      {/* Terminal tam satırlardan oluşur; satıra tamamlanmayan artık alan üstte kalır, durum şeridi varsa şeritle
+          terminal arasında boşluk kalmasın diye altta. */}
+      <div
+        ref={hostRef}
+        className={cn(
+          'selectable flex h-full w-full flex-col',
+          belowBar ? 'justify-start' : 'justify-end'
+        )}
+      />
       {scrolledUp && (
         <button
           type="button"

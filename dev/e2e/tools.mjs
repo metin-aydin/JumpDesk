@@ -525,6 +525,13 @@ try {
     restored.length === resized.length && restored.every((h, i) => Math.abs(h - resized[i]) <= 3),
     `${resized.join(' / ')} → ${restored.join(' / ')}`
   )
+  const nudge = await separator.boundingBox()
+  await page.mouse.move(nudge.x + nudge.width / 2, nudge.y + nudge.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(nudge.x + nudge.width / 2, nudge.y + nudge.height / 2 + 2, { steps: 2 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  check('a 2 px resize shows dirty dot', (await dirtyDot()) === 1)
   await named.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Yan Yana Yerleştir' }).click()
   await page.waitForTimeout(300)

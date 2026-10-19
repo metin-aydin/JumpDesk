@@ -1,7 +1,9 @@
-// Sunucu durumu şeridi: varsayılan kapalı, ayardan açılır; açık oturumda elle başlatılır, yeni oturumda kendiliğinden
-// gelir; dar panelde çipler kayar (tekerlek, ince gösterge), açık kalma süresi sabit kalır; ayrıntı kartı sabit
-// genişlikte ve pencerenin içinde açılır; tam ekran program (less) öndeyken ölçüm durur. Terminal metni okunabilsin
-// diye DOM çizicide çalışır. Kullanım: node dev/e2e/server-status.mjs <klasör> (mock açıkken)
+// Sunucu durumu şeridi: varsayılan kapalı, ayardan açılır; açık oturumda tam genişlikteki düğme onayla yeniden bağlanarak
+// başlatır, yeni oturumda kendiliğinden gelir; şeritle terminal arasında boşluk kalmaz; dar panelde çipler kayar
+// (tekerlek, yalnız fare üzerindeyken görünen ince gösterge), açık kalma süresi sabit kalır; her çip kendi kartını açar
+// (CPU/bellek geçmişi ve en çok kullanan işlemler, en büyük disk, çekirdek başına kullanım); kart sabit genişlikte ve
+// pencerenin içinde açılır; tam ekran program (less) öndeyken ölçüm durur. Terminal metni okunabilsin diye DOM
+// çizicide çalışır. Kullanım: node dev/e2e/server-status.mjs <klasör> (mock açıkken)
 import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -77,13 +79,37 @@ try {
     (await page.getByRole('button', { name: 'Durumu Göster' }).count()) === 0
   )
 
-  // 2. Ayar açılınca açık oturumda elle başlatılır; işlem tablosunda iş görünmez
+  // 2. Ayar açılınca açık oturumda tam genişlikteki düğme yeniden bağlanmayı sorar; Evet yeniden bağlar ve ölçüm başlar
   await setEnabled(true)
   const startButton = page.getByRole('button', { name: 'Durumu Göster' })
   await startButton.waitFor({ timeout: 5000 })
-  check('open session offers to start', true)
+  const startWidth = await startButton.evaluate((el) => ({
+    button: Math.round(el.getBoundingClientRect().width),
+    pane: Math.round(el.parentElement.getBoundingClientRect().width)
+  }))
+  check(
+    'start button spans the session width',
+    startWidth.button === startWidth.pane,
+    JSON.stringify(startWidth)
+  )
+  const reconnectText = page.getByText('Sunucu durumu yeni bağlantıyla başlar.', { exact: false })
   await startButton.click()
-  await strips().first().waitFor({ timeout: 8000 })
+  await reconnectText.waitFor({ timeout: 3000 })
+  await page.waitForTimeout(300)
+  await shot('status-00b-confirm')
+  await page.getByRole('button', { name: 'Hayır' }).click()
+  await page.waitForTimeout(500)
+  check(
+    'answering no keeps the session',
+    (await startButton.count()) === 1 &&
+      (await page.locator('[data-server-status]').count()) === 0 &&
+      /root@jump-ops/.test(await terminalText())
+  )
+  await startButton.click()
+  await reconnectText.waitFor({ timeout: 3000 })
+  await page.getByRole('button', { name: 'Evet' }).click()
+  await strips().first().waitFor({ timeout: 15000 })
+  check('answering yes reconnects and starts the strip', true)
   await page.waitForFunction(
     () => /CPU\s*\d+%/.test(document.querySelector('[data-server-status]')?.textContent ?? ''),
     null,
@@ -99,6 +125,34 @@ try {
     stripText.replace(/\s+/g, ' ')
   )
   check('uptime shown on the right', /\d+ (gün|sa|dk)/.test(stripText))
+  // Çip değeri sabit genişlikte: tek, çift ve üç haneli değerlerde çip boyu aynı kalır
+  const chipWidths = await strips()
+    .first()
+    .evaluate((strip) =>
+      [...strip.querySelectorAll('[data-chip-value]')].map((value) => {
+        const chip = value.closest('button')
+        const original = value.textContent
+        const widths = ['8%', '88%', '100%', '…', '1,56', '12,34'].map((text) => {
+          value.textContent = text
+          return chip.getBoundingClientRect().width
+        })
+        value.textContent = original
+        return widths
+      })
+    )
+  check(
+    'chip widths do not change with the number of digits',
+    chipWidths.length === 4 && chipWidths.every((w) => w.every((x) => x === w[0])),
+    JSON.stringify(chipWidths)
+  )
+  const gap = await page.evaluate(() => {
+    const strip = document.querySelector('[data-server-status]').getBoundingClientRect()
+    const screen = [...document.querySelectorAll('.xterm-screen')]
+      .find((e) => e.getBoundingClientRect().width > 0)
+      .getBoundingClientRect()
+    return Math.round(screen.top - strip.bottom)
+  })
+  check('terminal starts right below the strip', gap >= 0 && gap <= 3, `${gap}px`)
   await page.locator('.xterm-helper-textarea:visible').first().focus()
   await page.keyboard.type('jobs; echo JOBS-END\n')
   await page.waitForTimeout(800)
@@ -150,8 +204,22 @@ try {
     return t ? Math.round(t.getBoundingClientRect().height) : null
   })
   check('thin scroll indicator', thumb !== null && thumb <= 3, `${thumb}`)
+  const thumbOpacity = () =>
+    scroll.evaluate(
+      (el) => getComputedStyle(el.parentElement.querySelector('[aria-hidden]')).opacity
+    )
+  await page.mouse.move(5, HEIGHT - 5)
+  await page.waitForTimeout(300)
+  const hiddenOpacity = await thumbOpacity()
   const box = await scroll.boundingBox()
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.waitForTimeout(300)
+  const hoverOpacity = await thumbOpacity()
+  check(
+    'scroll indicator shows only on hover',
+    hiddenOpacity === '0' && hoverOpacity === '1',
+    `${hiddenOpacity} → ${hoverOpacity}`
+  )
   await page.mouse.wheel(0, 200)
   await page.waitForTimeout(300)
   const scrolled = await scroll.evaluate((el) => el.scrollLeft)
@@ -173,8 +241,10 @@ try {
     ['cpu', /CPU/, /Ortalama|Geçmiş birikiyor/],
     ['mem', /Bellek/, /GB/],
     ['disk', /Diskler/, /\//],
-    ['load', /Yük/, /dk ortalaması/]
+    ['load', /Yük/, /Çekirdek başına kullanım/]
   ]
+  // Sahte sunucunun kabuğu bu makinede çalışır: çekirdek sayısı buradan gelir.
+  const cpuCount = os.cpus().length
   for (const [index, [focus, title, detail]] of expectations.entries()) {
     const chip = scroll.getByRole('button').nth(index)
     await chip.scrollIntoViewIfNeeded()
@@ -201,7 +271,61 @@ try {
         'cpu card shows a history chart',
         (await page.getByRole('img', { name: 'CPU Geçmişi' }).count()) === 1
       )
+      const top = await card
+        .getByRole('list', { name: 'En çok CPU kullananlar' })
+        .locator('li')
+        .allInnerTexts()
+      check(
+        'cpu card lists top cpu processes',
+        top.length >= 1 && top.length <= 5 && top.every((r) => /\d+%$/.test(r.trim())),
+        top.map((r) => r.replace(/\s+/g, ' ')).join(' | ')
+      )
       await shot('status-03-card-cpu')
+    }
+    if (focus === 'mem') {
+      const top = await card
+        .getByRole('list', { name: 'En çok bellek kullananlar' })
+        .locator('li')
+        .allInnerTexts()
+      check(
+        'memory card lists top 5 memory processes',
+        top.length === 5 && top.every((r) => /\d+ (MB|GB)$/.test(r.trim())),
+        top.map((r) => r.replace(/\s+/g, ' ')).join(' | ')
+      )
+      await shot('status-03b-card-mem')
+    }
+    if (focus === 'disk') {
+      const chipMount = (await chip.innerText())
+        .replace(/^Disk\s*/, '')
+        .replace(/\s*\d+%$/, '')
+        .trim()
+      const sizes = await card.evaluate((el) =>
+        [...el.querySelectorAll('[title]')].map((m) => ({
+          mount: m.getAttribute('title'),
+          size: Number(m.nextElementSibling.innerText.match(/\/\s*([\d.,]+)/)[1].replace(',', '.'))
+        }))
+      )
+      check(
+        'disk chip shows the largest disk, listed first',
+        sizes.length > 0 &&
+          sizes[0].mount === chipMount &&
+          sizes.every((d) => d.size <= sizes[0].size),
+        `${chipMount} · ${sizes.map((d) => `${d.mount} ${d.size}`).join(', ')}`
+      )
+    }
+    if (focus === 'load') {
+      const rows = card.locator('[data-core]')
+      const charts = card.getByRole('img', { name: /^cpu\d+ Geçmişi$/ })
+      check(
+        'load card lists every core with a line chart',
+        (await rows.count()) === cpuCount && (await charts.count()) === cpuCount,
+        `${await rows.count()} çekirdek, ${await charts.count()} grafik / ${cpuCount}`
+      )
+      check(
+        'load card has no load averages or uptime',
+        !/ortalaması|1 \/ 5 \/ 15|Açık kalma/.test(text)
+      )
+      await shot('status-03c-card-load')
     }
     await page.keyboard.press('Escape')
     await page.waitForTimeout(300)

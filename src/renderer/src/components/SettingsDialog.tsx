@@ -438,10 +438,7 @@ function ServerStatusSection(): React.JSX.Element {
             aria-label={t('Sunucu Durum Şeridi')}
           />
         </SettingRow>
-        <SettingRow
-          title={t('Yenileme Aralığı')}
-          description={t('Yeni bağlantılarda ve şeritten başlatılan ölçümlerde geçerlidir.')}
-        >
+        <SettingRow title={t('Yenileme Aralığı')} description={t('Yeni bağlantılarda geçerlidir.')}>
           <div className="flex shrink-0 gap-1">
             {SERVER_STATUS_INTERVALS.map((sec) => (
               <button
@@ -464,7 +461,7 @@ function ServerStatusSection(): React.JSX.Element {
       </div>
       <p className="text-[11.5px] text-muted-foreground">
         {t(
-          'Ölçümü, bağlanınca sunucuda arka planda çalışan küçük bir döngü yapar; sunucuya hiçbir şey kurulmaz ve bilgiler yalnız bu uygulamada gösterilir. Tam ekran programlar (vim, less, top) açıkken ölçüm durur. Ayarı açmadan önce bağlanılan oturumlarda şeritteki "Durumu Göster" ile başlatılır; ayar kapatılınca açık oturumlardaki ölçüm oturum bitene kadar sürer.'
+          'Ölçümü, bağlanınca sunucuda arka planda çalışan küçük bir döngü yapar; sunucuya hiçbir şey kurulmaz ve bilgiler yalnız bu uygulamada gösterilir. Tam ekran programlar (vim, less, top) açıkken ölçüm durur. Ayarı açmadan önce bağlanılan oturumlarda şeritteki "Durumu Göster" oturumu yeniden bağlayarak başlatır; ayar kapatılınca açık oturumlardaki ölçüm oturum bitene kadar sürer.'
         )}
       </p>
     </div>

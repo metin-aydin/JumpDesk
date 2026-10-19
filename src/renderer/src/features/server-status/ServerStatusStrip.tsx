@@ -1,22 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Activity } from 'lucide-react'
-import { toast } from 'sonner'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { buildStatsStartCommand } from '@/features/terminal/shell-integration'
-import { terminalRegistry } from '@/features/terminal/registry'
 import { currentLocale, useT } from '@/lib/i18n'
-import { usePreferences } from '@/stores/preferences'
-import {
-  fullestDisk,
-  markStatsRequested,
-  usageLevel,
-  useServerStats,
-  type ServerStats
-} from '@/stores/server-stats'
-import { useSessionInfo } from '@/stores/session-info'
+import { cn } from '@/lib/utils'
+import { useConfirm } from '@/stores/confirm'
+import { largestDisk, usageLevel, useServerStats, type ServerStats } from '@/stores/server-stats'
 import { LEVEL_CLASS, formatPercent } from './format'
 import { ServerStatusCard, type StatFocus } from './ServerStatusCard'
+import { useStatusBarVisible } from './use-status-bar'
 
 /** Şeritteki kısa açık kalma süresi: gün, saat ya da dakika. */
 function shortUptime(t: ReturnType<typeof useT>, seconds: number): string {
@@ -29,6 +21,27 @@ function shortUptime(t: ReturnType<typeof useT>, seconds: number): string {
 
 const CHIP =
   'inline-flex h-[18px] shrink-0 items-center gap-1 rounded bg-muted px-1.5 text-[11px] text-foreground/90 transition-colors hover:bg-accent focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none data-[popup-open]:bg-accent'
+
+/**
+ * Çipteki değer: "100%" ya da "12,34" sığacak sabit genişlikte, sağa hizalı ve eşit genişlikte rakamlarla; değer tek
+ * haneden çift haneye geçince çip boyu değişmez.
+ */
+function ChipValue({
+  className,
+  children
+}: {
+  className?: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <span
+      data-chip-value
+      className={cn('inline-block min-w-[4.5ch] text-right tabular-nums', className)}
+    >
+      {children}
+    </span>
+  )
+}
 
 /** Çip: tıklayınca ayrıntı kartı açılır (kart sayfaya çizilir; dar panelde kırpılmaz). */
 function StatChip({
@@ -50,7 +63,7 @@ function StatChip({
       >
         {children}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 gap-0 p-3">
+      <PopoverContent align="start" className="w-80 gap-0 p-3 pb-2">
         <ServerStatusCard tabId={tabId} stats={stats} focus={focus} />
       </PopoverContent>
     </Popover>
@@ -58,8 +71,8 @@ function StatChip({
 }
 
 /**
- * Yatay kaydırılan alan: tarayıcının kaydırma çubuğu gizlidir (yer kaplamaz), içerik taşınca altta ince bir gösterge
- * belirir; fare tekerleği alanı yatay kaydırır, gösterge sürüklenebilir.
+ * Yatay kaydırılan alan: tarayıcının kaydırma çubuğu gizlidir (yer kaplamaz), içerik taşınca fare üzerindeyken altta
+ * ince bir gösterge belirir; fare tekerleği alanı yatay kaydırır, gösterge sürüklenebilir.
  */
 function ScrollRow({ children }: { children: React.ReactNode }): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
@@ -135,7 +148,7 @@ function ScrollRow({ children }: { children: React.ReactNode }): React.JSX.Eleme
         <div
           aria-hidden
           onPointerDown={startDrag}
-          className="absolute bottom-0 h-[3px] cursor-default rounded-full bg-foreground/20 transition-colors group-hover/row:bg-foreground/35 hover:bg-foreground/50"
+          className="absolute bottom-0 h-[3px] cursor-default rounded-full bg-foreground/35 opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-foreground/50 active:opacity-100"
           style={{ left: thumb.left, width: thumb.width }}
         />
       )}
@@ -144,17 +157,20 @@ function ScrollRow({ children }: { children: React.ReactNode }): React.JSX.Eleme
 }
 
 /**
- * Sunucu durumu şeridi (başlığın altında): CPU, bellek, en dolu disk ve yük çipleri; sağda açık kalma süresi. Ayar
+ * Sunucu durumu şeridi (başlığın altında): CPU, bellek, en büyük disk ve yük çipleri; sağda açık kalma süresi. Ayar
  * kapalıysa, oturum Linux kabuk entegrasyonu taşımıyorsa ya da henüz veri gelmediyse çizilmez. Ayar açılmadan önce
  * bağlanan oturumda ölçümü başlatan bir düğme gösterilir.
  */
-export function ServerStatusStrip({ tabId }: { tabId: string }): React.JSX.Element | null {
+export function ServerStatusStrip({
+  tabId,
+  onReconnect
+}: {
+  tabId: string
+  onReconnect: () => void
+}): React.JSX.Element | null {
   const t = useT()
-  const enabled = usePreferences((s) => s.serverStatus)
-  const interval = usePreferences((s) => s.serverStatusInterval)
-  const integration = useSessionInfo((s) => s.byTab[tabId]?.integration)
+  const visible = useStatusBarVisible(tabId)
   const stats = useServerStats((s) => s.byTab[tabId])
-  const requested = useServerStats((s) => s.requested[tabId] ?? false)
   const [now, setNow] = useState(() => Date.now())
 
   // Açık kalma süresi örnekler arasında da ilerler (dakikalık gösterim için dakikada bir yenilenir).
@@ -164,33 +180,42 @@ export function ServerStatusStrip({ tabId }: { tabId: string }): React.JSX.Eleme
     return () => clearInterval(id)
   }, [stats])
 
-  if (!enabled || integration !== 'ready') return null
+  if (!visible) return null
 
   if (!stats) {
-    if (requested) return null
-    const start = (): void => {
-      const handle = terminalRegistry.get(tabId)
-      if (!handle?.live.atPrompt) {
-        toast.info(t('Komut satırı boşken başlatılabilir'))
-        return
-      }
-      markStatsRequested(tabId)
-      handle.run(buildStatsStartCommand(interval))
+    // Ölçüm döngüsü kurulum betiğiyle başlar; ayar açılmadan önce bağlanan oturum yeniden bağlanır.
+    const start = async (): Promise<void> => {
+      const ok = await useConfirm.getState().ask({
+        title: t('Yeniden Bağlantı Gerekiyor'),
+        description: t(
+          'Sunucu durumu yeni bağlantıyla başlar. Oturum yeniden bağlanınca terminaldeki çıktı silinir ve sunucuda çalışan komutlar sonlanır. Yeniden bağlanılsın mı?'
+        ),
+        confirmLabel: t('Evet'),
+        cancelLabel: t('Hayır')
+      })
+      if (ok) onReconnect()
     }
     return (
-      <div className="flex h-6 shrink-0 items-center border-b bg-muted/30 px-1.5">
-        <Tooltip>
-          <TooltipTrigger render={<button type="button" className={CHIP} onClick={start} />}>
-            <Activity className="size-3" /> {t('Durumu Göster')}
-          </TooltipTrigger>
-          <TooltipContent>{t('Bu Oturumda Sunucu Durumunu Başlat')}</TooltipContent>
-        </Tooltip>
-      </div>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              data-status-start
+              onClick={() => void start()}
+              className="flex h-6 w-full shrink-0 items-center justify-center gap-1 border-b bg-muted/30 text-[11px] text-foreground/90 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+            />
+          }
+        >
+          <Activity className="size-3" /> {t('Durumu Göster')}
+        </TooltipTrigger>
+        <TooltipContent>{t('Oturumu Yeniden Bağlayıp Sunucu Durumunu Başlat')}</TooltipContent>
+      </Tooltip>
     )
   }
 
   const memPercent = stats.memTotal > 0 ? (stats.memUsed / stats.memTotal) * 100 : null
-  const disk = fullestDisk(stats.disks)
+  const disk = largestDisk(stats.disks)
   const diskPercent = disk ? (disk.used / disk.size) * 100 : null
   const uptime =
     stats.uptimeSec !== null ? stats.uptimeSec + Math.max(0, now - stats.updatedAt) / 1000 : null
@@ -204,25 +229,27 @@ export function ServerStatusStrip({ tabId }: { tabId: string }): React.JSX.Eleme
     >
       <ScrollRow>
         <StatChip tabId={tabId} stats={stats} focus="cpu">
-          {t('CPU')} <span className={level(stats.cpu)}>{formatPercent(stats.cpu)}</span>
+          {t('CPU')} <ChipValue className={level(stats.cpu)}>{formatPercent(stats.cpu)}</ChipValue>
         </StatChip>
         <StatChip tabId={tabId} stats={stats} focus="mem">
-          {t('RAM')} <span className={level(memPercent)}>{formatPercent(memPercent)}</span>
+          {t('RAM')}{' '}
+          <ChipValue className={level(memPercent)}>{formatPercent(memPercent)}</ChipValue>
         </StatChip>
         {disk && (
           <StatChip tabId={tabId} stats={stats} focus="disk">
             {t('Disk')} <span className="text-muted-foreground">{disk.mount}</span>
-            <span className={level(diskPercent)}>{formatPercent(diskPercent)}</span>
+            <ChipValue className={level(diskPercent)}>{formatPercent(diskPercent)}</ChipValue>
           </StatChip>
         )}
         {stats.load && (
           <StatChip tabId={tabId} stats={stats} focus="load">
             {t('Load')}{' '}
-            <span className="text-muted-foreground">
-              {new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 2 }).format(
-                stats.load[0]
-              )}
-            </span>
+            <ChipValue className="text-muted-foreground">
+              {new Intl.NumberFormat(currentLocale(), {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              }).format(stats.load[0])}
+            </ChipValue>
           </StatChip>
         )}
       </ScrollRow>

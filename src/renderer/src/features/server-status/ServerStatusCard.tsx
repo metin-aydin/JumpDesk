@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { currentLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { usageLevel, type ServerStats } from '@/stores/server-stats'
+import { usageLevel, type ProcessUsage, type ServerStats } from '@/stores/server-stats'
 import { findTab, useWorkspace } from '@/stores/workspace'
-import { LEVEL_CLASS, formatGb, formatPercent } from './format'
+import { LEVEL_CLASS, formatGb, formatMemory, formatPercent } from './format'
 
 /** Kartın hangi çipten açıldığı; kart o bilginin ayrıntısını gösterir. */
 export type StatFocus = 'cpu' | 'mem' | 'disk' | 'load'
@@ -80,6 +80,68 @@ function HistoryChart({ values, label }: { values: number[]; label: string }): R
   )
 }
 
+/** Satır içi küçük çizgi grafik (0–100); tek değer varken boş kalır. */
+function Sparkline({ values, label }: { values: number[]; label: string }): React.JSX.Element {
+  const w = 100
+  const h = 16
+  const step = values.length > 1 ? w / (values.length - 1) : 0
+  const y = (v: number): number => h - (Math.min(100, Math.max(0, v)) / 100) * (h - 2) - 1
+  const line = values.map((v, i) => `${(i * step).toFixed(2)},${y(v).toFixed(2)}`).join(' ')
+  return (
+    <svg
+      role="img"
+      aria-label={label}
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      className="h-4 min-w-0 flex-1 rounded-sm bg-muted/40 text-primary"
+    >
+      {values.length > 1 && (
+        <>
+          <polygon points={`0,${h} ${line} ${w},${h}`} fill="currentColor" fillOpacity={0.12} />
+          <polyline
+            points={line}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.25}
+            vectorEffect="non-scaling-stroke"
+          />
+        </>
+      )}
+    </svg>
+  )
+}
+
+/** En çok kaynak kullanan işlemler: ad, PID ve değer. */
+function ProcessList({
+  title,
+  items,
+  format
+}: {
+  title: string
+  items: ProcessUsage[]
+  format: (value: number) => string
+}): React.JSX.Element | null {
+  if (items.length === 0) return null
+  return (
+    <div className="space-y-1">
+      <div className="text-[10.5px] text-muted-foreground">{title}</div>
+      <ul aria-label={title} className="space-y-0.5">
+        {items.map((p) => (
+          <li key={p.pid} data-process={p.pid} className="flex items-baseline gap-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={p.name}>
+              {p.name}
+            </span>
+            <span className="shrink-0 text-[10.5px] text-muted-foreground tabular-nums">
+              {p.pid}
+            </span>
+            <span className="w-14 shrink-0 text-right tabular-nums">{format(p.value)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }): React.JSX.Element {
   return (
     <div className="flex items-baseline justify-between gap-2">
@@ -87,15 +149,6 @@ function Row({ label, value }: { label: string; value: React.ReactNode }): React
       <span className="text-right tabular-nums">{value}</span>
     </div>
   )
-}
-
-/** Uzun biçimli açık kalma süresi (gün ve saat). */
-function longUptime(t: ReturnType<typeof useT>, seconds: number): string {
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  if (days >= 1) return t('{d} gün {h} sa', { d: days, h: hours })
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return hours >= 1 ? t('{h} sa {m} dk', { h: hours, m: minutes }) : t('{n} dk', { n: minutes })
 }
 
 const TITLES: Record<StatFocus, string> = {
@@ -129,7 +182,6 @@ export function ServerStatusCard({
   const number = new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 2 })
   const memPercent = stats.memTotal > 0 ? (stats.memUsed / stats.memTotal) * 100 : null
   const ago = Math.max(0, Math.round((now - stats.updatedAt) / 1000))
-  const uptime = stats.uptimeSec !== null ? stats.uptimeSec + (now - stats.updatedAt) / 1000 : null
   const level = (v: number | null): string => LEVEL_CLASS[usageLevel(v)]
 
   return (
@@ -159,6 +211,13 @@ export function ServerStatusCard({
               value={stats.load.map((v) => number.format(v)).join(' · ')}
             />
           )}
+          <ProcessList
+            title={t('En çok CPU kullananlar')}
+            items={stats.topCpu}
+            format={(v) =>
+              `${new Intl.NumberFormat(currentLocale(), { maximumFractionDigits: 1 }).format(v)}%`
+            }
+          />
         </>
       )}
 
@@ -180,13 +239,18 @@ export function ServerStatusCard({
               value={`${formatGb(stats.swapUsed)} / ${formatGb(stats.swapTotal)} GB`}
             />
           )}
+          <ProcessList
+            title={t('En çok bellek kullananlar')}
+            items={stats.topMem}
+            format={formatMemory}
+          />
         </>
       )}
 
       {focus === 'disk' && (
         <div className="space-y-2">
           {[...stats.disks]
-            .sort((a, b) => b.used / b.size - a.used / a.size)
+            .sort((a, b) => b.size - a.size)
             .map((d) => {
               const percent = (d.used / d.size) * 100
               return (
@@ -209,32 +273,37 @@ export function ServerStatusCard({
         </div>
       )}
 
-      {focus === 'load' && stats.load && (
+      {focus === 'load' && (
         <div className="space-y-1.5">
-          {(['1', '5', '15'] as const).map((minutes, i) => {
-            const value = stats.load![i]
-            const perCore = stats.cores ? (value / stats.cores) * 100 : null
-            return (
-              <div key={minutes} className="space-y-0.5">
-                <Row
-                  label={t('{n} dk ortalaması', { n: minutes })}
-                  value={
-                    <>
-                      {number.format(value)}
-                      {perCore !== null && (
-                        <span className={cn('ml-1.5', level(perCore))}>
-                          {t('çekirdek başına {value}', { value: formatPercent(perCore) })}
-                        </span>
-                      )}
-                    </>
-                  }
-                />
-                {perCore !== null && <UsageBar percent={perCore} />}
-              </div>
-            )
-          })}
-          {stats.cores !== null && <Row label={t('Çekirdek')} value={stats.cores} />}
-          {uptime !== null && <Row label={t('Açık kalma süresi')} value={longUptime(t, uptime)} />}
+          <div className="flex items-baseline justify-between gap-2 text-[10.5px] text-muted-foreground">
+            <span>{t('Çekirdek başına kullanım')}</span>
+            {stats.cores !== null && <span>{t('{n} çekirdek', { n: stats.cores })}</span>}
+          </div>
+          {stats.coreHistory.length === 0 ? (
+            <div className="flex h-16 items-center justify-center rounded-md bg-muted/40 text-[11px] text-muted-foreground">
+              {t('Geçmiş birikiyor…')}
+            </div>
+          ) : (
+            <ul
+              aria-label={t('Çekirdek başına kullanım')}
+              className="max-h-72 space-y-1 overflow-y-auto"
+            >
+              {stats.coreHistory.map((values, i) => {
+                const current = stats.coreUsage[i] ?? values[values.length - 1] ?? null
+                return (
+                  <li key={i} data-core={i} className="flex items-center gap-2">
+                    <span className="w-10 shrink-0 font-mono text-[10.5px] text-muted-foreground">
+                      {`cpu${i}`}
+                    </span>
+                    <Sparkline values={values} label={t('cpu{n} Geçmişi', { n: i })} />
+                    <span className={cn('w-9 shrink-0 text-right tabular-nums', level(current))}>
+                      {formatPercent(current)}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
       )}
 

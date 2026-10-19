@@ -300,5 +300,6 @@ export function isGroupDirty(
     return true
   const saved = fractions(group.ids, group.mode, item.sizes)
   const now = fractions(group.ids, group.mode, sizesOf(group))
-  return saved.some((v, i) => Math.abs(v - now[i]) > 0.02)
+  // Kayan nokta farkı dışındaki her oran değişikliği (bir piksellik sürükleme dahil) değişiklik sayılır.
+  return saved.some((v, i) => Math.abs(v - now[i]) > 1e-6)
 }

@@ -562,7 +562,7 @@ export function SessionView({
   const integrate = phase.protocol === 'ssh' && osKind(phase.detail.type?.value) === 'linux'
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      {integrate && <ServerStatusStrip tabId={tab.id} />}
+      {integrate && <ServerStatusStrip tabId={tab.id} onReconnect={() => void reconnect()} />}
       <TerminalPane
         key={phase.token.id}
         tabId={tab.id}

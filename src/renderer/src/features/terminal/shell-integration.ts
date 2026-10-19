@@ -6,7 +6,7 @@ import type { IDisposable, Terminal } from '@xterm/xterm'
  *   C = çalışma dizini, L = dizindeki girdiler (`ls -1Ap`), X = son komut (`history 1`, numarasıyla),
  *   H = geçmiş (kurulumda bir kez), I = sunucunun IP'leri, K = komut adları, B = istem sonu (girdi başlangıcı),
  *   M = sunucu durumu (arka plandaki ölçüm döngüsünden; bkz. STATS_SCRIPT).
- * Küçük harfli h ve k, H ve K'nin gzip ile sıkıştırılmış hâlidir (kurulumda gönderilen büyük veri).
+ * Küçük harfli h, k ve m; H, K ve M'nin gzip ile sıkıştırılmış hâlidir (büyük ya da sık gönderilen veri).
  */
 export const OSC_ID = 6973
 /** Entegrasyon işlevlerinin ön eki; bunu içeren komutlar geçmişe ve önerilere alınmaz. */
@@ -27,16 +27,21 @@ alias ls >/dev/null 2>&1||alias ls='ls --color=auto';alias grep >/dev/null 2>&1|
 __jd_init(){ __jd_osc I "$(__jd_ip|__jd_b64)";__jd_osc h "$(__jd_hist|gzip -c|__jd_b64)";[ "$1" = 1 ]&&__jd_osc k "$(__jd_cmds|head -n 5000|gzip -c|__jd_b64)";__jd_last=$(__jd_last1);[ "$2" -gt 0 ] 2>/dev/null&&__jd_stat_start "$2";return 0;}`
 
 /**
- * Sunucu durumu (yalnız Linux, `/proc`): arka planda çalışan döngü (`__jd_sl`) belirli aralıklarla CPU sayaçlarını,
- * belleği, yükü ve açık kalma süresini; ilk örnekte ve her altıncı örnekte çekirdek sayısını, işletim sistemini ve
- * yerel diskleri (`df -l`) M türünde yayar (`__jd_sm`; `__jd_ss` güvenli anı denetler). Kurulum komutu tek satırdır ve
- * satır düzenlemesi olmayan kabuklarda 4096 baytı aşmamalı; betik bu yüzden kısa yazılır. Çıktı terminale yazıldığı için tam ekran programlar ve uzak bağlantılar (vim, less, top,
+ * Sunucu durumu (yalnız Linux, `/proc`): arka planda çalışan döngü (`__jd_sl`) belirli aralıklarla toplam ve çekirdek
+ * başına CPU sayaçlarını, belleği, yükü ve açık kalma süresini; ilk örnekte ve her altıncı örnekte çekirdek sayısını,
+ * bellek sayfası boyutunu, işletim sistemini ve yerel diskleri (`df -l`) gzip'li m türünde yayar (`__jd_sm`; `__jd_ss`
+ * güvenli anı denetler). Her örnekte en çok CPU harcayan (`pc`, önceki örnekten bu yana tik) ve en çok bellek tutan
+ * (`pm`, sayfa) beş işlem de gelir (`__jd_pr` tüm işlemlerin sayaçları, `__jd_tp` farkı ve sıralamayı çıkarır).
+ * Kurulum komutu tek satırdır ve satır düzenlemesi olmayan kabuklarda 4096 baytı aşmamalı; betik bu yüzden kısa
+ * yazılır. Çıktı terminale yazıldığı için tam ekran programlar ve uzak bağlantılar (vim, less, top,
  * ssh…) öndeyken susar; aksi halde programın çıktı dizilerinin arasına girebilir. Döngü işlem tablosuna girmez
  * (alt kabukta başlatılır), Ctrl+C'den etkilenmez ve kabuk kapanınca biter.
  */
 const STATS_SCRIPT = String.raw`__jd_ss(){ local a b c d pg f g tp r cm;read -r a b c d pg f g tp r </proc/$$/stat 2>/dev/null||return 1;[ "$tp" = "$pg" ]&&return 0;[ "$tp" -gt 0 ] 2>/dev/null||return 1;read -r cm </proc/$tp/comm 2>/dev/null||return 1;case "$cm" in vi*|nvim|nano|emacs|less|more|most|man|*top|mc|tmux|screen|watch|ssh|telnet|mosh*|ncdu|nmtui|whiptail|dialog|fzf|mysql|mariadb|psql|sqlplus|tig|lynx|w3m|*ftp|nload|nethogs) return 1;;esac;}
-__jd_sm(){ local l k v r;read -r l </proc/stat;printf 'cpu %s\n' "${'$'}{l#cpu}";while read -r k v r;do case $k in Mem*|Buffers:|Cached:|Swap[TF]*) printf '%s %s\n' "${'$'}{k%:}" "$v";;esac;done </proc/meminfo;read -r l </proc/loadavg;printf 'load %s\n' "$l";read -r l </proc/uptime;printf 'up %s\n' "${'$'}{l%% *}";[ "$1" = 1 ]||return 0;printf 'cores %s\nos %s\n' "$(grep -c ^processor /proc/cpuinfo)" "$(. /etc/os-release 2>/dev/null;printf %s "$PRETTY_NAME")";df -Pkl 2>/dev/null|awk 'NR>1&&$2>0&&$1!~/tmpfs|overlay|squashfs/&&$6!~/^\/(dev|run|sys|proc|snap)/{m=$6;for(i=7;i<=NF;i++)m=m" "$i;print "disk",$2,$3,m}';}
-__jd_sl(){ local n=0;while kill -0 $$ 2>/dev/null;do if __jd_ss;then __jd_osc M "$(__jd_sm $((n%6==0?1:0))|__jd_b64)";n=$((n+1));fi;[ $n = 1 ]&&sleep 1||sleep $1;done;}
+__jd_sm(){ local l k v r;while read -r k r;do case $k in cpu*) printf '%s %s\n' "$k" "$r";;*) break;;esac;done </proc/stat;while read -r k v r;do case $k in Mem*|Buffers:|Cached:|Swap[TF]*) printf '%s %s\n' "${'$'}{k%:}" "$v";;esac;done </proc/meminfo;read -r l </proc/loadavg;printf 'load %s\n' "$l";read -r l </proc/uptime;printf 'up %s\n' "${'$'}{l%% *}";[ "$1" = 1 ]||return 0;printf 'cores %s\npg %s\nos %s\n' "$(grep -c ^processor /proc/cpuinfo)" "$(getconf PAGESIZE 2>/dev/null)" "$(. /etc/os-release 2>/dev/null;printf %s "$PRETTY_NAME")";df -Pkl 2>/dev/null|awk 'NR>1&&$2>0&&$1!~/tmpfs|overlay|squashfs/&&$6!~/^\/(dev|run|sys|proc|snap)/{m=$6;for(i=7;i<=NF;i++)m=m" "$i;print "disk",$2,$3,m}';}
+__jd_pr(){ cat /proc/[0-9]*/stat 2>/dev/null|awk '{c=$0;sub(/^[0-9]+ \(/,"",c);sub(/\) [^)]*$/,"",c);r=$0;sub(/.*\) /,"",r);split(r,f," ");print $1,f[12]+f[13],f[22],c}';}
+__jd_tp(){ local t;t=$({ printf '%s\n' "$1";echo --;printf '%s\n' "$2";}|awk '$0=="--"{s=1;next}!s{o[$1]=$2;next}{c=$0;sub(/^[^ ]+ [^ ]+ [^ ]+ /,"",c);print(($1 in o)?$2-o[$1]:$2),$3,$1,c}');[ -n "$1" ]&&printf '%s\n' "$t"|sort -rn|head -n 5|sed 's/^\([0-9-]*\) [0-9]* /pc \1 /';printf '%s\n' "$t"|sort -k2,2rn|head -n 5|sed 's/^[0-9-]* /pm /';}
+__jd_sl(){ local n=0 p c;while kill -0 $$ 2>/dev/null;do if __jd_ss;then c=$(__jd_pr);__jd_osc m "$({ __jd_sm $((n%6==0?1:0));__jd_tp "$p" "$c";}|gzip -c|__jd_b64)";p=$c;n=$((n+1));fi;[ $n = 1 ]&&sleep 1||sleep $1;done;}
 __jd_stat_start(){ [ -r /proc/stat ]||return 0;[ -n "$__jd_sp" ]&&kill -0 $__jd_sp 2>/dev/null&&return 0;__jd_sp=$( (__jd_sl ${'$'}{1:-5} </dev/null >/dev/tty 2>/dev/null & echo $!) );}
 __jd_stat_stop(){ [ -n "$__jd_sp" ]&&kill $__jd_sp 2>/dev/null;__jd_sp=;}`
 
@@ -88,11 +93,6 @@ export async function buildSetupCommand(
   return ` eval "$(printf %s ${packed} | base64 -d | gzip -dc)";__jd_init ${names} ${options.statsIntervalSec ?? 0}\r`
 }
 
-/** Entegrasyonu kurulu bir oturumda sunucu durumu döngüsünü başlatan komut (komut satırına yazılır). */
-export function buildStatsStartCommand(intervalSec: number): string {
-  return ` __jd_stat_start ${intervalSec}`
-}
-
 /** Testler için: kabuk betikleri (kurulumla aynı içerik). */
 export const SHELL_SCRIPTS = { integration: SCRIPT, stats: STATS_SCRIPT }
 
@@ -119,11 +119,13 @@ export function isIntegrationNoise(command: string): boolean {
 }
 
 export function attachIntegration(term: Terminal, h: IntegrationHandlers): IDisposable {
+  // Sıkıştırılmış durum örnekleri sırayla açılır; geç açılan bir örnek yenisinin üzerine yazmaz.
+  let stats = Promise.resolve()
   return term.parser.registerOscHandler(OSC_ID, (data) => {
     const sep = data.indexOf(';')
     const type = sep < 0 ? data : data.slice(0, sep)
     const packed = sep < 0 ? '' : data.slice(sep + 1)
-    const payload = type === 'h' || type === 'k' ? '' : fromBase64(packed)
+    const payload = type === 'h' || type === 'k' || type === 'm' ? '' : fromBase64(packed)
     switch (type) {
       case 'B': {
         const buf = term.buffer.active
@@ -162,6 +164,9 @@ export function attachIntegration(term: Terminal, h: IntegrationHandlers): IDisp
         break
       case 'M':
         h.onStats?.(payload)
+        break
+      case 'm':
+        stats = stats.then(() => gunzipBase64(packed)).then((text) => h.onStats?.(text))
         break
       default:
         break

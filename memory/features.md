@@ -943,3 +943,31 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
      çıkış 0. typecheck, i18n-check 0 sorun, server-stats birim testi geçti.
    - Commit `0bdbaaa` `development`'a pushlandı; PR #5 başlığı "JumpDesk 0.2.3: server status strip, faster session
      setup", açıklaması (sürüm notu) beş düzeltmeyi içerecek şekilde güncellendi. Birleştirmeyi kullanıcı yapar.
+
+## Kullanıcı istekleri — 40. tur (2026-10-19): şerit ayrıntıları, işlemler, yeniden bağlanma
+1. **Disk çipi en büyük diski gösterir** (`largestDisk`, boyuta göre; eski `fullestDisk` kaldırıldı). Disk kartı da
+   boyuta göre sıralı (çipteki disk ilk satır).
+2. **Load kartı:** 1/5/15 ortalamaları yok; çekirdek başına CPU kullanımı (`cpu0`…`cpuN`) her satırda çizgi grafikle
+   (`Sparkline`, `role=img` "cpu{n} Geçmişi") ve yüzdeyle; çok çekirdekte liste `max-h-72` kayar; altta açık kalma süresi.
+   Betik `/proc/stat`'taki tüm `cpu*` satırlarını yayar; depo `coreUsage`, `coreHistory` (çekirdek sayısı değişince
+   sıfırlanır). `applySample` ikinci parametresi artık `CpuSnapshot {all, cores}`.
+3. **En çok kullanan 5 işlem (CPU ve RAM kartları):** `__jd_pr` tüm işlemlerin `/proc/[0-9]*/stat` sayaçlarını (pid,
+   utime+stime tik, rss sayfa, ad) tek `cat|awk` ile çıkarır; döngü önceki görüntüyü `p` değişkeninde tutar, `__jd_tp`
+   farkı alıp `pc <tik> <pid> <ad>` (ilk örnekte yok) ve `pm <sayfa> <pid> <ad>` satırlarını üretir. Renderer CPU payını
+   aynı aralıktaki toplam CPU tikine oranlar (tüm makineye göre %, kartın CPU değeriyle tutarlı; top'taki çekirdek
+   başına % değil), 0 tikliler atılır; bellek = sayfa × `pg` (getconf PAGESIZE, ilk/6. örnekte). `top -bn1` kendisini
+   listeler ve çok kısa aralık ölçer, `ps pcpu` ömür boyu ortalama — ikisi de seçilmedi.
+4. **Durum iletisi gzip'li `m` türünde** (`__jd_sm…|gzip -c|__jd_b64`); renderer sırayla açar (söz zinciri), kapanmış
+   terminalde gelen örnek yok sayılır. Kurulum komutu 2316 bayt.
+5. **Kaydırma göstergesi yalnız fare şeritteyken** görünür (opacity 0 → 1).
+6. **Şeritle terminal arasında boşluk yok:** terminal tam satırlardan oluşur, artık alan (≤1 satır) şerit varken altta,
+   yokken üstte (`TerminalPane` `belowBar`: `pt-0.5` + `justify-start`). Ölçüm: önceden 9–22 px, şimdi 2 px.
+   Görünürlük tek kaynaktan: `features/server-status/use-status-bar.ts` `useStatusBarVisible` (şerit ve terminal).
+7. **Panel boyutu: her değişiklik kirli sayılır** (`isGroupDirty` toleransı 0,02 → 1e-6); tools.mjs "a 2 px resize".
+8. **"Durumu Göster" tam genişlikte düğme;** tıklayınca onay ("Yeniden Bağlantı Gerekiyor", Evet/Hayır); Evet →
+   `SessionView.reconnect()` (yeni token, yeni TerminalPane, kurulum ölçümü başlatır). `buildStatsStartCommand`
+   kaldırıldı. Yeni oturum ayar açıksa mount'ta `markStatsRequested` (yeniden bağlanırken düğme yanıp sönmez).
+   Ayar açıklaması ve "Yenileme Aralığı" notu buna göre güncellendi.
+9. Testler: server-stats birim 48/48 (gerçek bash/zsh'de çekirdekler, sayfa boyutu, meşgul `sh` en üstte, gzip'li
+   örnek; sentetik pay %20, boşluklu ad, çekirdek sayısı değişimi); server-status e2e 33/33 (Hayır/Evet, tam genişlik,
+   2 px boşluk, hover göstergesi, CPU/RAM işlem listeleri, en büyük disk, 8 çekirdek 8 grafik).
