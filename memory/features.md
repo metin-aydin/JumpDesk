@@ -1090,3 +1090,7 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    [220,61,67]) ve odak halkası ayırıcı tarafında mavi ([130,169,244]). Testlerde panel seçici
    `[data-workspace] > [data-pane]` (eskiden `div.absolute`, artık çerçeve katmanını da yakalıyordu). tools 69/69,
    popups 4/4.
+4. Panelle ilgili testler geçti (windows 47, multiwindow 21, panels 13, menus 3, server-status 34, alarm-warmup 5,
+   tabs, smoke, group-perf 3×5: 35 ms). Commit `36eabb6` pushlandı, PR #5 sürüm notuna çerçeve düzeltmesi eklendi.
+   Not: kullanıcı `npx electron-vite dev -- … --log-level=3 --remote-debugging-port=9222` ile açınca vaapi/NSS/vsync
+   satırları kayboldu. Dev başlatmak `out/main` ve `out/preload`'ı yeniden yazar (e2e testleri `out/`'u kullanır).
