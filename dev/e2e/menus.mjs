@@ -1,4 +1,5 @@
-// Sağ tık menülerinde simgesiz öğelerin simgeli öğelerle hizalı olduğunu denetler: node dev/e2e/menus.mjs <klasör>
+// Sağ tık menüleri: simgesiz öğeler simgelilerle hizalı, "Düzeni Kaydet…" yalnız oturum sekmelerinde, klasör okunurken
+// bağlanma seçenekleri gizli. Kullanım: node dev/e2e/menus.mjs <klasör>
 import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -43,6 +44,22 @@ const pads = await page.evaluate(() =>
   )
 )
 console.log(pads.join('\n'))
+const sessionSave = await page.getByRole('menuitem', { name: 'Düzeni Kaydet…' }).count()
+await page.keyboard.press('Escape')
+// Boş "Yeni Bağlantı" sekmesinde düzen kaydedilmez
+await page.keyboard.press('Control+Shift+T')
+await page.waitForTimeout(500)
+await page
+  .getByRole('tab', { name: /Yeni Bağlantı/ })
+  .last()
+  .click({ button: 'right' })
+await page.getByRole('menu').waitFor()
+const newTabSave = await page.getByRole('menuitem', { name: 'Düzeni Kaydet…' }).count()
+const saveOk = sessionSave === 1 && newTabSave === 0
+console.log(
+  `${saveOk ? 'ok  ' : 'FAIL'} save layout only on session tabs (session ${sessionSave}, new tab ${newTabSave})`
+)
+if (!saveOk) process.exitCode = 1
 await page.keyboard.press('Escape')
 await page.getByRole('tree').getByText('Prod', { exact: true }).click({ button: 'right' })
 await page.getByText('Klasördeki Sunucular Okunuyor…').waitFor({ timeout: 2000 })

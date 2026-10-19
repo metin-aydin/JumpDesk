@@ -1136,10 +1136,15 @@ export function TabStrip({ windowId = MAIN_WINDOW }: { windowId?: string }): Rea
                     <ContextMenuItem variant="destructive" onClick={() => void closeAllSafely()}>
                       <XSquare /> {t('Tümünü Kapat')}
                     </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={() => useLayoutDialog.getState().openSave(null)}>
-                      <LayoutDashboard /> {t('Düzeni Kaydet…')}
-                    </ContextMenuItem>
+                    {/* Boş "Yeni Bağlantı" sekmesinde kaydedilecek oturum yoktur. */}
+                    {tab.asset && (
+                      <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onClick={() => useLayoutDialog.getState().openSave(null)}>
+                          <LayoutDashboard /> {t('Düzeni Kaydet…')}
+                        </ContextMenuItem>
+                      </>
+                    )}
                   </>
                 )}
               </ContextMenuContent>

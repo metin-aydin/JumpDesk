@@ -2,11 +2,15 @@
 // Kendi mock sunucusunu (MOCK_DATA=perf) ayrı bir portta açar. Her terminalin geri kaydırma arabelleği doldurulur ve
 // sürekli log akar; vurgu ve alarm kuralları açıktır.
 // Kullanım: npm run build && node dev/e2e/group-perf.mjs [sunucu-sayısı] [klasör]
-//   PERF_VISIBLE=1  pencere ekranda açılır (gerçek GPU ile WebGL); yoksa ekran dışı çizimde WebGL SwiftShader ile açılır
+//   PERF_VISIBLE=1  pencere ekranda ve üstte açılır; yoksa ekran dışı çizilir (WebGL ikisinde de gerçek GPU'yu, GPU yoksa
+//                   SwiftShader'ı kullanır). Görünür ölçüm, pencere örtülürse XWayland saniyede bir kareye düştüğü için bozulur.
 //   PERF_PROFILE=1  ilk "+" tıklamasının CPU profili alınır, en çok süren işlevler yazılır
 //   PERF_PROFILE=idle  etkileşimsiz akış sırasının CPU profili alınır
+//   PERF_PROFILE=switch  gruplar arası tüm geçişlerin CPU profili alınır (PERF_GROUPS > 1)
 //   PERF_MAX_MS     geçiş başına izin verilen en uzun kilitlenme (varsayılan 250)
 //   PERF_APP        açılacak ana süreç dosyası (varsayılan out/main/index.js; başka klasöre derlenmiş sürümü ölçmek için)
+//   PERF_GROUPS     açılacak grup sayısı (varsayılan 1); 1'den fazlaysa gruplar arası geçiş ölçülür
+//   PERF_STATUS=1   sunucu durum şeridi açılır (her oturumda ölçüm döngüsü)
 //   JUMPDESK_DISABLE_WEBGL=1  terminaller DOM çiziciyle çizilir (WebGL olmayan makineler)
 import { _electron as electron } from 'playwright-core'
 import { spawn } from 'node:child_process'
@@ -22,6 +26,8 @@ fs.mkdirSync(out, { recursive: true })
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'jumpdesk-group-perf-'))
 const visible = process.env.PERF_VISIBLE === '1'
 const maxAllowed = Number(process.env.PERF_MAX_MS || 250)
+const groups = Number(process.env.PERF_GROUPS || 1)
+const sessions = servers * groups
 const MOCK_PORT = 18095
 
 const mock = spawn(process.execPath, [path.join(root, 'dev/mock-jms/server.mjs')], {
@@ -63,6 +69,13 @@ const app = await electron.launch({
   }
 })
 const page = await app.firstWindow()
+// Görünür ölçümde pencere üstte tutulur: başka pencere örterse Chromium kareleri yavaşlatır ve ölçüm bozulur.
+if (visible)
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    win.setAlwaysOnTop(true)
+    win.focus()
+  })
 page.on('console', (m) => m.type() === 'error' && console.log(`console.error: ${m.text()}`))
 if (!visible)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1600, 1000))
@@ -178,30 +191,60 @@ try {
     })
   )
   await page.waitForTimeout(800)
+  if (process.env.PERF_STATUS === '1') {
+    await page.keyboard.press('Control+,')
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Sunucu Durumu', exact: true }).click()
+    await dialog.getByRole('switch', { name: 'Sunucu Durum Şeridi' }).click()
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'hidden' })
+  }
 
   const tree = page.getByRole('tree')
-  await tree.getByText('Cluster', { exact: true }).click({ button: 'right' })
-  await page.getByRole('menuitem', { name: /Klasördeki \d+ Sunucuya Farklı Bağlan…/ }).hover()
-  await page.getByRole('menuitem', { name: 'Tümünü Izgara Şeklinde Açarak Bağlan' }).click()
-  await page.waitForFunction(
-    (n) => document.querySelectorAll('.xterm-helper-textarea').length >= n,
-    servers,
-    { timeout: 20000 }
-  )
-  await page.waitForTimeout(5000)
+  for (let g = 1; g <= groups; g++) {
+    const openedAt = Date.now()
+    await startWatch()
+    await tree.getByText('Cluster', { exact: true }).click({ button: 'right' })
+    await page.getByRole('menuitem', { name: /Klasördeki \d+ Sunucuya Farklı Bağlan…/ }).hover()
+    await page.getByRole('menuitem', { name: 'Tümünü Izgara Şeklinde Açarak Bağlan' }).click()
+    await page.waitForFunction(
+      (n) => document.querySelectorAll('.xterm-helper-textarea').length >= n,
+      servers * g,
+      { timeout: 60000 }
+    )
+    await page.waitForTimeout(groups > 1 ? 3000 : 5000)
+    const opened = await stopWatch()
+    const r = await renderer()
+    console.log(
+      `grup ${g} açıldı: ${Date.now() - openedAt} ms, en uzun kare boşluğu ${opened.maxGap} ms, uzun görevler [${opened.long.join(', ')}], ${r.webgl}/${r.terminals} WebGL`
+    )
+  }
   const info = await renderer()
-  console.log(`${info.terminals} terminal, ${info.webgl} tanesi WebGL ile çiziliyor`)
-  check('all sessions open', info.terminals === servers, `${info.terminals}/${servers}`)
+  const gpu = await page.evaluate(() => {
+    const gl = document.createElement('canvas').getContext('webgl2')
+    const ext = gl?.getExtension('WEBGL_debug_renderer_info')
+    return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'yok'
+  })
+  console.log(`${info.terminals} terminal, ${info.webgl} tanesi WebGL ile çiziliyor (GPU: ${gpu})`)
+  check('all sessions open', info.terminals === sessions, `${info.terminals}/${sessions}`)
 
   // Geri kaydırma arabelleği dolar (5000 satır), ardından her terminalde saniyede ~50 satır log akar.
   const fill =
     'for i in $(seq 1 6000); do printf "%s INFO [w-%d] GET /api/orders/%d 200 WARN slow ERROR none\\n" "$EPOCHREALTIME" $i $RANDOM; done; ' +
     'while :; do for j in 1 2 3 4 5; do printf "%s INFO [w-%d] GET /api/orders 200 WARN slow ERROR timeout\\n" "$EPOCHREALTIME" $RANDOM; done; sleep 0.1; done\n'
-  const inputs = page.locator('.xterm-helper-textarea')
-  for (let i = 0; i < servers; i++) {
-    await inputs.nth(i).focus()
-    await page.keyboard.insertText(fill)
-    await page.keyboard.press('Enter')
+  const groupTabs = '[data-tab-strip] [role=tab]'
+  for (let g = 0; g < groups; g++) {
+    // Her grubun terminalleri görünürken komutu alır (odak yalnız görünen terminalde çalışır)
+    if (groups > 1) {
+      await page.locator(groupTabs).nth(g).click()
+      await page.waitForTimeout(800)
+    }
+    const inputs = page.locator('.xterm-helper-textarea:visible')
+    for (let i = 0; i < servers; i++) {
+      await inputs.nth(i).focus()
+      await page.keyboard.insertText(fill)
+      await page.keyboard.press('Enter')
+    }
   }
   await page.waitForTimeout(6000)
 
@@ -215,10 +258,24 @@ try {
   )
 
   const plus = { selector: '[aria-label="Yeni Bağlantı"]' }
-  const groupTab = { selector: '[data-tab-strip] [role=tab]', index: 0 }
+  const groupTab = { selector: groupTabs, index: 0 }
   const results = []
   let cdp = process.env.PERF_PROFILE === '1' ? await startProfile() : null
-  for (let round = 1; round <= 3; round++) {
+  const switchCdp = process.env.PERF_PROFILE === 'switch' ? await startProfile() : null
+  // Birden çok grupta: gruplar arasında sırayla geçilir
+  for (let round = 1; groups > 1 && round <= 3; round++) {
+    for (let g = 0; g < groups; g++) {
+      results.push(await measure(`tur ${round} — grup ${g + 1}`, { selector: groupTabs, index: g }))
+      if (cdp) {
+        await printProfile(cdp, 'group-switch')
+        cdp = null
+      }
+    }
+    const r = await renderer()
+    console.log(`  ${r.terminals} terminal, ${r.webgl} WebGL`)
+  }
+  if (switchCdp) await printProfile(switchCdp, 'group-switches')
+  for (let round = 1; groups === 1 && round <= 3; round++) {
     results.push(await measure(`tur ${round} — "+" (yeni sekme)`, plus))
     if (cdp && round === 1) {
       await printProfile(cdp, 'plus')
@@ -236,7 +293,23 @@ try {
   check(`switching tabs stays responsive (< ${maxAllowed} ms)`, worst < maxAllowed, `${worst} ms`)
 } catch (err) {
   failed = true
-  console.log(`FAIL: ${err.message}`)
+  console.log(`FAIL: ${err.message.split('\n')[0]}`)
+  const state = await page
+    .evaluate(() => ({
+      terminals: document.querySelectorAll('.xterm-helper-textarea').length,
+      tabs: [...document.querySelectorAll('[data-tab-strip] [role=tab]')].map(
+        (t) => t.innerText.split('\n')[0]
+      ),
+      text: document.body.innerText.slice(0, 300)
+    }))
+    .catch((e) => `değerlendirilemedi: ${e.message}`)
+  console.log(JSON.stringify(state))
+  const b64 = await app
+    .evaluate(async ({ BrowserWindow }) =>
+      (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString('base64')
+    )
+    .catch(() => null)
+  if (b64) fs.writeFileSync(path.join(out, 'failure.png'), Buffer.from(b64, 'base64'))
 } finally {
   await app.close().catch(() => undefined)
   mock.kill()
