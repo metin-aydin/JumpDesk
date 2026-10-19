@@ -1071,3 +1071,7 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    ve Linux paket başlatıcısına (`build/after-pack.cjs`, `JUMPDESK_CHROMIUM_LOGS=1` ile kapatılır) eklendi; ölçüm:
    bayraksız 10 sn'de 2 ileti, bayrakla 0. Chromium bu iletiyi açılışta en çok 3 kez basıp susar (kullanıcının terminalinde 1-2-3 sonra yalnız HMR satırları); vaapi/NSS ERROR satırları da aynı bayrakla gizlenir.
 6. Kullanıcı yeniden başlattıktan sonra donma ve kaydırma bandı düzeldi ("düzgün çalışıyor").
+7. **Doğrulama ve gönderim (42. tur):** tam e2e 18 test + font-perf + group-perf (boşta/akışlı/DOM, 3×5) geçti;
+   group-perf'te WebGL denetimleri DOM kipinde atlanır. Commit `8ee1b24` `development`'a pushlandı; PR #5 başlığı
+   "JumpDesk 0.2.3: server status strip, faster sessions, alarm spotlight", açıklaması (sürüm notu) güncellendi.
+   Birleştirmeyi kullanıcı yapar.
