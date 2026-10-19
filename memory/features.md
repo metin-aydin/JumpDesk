@@ -935,5 +935,11 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    - `pkill -f "out/main/index.js"` aynı Bash komutunun içindeyse kabuğun kendisini öldürür (çıkış 144); ayrı çalıştır.
    - ESLint'te ~119 eski hata var (çoğu `components/ui/*` dönüş türü, `react-hooks/refs`); değişen dosyalar HEAD ile
      aynı sayıda hata verir, yeni hata eklenmedi.
-   - Sonuç: ai 24/24, tools boyut adımları geçti, server-status 24/24, popups 4/4, update 19/19, server-stats birim
-     testi geçti, typecheck ve i18n 0 sorun. PR #5 (0.2.3) açık; düzeltmeler aynı PR'a eklenir.
+   - Mock sunucu kabuk geçmişi kalıcıdır (`/tmp/jumpdesk-mock-hosts/<sunucu>/.bash_history`): bir testte terminale
+     yanlışlıkla yazılan Türkçe metin sonraki i18n.mjs'de "Turkish text on English screens" (geçmiş paneli) olarak
+     düşer; satır dosyadan silinir.
+   - Sonuç: tam e2e (18 test) geçti — tools 57, ai 24, windows 47, transfer 39, server-status 24, multiwindow 21,
+     update 19, home 17, panels 13, server-address 6, alarm-warmup 5, popups 4, i18n 4; smoke/tabs/sftp/menus/rdp
+     çıkış 0. typecheck, i18n-check 0 sorun, server-stats birim testi geçti.
+   - Commit `0bdbaaa` `development`'a pushlandı; PR #5 başlığı "JumpDesk 0.2.3: server status strip, faster session
+     setup", açıklaması (sürüm notu) beş düzeltmeyi içerecek şekilde güncellendi. Birleştirmeyi kullanıcı yapar.
