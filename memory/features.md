@@ -1100,3 +1100,5 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
   aynı `animate-alarm-flash` ile 4 kez gelip gider, hareket azaltmada sabit; çerçeve katmanında, ayırıcıların üstünde).
   Odak halkası katman sırasında yine gizlenir. tools.mjs: "red overlay covers the whole pane, also next to a separator"
   (kenarlardan 2 px içeride piksel [248,216,217]). tools 69/69. PR #5 sürüm notu güncellendi.
+- Kullanıcı "hepsi tamam, commitle pushla, main'e PR aç" dedi: her şey zaten commitli ve pushlıydı (`dcd818a`); PR #5
+  (development → main) açık, CI 5 geçti / 1 atlandı, MERGEABLE/CLEAN. Yeni PR açılmadı; birleştirme kullanıcıda.
