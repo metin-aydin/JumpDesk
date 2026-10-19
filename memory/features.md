@@ -971,3 +971,10 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
 9. Testler: server-stats birim 48/48 (gerçek bash/zsh'de çekirdekler, sayfa boyutu, meşgul `sh` en üstte, gzip'li
    örnek; sentetik pay %20, boşluklu ad, çekirdek sayısı değişimi); server-status e2e 33/33 (Hayır/Evet, tam genişlik,
    2 px boşluk, hover göstergesi, CPU/RAM işlem listeleri, en büyük disk, 8 çekirdek 8 grafik).
+10. **Aynı turda ek istekler:** Load kartında açık kalma süresi yok (kullanıcı istemedi; şeridin sağında zaten var;
+    `longUptime` ve ilgili çeviriler kaldırıldı). Kart altındaki "Son güncelleme" çizgisinin üstü ve altı eşit:
+    `PopoverContent` `p-3 pb-2` (çizgi üstü `pt-2`). Çip değerleri `ChipValue` (`min-w-[4.5ch]`, sağa hizalı,
+    `tabular-nums`; "100%" sığar), yük her zaman iki ondalık → hane sayısı değişince çip boyu sabit (e2e "chip widths do
+    not change", 8%/88%/100%/…/1,56/12,34 aynı genişlik).
+11. Tam e2e (18 test) geçti; sonra yalnız şerit/kart değişti, server-status 34 denetim geçti. Commit `a17c97b`
+    pushlandı, PR #5 açıklaması güncellendi (başlık aynı). Birleştirmeyi kullanıcı yapar.
