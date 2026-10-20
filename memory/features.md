@@ -1154,3 +1154,6 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
 4. Test `dev/e2e/right-click.mjs` (DOM çizici, Electron `clipboard` ile pano): 6/6 — yapıştırır ama çalıştırmaz,
    Enter'la çalışır, seçimde kopyalar + seçim kalkar + yapıştırmaz, fare kipinde (`printf '\e[?1000h'`) sağ tık
    programa kalır, Shift+sağ tık yapıştırır. CLAUDE.md e2e listesine eklendi. Sürüm 0.2.5 olacak.
+5. Testler geçti (right-click 6, windows 47, tools 69, tab-keys 8, multiwindow 21, popups 4, ai 24, server-status 34,
+   i18n, smoke). Commit `caf7f92` pushlandı; **PR #8** açıldı (https://github.com/metin-aydin/JumpDesk/pull/8,
+   "JumpDesk 0.2.5: right-click paste in terminals", oturuma bağlı, CI çalışıyor). Birleştirme kullanıcıda.
