@@ -187,6 +187,8 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       customGlyphs: true,
       drawBoldTextInBrightColors: true,
       macOptionIsMeta: true,
+      // Sağ tık seçili metni kopyalar ya da yapıştırır; macOS'ta varsayılan kelime seçimi buna engel olur.
+      rightClickSelectsWord: false,
       theme: terminalTheme(useTheme.getState().info.resolved)
     })
     const fit = new FitAddon()
@@ -399,6 +401,26 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       }
       return true
     })
+
+    /**
+     * Sağ tık (Windows Terminal ve PuTTY'deki gibi): seçim varsa kopyalar ve seçimi kaldırır, yoksa panodakini
+     * yapıştırır. Fareyi kullanan tam ekran programlar (vim, mc, htop) sağ tıkı kendisi alır; Shift+sağ tık yine
+     * yapıştırır.
+     */
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault()
+      if (term.modes.mouseTrackingMode !== 'none' && !e.shiftKey) return
+      if (term.hasSelection()) {
+        void navigator.clipboard.writeText(term.getSelection())
+        term.clearSelection()
+        return
+      }
+      term.focus()
+      void navigator.clipboard.readText().then((text) => {
+        if (text && !disposed) term.paste(text)
+      })
+    }
+    host.addEventListener('contextmenu', onContextMenu)
 
     const sizeChanged = (): void => {
       if (!visibleRef.current || host.clientWidth === 0) return
@@ -745,6 +767,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
 
     return () => {
       disposed = true
+      host.removeEventListener('contextmenu', onContextMenu)
       unsubscribeFont()
       if (fontTimer) clearTimeout(fontTimer)
       unsubscribeMoved()

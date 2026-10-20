@@ -1140,3 +1140,17 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    panes", açıklaması güncellendi. Kullanıcı izniyle #6'ya İngilizce açıklama yorumu yazıldı (Ctrl şerit, Alt grup
    paneli, ⌘/⌃ macOS, grup dışında Alt terminale gider, AltGr korunur, Keyboard Shortcuts Ctrl+Shift+K) ve issue
    "completed" olarak kapatıldı. Not: `gh issue view --json` `stateReason` alanını desteklemiyor.
+
+## Kullanıcı isteği — 46. tur (2026-10-20): SSH terminalinde sağ tıkla yapıştırma
+1. PR #7 birleşti, **v0.2.4 yayımlandı** (06:22 UTC). Yerelde main çekildi, yeni `development` açıldı (değişiklikler
+   stash ile taşındı).
+2. Şikâyet: sağ tıkla yapıştırma çalışmıyor. Neden: terminalde hiç sağ tık işleyicisi yoktu (Electron'da varsayılan
+   bağlam menüsü yok, sağ tık hiçbir şey yapmıyordu).
+3. Uygulama (`TerminalPane` `onContextMenu`, host'a `contextmenu` dinleyicisi): seçim varsa kopyalar ve seçimi kaldırır
+   (Windows Terminal/PuTTY), yoksa `navigator.clipboard.readText()` → `term.paste` (köşeli parantezli yapıştırmaya
+   uyar, çalıştırmaz). `term.modes.mouseTrackingMode !== 'none'` ise (vim/mc/htop fare kipi) sağ tık programa kalır,
+   Shift+sağ tık yapıştırır. `rightClickSelectsWord: false` (macOS varsayılanı sağ tıkta kelime seçerdi). Kısayollar
+   listesine "Sağ Tık — Seçimi Kopyala / Yapıştır".
+4. Test `dev/e2e/right-click.mjs` (DOM çizici, Electron `clipboard` ile pano): 6/6 — yapıştırır ama çalıştırmaz,
+   Enter'la çalışır, seçimde kopyalar + seçim kalkar + yapıştırmaz, fare kipinde (`printf '\e[?1000h'`) sağ tık
+   programa kalır, Shift+sağ tık yapıştırır. CLAUDE.md e2e listesine eklendi. Sürüm 0.2.5 olacak.
