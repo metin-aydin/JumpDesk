@@ -14,17 +14,29 @@ export function isAppShortcut(e: KeyboardEvent, key: string): boolean {
   return e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && k === want
 }
 
+/** Numara kısayolu: şeritteki n. sekmeye (`tab`) ya da etkin gruptaki n. panele (`pane`) geçiş; 9 = sonuncusu. */
+export interface NumberShortcut {
+  scope: 'tab' | 'pane'
+  n: number
+}
+
 /**
- * Sekme şeridindeki n. öğeye geçiş (9 = son öğe): Ctrl+1…9 (macOS ⌘+1…9); Windows ve Linux'ta Alt+1…9 da (GNOME
- * Terminal, Konsole ve Firefox'taki gibi). macOS'ta Option+rakam karakter yazdığı için Alt kullanılmaz. AltGr
- * (Windows'ta Ctrl+Alt olarak gelir) rakamla `{ [ ] }` gibi karakterler yazar; ona dokunulmaz. Kısayol değilse null.
+ * Ctrl+1…9 (macOS ⌘) şeritteki sekmeye, Alt+1…9 (macOS'ta Option+rakam karakter yazdığı için ⌃) gruptaki panele
+ * geçer. Shift'li ve AltGr'li (Windows'ta Ctrl+Alt olarak gelir; rakamla `{ [ ] }` gibi karakterler yazar) basışlar
+ * kısayol sayılmaz.
  */
-export function tabNumberShortcut(e: KeyboardEvent): number | null {
+export function numberShortcut(e: KeyboardEvent): NumberShortcut | null {
   const m = /^Digit([1-9])$/.exec(e.code)
   if (!m || e.shiftKey || e.getModifierState('AltGraph')) return null
-  const primary = isMac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey
-  const alt = !isMac && e.altKey && !e.ctrlKey && !e.metaKey
-  if ((primary && !e.altKey) || alt) return Number(m[1])
+  const n = Number(m[1])
+  const { ctrlKey: ctrl, altKey: alt, metaKey: meta } = e
+  if (isMac) {
+    if (meta && !ctrl && !alt) return { scope: 'tab', n }
+    if (ctrl && !meta && !alt) return { scope: 'pane', n }
+    return null
+  }
+  if (ctrl && !alt && !meta) return { scope: 'tab', n }
+  if (alt && !ctrl && !meta) return { scope: 'pane', n }
   return null
 }
 

@@ -1125,3 +1125,13 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    (https://github.com/metin-aydin/JumpDesk/pull/7, "JumpDesk 0.2.4: switch tabs with Alt+1…9", oturuma bağlı, CI
    çalışıyor). Kullanıcıdan beklenen kararlar: (a) Alt+rakam terminale gitmesin (öneri) mi, (b) ayar mı; issue'ya
    yorum yazılsın mı (dış iletişim → izin gerekir). Birleştirme kullanıcıda.
+7. **Kullanıcı kararı (2026-10-20):** "Ctrl üst düzey sekme değişimi, Alt iç sekmelerde (gruptaki paneller) değişim
+   yapsın." Uygulama: `lib/shortcuts.ts` `numberShortcut(e)` → `{ scope: 'tab' | 'pane', n }`: Ctrl+1…9 (macOS ⌘)
+   şerit, Alt+1…9 (macOS ⌃; Option+rakam karakter yazar) panel; Shift/AltGr hariç. `features/workspace/number-keys.ts`
+   `applyNumberShortcut(shortcut, windowId, tabId)`: panel kapsamında sekme grupta değilse false döner (tuş terminale
+   gider, irssi/weechat kullanılabilir); büyütülmüş grupta `toggleZoom(hedef)` büyütmeyi taşır. Ana ve ayrı pencere
+   aynı işlevi kullanır. Kısayollar listesine "Gruptaki Panele Git" / "Gruptaki Son Panele Git" eklendi (EN çeviri).
+   tab-keys.mjs 8/8: Ctrl sırası, Ctrl+9, Alt panel sırası (soldan sağa/yukarıdan aşağı), Alt+9, grupta Alt terminale
+   gitmez, büyütülmüş grupta büyütme taşınır, tek sekmede Alt+1 terminale gider ("(arg: 1)"). PR #7 başlığı/açıklaması
+   buna göre güncellenecek; "Closes #6" önceki commit'te (issue'nun istediği Alt üst düzey değil, Ctrl üst düzey oldu —
+   kullanıcıya belirtildi). Issue'ya yorum için izin hâlâ bekleniyor.

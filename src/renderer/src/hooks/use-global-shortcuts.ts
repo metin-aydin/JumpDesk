@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
-import { isAppShortcut, isMac, isSettingsShortcut, tabNumberShortcut } from '@/lib/shortcuts'
+import { isAppShortcut, isMac, isSettingsShortcut, numberShortcut } from '@/lib/shortcuts'
+import { applyNumberShortcut } from '@/features/workspace/number-keys'
 import { terminalRegistry } from '@/features/terminal/registry'
 import { useTabSearch } from '@/stores/tab-search'
 import { useDialogs } from '@/stores/dialogs'
 import { closeTabSafely } from '@/features/layouts/guard'
-import { MAIN_WINDOW, groupOf, topLevelTabs, useWorkspace } from '@/stores/workspace'
+import { MAIN_WINDOW, groupOf, useWorkspace } from '@/stores/workspace'
 
 /** Uygulama kısayolları yakalama aşamasında dinlenir; terminale ulaşmadan işlenir. */
 export function useGlobalShortcuts(enabled: boolean): void {
@@ -12,7 +13,7 @@ export function useGlobalShortcuts(enabled: boolean): void {
     if (!enabled) return
     const onKey = (e: KeyboardEvent): void => {
       const ws = useWorkspace.getState()
-      const tabNumber = tabNumberShortcut(e)
+      const number = numberShortcut(e)
       let handled = true
       if (isAppShortcut(e, 'T')) ws.openConnectTab()
       else if (isAppShortcut(e, 'W')) void closeTabSafely(ws.activeId)
@@ -35,11 +36,8 @@ export function useGlobalShortcuts(enabled: boolean): void {
       )
         useTabSearch.getState().setOpen(!useTabSearch.getState().open)
       else if (e.ctrlKey && e.key === 'Tab') ws.activateRelative(e.shiftKey ? -1 : 1)
-      else if (tabNumber !== null) {
-        const targets = topLevelTabs(ws, MAIN_WINDOW)
-        const id = tabNumber === 9 ? targets[targets.length - 1] : targets[tabNumber - 1]
-        if (id) ws.activate(id)
-      } else handled = false
+      else if (number) handled = applyNumberShortcut(number, MAIN_WINDOW, ws.activeId)
+      else handled = false
       if (handled) {
         e.preventDefault()
         e.stopPropagation()
