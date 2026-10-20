@@ -59,6 +59,7 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Enter / Shift+Enter', label: t('Sonraki / Önceki Eşleşme') },
         { keys: isMac ? '⌘C' : 'Ctrl+Shift+C', label: t('Kopyala') },
         { keys: isMac ? '⌘V' : 'Ctrl+Shift+V', label: t('Yapıştır') },
+        { keys: t('Sağ Tık'), label: t('Seçimi Kopyala / Yapıştır') },
         { keys: 'Ctrl+Space', label: t('Öneri Listesini Aç') },
         { keys: 'Ctrl+Space Ctrl+Space', label: t('Yapay Zekaya Sor') },
         { keys: 'Tab / →', label: t('Öneriyi Kabul Et') }

@@ -1140,3 +1140,100 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    panes", açıklaması güncellendi. Kullanıcı izniyle #6'ya İngilizce açıklama yorumu yazıldı (Ctrl şerit, Alt grup
    paneli, ⌘/⌃ macOS, grup dışında Alt terminale gider, AltGr korunur, Keyboard Shortcuts Ctrl+Shift+K) ve issue
    "completed" olarak kapatıldı. Not: `gh issue view --json` `stateReason` alanını desteklemiyor.
+
+## Kullanıcı isteği — 46. tur (2026-10-20): SSH terminalinde sağ tıkla yapıştırma
+1. PR #7 birleşti, **v0.2.4 yayımlandı** (06:22 UTC). Yerelde main çekildi, yeni `development` açıldı (değişiklikler
+   stash ile taşındı).
+2. Şikâyet: sağ tıkla yapıştırma çalışmıyor. Neden: terminalde hiç sağ tık işleyicisi yoktu (Electron'da varsayılan
+   bağlam menüsü yok, sağ tık hiçbir şey yapmıyordu).
+3. Uygulama (`TerminalPane` `onContextMenu`, host'a `contextmenu` dinleyicisi): seçim varsa kopyalar ve seçimi kaldırır
+   (Windows Terminal/PuTTY), yoksa `navigator.clipboard.readText()` → `term.paste` (köşeli parantezli yapıştırmaya
+   uyar, çalıştırmaz). `term.modes.mouseTrackingMode !== 'none'` ise (vim/mc/htop fare kipi) sağ tık programa kalır,
+   Shift+sağ tık yapıştırır. `rightClickSelectsWord: false` (macOS varsayılanı sağ tıkta kelime seçerdi). Kısayollar
+   listesine "Sağ Tık — Seçimi Kopyala / Yapıştır".
+4. Test `dev/e2e/right-click.mjs` (DOM çizici, Electron `clipboard` ile pano): 6/6 — yapıştırır ama çalıştırmaz,
+   Enter'la çalışır, seçimde kopyalar + seçim kalkar + yapıştırmaz, fare kipinde (`printf '\e[?1000h'`) sağ tık
+   programa kalır, Shift+sağ tık yapıştırır. CLAUDE.md e2e listesine eklendi. Sürüm 0.2.5 olacak.
+5. Testler geçti (right-click 6, windows 47, tools 69, tab-keys 8, multiwindow 21, popups 4, ai 24, server-status 34,
+   i18n, smoke). Commit `caf7f92` pushlandı; **PR #8** açıldı (https://github.com/metin-aydin/JumpDesk/pull/8,
+   "JumpDesk 0.2.5: right-click paste in terminals", oturuma bağlı, CI çalışıyor). Birleştirme kullanıcıda.
+
+## Kullanıcı istekleri — 47. tur (2026-10-20): terminal boşlukları, bazı sunucularda durum şeridi yok
+1. **Terminalin üstünde/altında ~1 satır boşluk (ekran görüntüsü, grup paneli):** ölçüm (grup paneli, 4 yükseklik):
+   üst boşluk = 6 px `pt-1.5` + artan alan (hücre tam piksel, 19 px) → 12–23 px; alt 0 px. Alttaki boş satır imlecin
+   satırı (`tail -f` çıktısı satır sonuyla biter, imleç yeni satırda) — her terminalde vardır, kaldırılamaz.
+   **Düzeltme:** `TerminalPane` `fillHeight()` (`sizeChanged` başında, görünürken): hücre yüksekliği taban (yazı ×
+   `LINE_HEIGHT` 1.15) ±1 cihaz pikseli içinde artanı en aza indirecek biçimde seçilir (`lineHeight = (hücre+0.5)/
+   yazı`; tabansa 1.15), sonra `resyncViewport(term)` (xterm-patches'ten dışa açıldı; satır yüksekliği değişince
+   kaydırma konumu yeniden hesaplanır). Görünür olma yolundaki ayrı fit kaldırıldı (`sizeChangedRef`), `fitRef` silindi.
+   Üst dolgu `pt-1.5` → `pt-1`. Ölçüm (21 yükseklik): üst boşluk ort. 8,1 px (eskiden ~17), en çok 17. ±2 px
+   hesaplandı (ort. 2,7 artan) ama paneller arası satır aralığı farkı büyür → ±1 seçildi.
+2. **Bazı sunucularda durum şeridi görünmüyor (ayar açık):** canlı uygulama kapandığı için doğrudan bakılamadı. Kod
+   nedenleri: (a) kurulum yanıtı 3 sn içinde gelmezse (`SetupEchoGate` zaman aşımı; yavaş giriş betikleri, motd, yoğun
+   sunucu) entegrasyon 'failed' oluyordu; sonradan gelen iletiler (istatistik dahil) şeridi açmıyordu (görünürlük
+   'ready' ister) → **düzeltildi:** entegrasyondan gelen her ileti (`onCwd/onIps/onStats`) 'pending'/'failed'ı
+   'ready' yapar; zaman aşımında 10 sn (`INTEGRATION_GRACE_MS`) 'pending' kalır, sonra 'failed'. (b) Kabuk bash/zsh
+   değil ya da base64/gzip yok → kurulamaz; artık şerit yerine "Sunucu durumu alınamadı: kabuk entegrasyonu
+   kurulamadı (bash ya da zsh, base64 ve gzip gerekir)." satırı (`useStatusBarState` → 'failed', `data-server-status-
+   failed`). (c) JumpServer'da varlık türü linux/unix/macos/bsd/aix değilse entegrasyon hiç kurulmaz (şerit yok,
+   otomatik tamamlama da yok). (d) /proc'suz sistemlerde (AIX/BSD) ölçüm başlamaz.
+   Testler (server-status.mjs, 36): "late setup response still shows the strip, without a failure line in between"
+   (`sleep 5` istem gelir gelmez), "failed integration explains why" (`exec env -i PATH=/nonexistent bash`).
+3. Canlı tanı tuzağı: uzun süre HMR almış dev uygulamada `import('/src/stores/…')` yeni (boş) modül örneği verir;
+   `performance.getEntriesByType('resource')` ile yüklenmiş `?t=` adresi bulunup o içe aktarılmalı.
+4. Tam regresyon geçti (server-status 36, right-click 6, tab-keys 8, windows 47, tools 69, multiwindow 21, popups,
+   ai 24, panels 13, home 17, i18n, menus, tabs, alarm-warmup, transfer 39, update 19, server-address, sftp, rdp,
+   font-perf, group-perf 3×5 boşta/akışlı 33–43 ms). Commit `2f8b3b0` pushlandı; PR #8 başlığı "JumpDesk 0.2.5:
+   right-click paste, status strip on slow servers", açıklaması güncellendi. Birleştirme kullanıcıda.
+
+## Kullanıcı isteği — 48. tur (2026-10-20): sistem tepsisi simgesi ve kayıtlı düzenler (tartışma)
+1. İstek: Ubuntu/macOS sağ üstte, Windows sağ altta simge; tıklayınca kayıtlı düzenler uygulamanın tasarımında açılır
+   pencerede; düzene tıklayınca uygulama açıksa yeni sekmede, değilse uygulamayı açıp düzeni açsın.
+2. Teknik bulgu (bu makinedeki `ubuntu-appindicators@ubuntu.com/indicatorStatusIcon.js`): GNOME AppIndicator'da sol
+   tek tık menü varsa menüyü açar (çift tık beklemesiyle), menü yoksa hiçbir şey yapmaz; çift sol tık `Activate`
+   (Electron `click`), orta tık `SecondaryActivate`, sağ tık menü. Yani Ubuntu'da tek tıkla özel pencere açılamaz;
+   yalnız GNOME'un kendi (dbusmenu) menüsü. Linux'ta `tray.getBounds()` boş döner (konum yok). macOS/Windows'ta tıklama
+   olayı ve simge konumu var → özel açılır pencere mümkün.
+3. Kullanıcı kararı: pencere kapatılınca **tepside kalsın, oturumlar kapansın** (süreç yaşar, pencere yok olur; düzen
+   seçilince pencere yeniden açılıp düzen açılır). Ubuntu için iki yöntem çizilerek gösterildi (show_widget): A)
+   düzenler doğrudan GNOME menüsünde (tek tık), B) menüde "Düzenler…" → bizim tasarımda açılır pencere (iki tık).
+   macOS/Windows'ta tek tıkla bizim açılır pencere, sağ tıkta "JumpDesk'i Göster"/"Çıkış". Kullanıcının A/B seçimi
+   bekleniyor.
+4. **Kullanıcı A'yı seçti (2026-10-20). Uygulama:**
+   - `src/main/tray.ts` `initTray(win)`: simge (Linux renkli 32 px `resources/tray/tray.png`; Windows 16+32 px;
+     macOS şablon `trayTemplate.png` + `@2x`, siyah `>_` çerçeveli, ffmpeg librsvg ile SVG'den üretildi). Linux: GNOME
+     menüsü = "Kayıtlı Düzenler" (pasif başlık), düzenler, ayırıcı, "JumpDesk'i Göster", "Çıkış"; çift tık (Activate)
+     pencereyi gösterir; düzen adındaki `&` `&&` yapılır (kısayol harfi sayılmasın). macOS/Windows: sol tık bizim
+     açılır pencere (`tray.html`, `TrayPopup.tsx`: başlık, arama, düzen + sunucu sayısı, ok tuşları/Enter/Esc,
+     "JumpDesk'i Göster"; içerik yüksekliğini bildirir, pencere ona göre boyutlanır, odak kaybında gizlenir), sağ tık
+     kısa menü. Konum `tray-position.ts` `popupPosition` (simge altı/üstü, çalışma alanına sığdırma, Linux'ta sağ üst).
+   - Kapatma: tepsi varsa `close` önlenir → ana pencereye `app:hidden` (renderer `useWorkspace.reset()`: oturumlar ve
+     ayrı pencereler kapanır) → `win.hide()`; ilk seferde (Linux/Windows) bir kez bildirim (`store.trayHintShown`).
+     Pencereyi yeniden kurmak yerine gizlemek seçildi: `registerIpc/attachAuthWindow/initUpdater/notify` ana pencere
+     örneğine bağlı. `quitting.ts`: `before-quit` → gerçekten kapanıyor; güncelleme kurulumunda `markQuitting()`
+     (macOS Squirrel pencereleri önce kapatır). İkinci örnek ve macOS `activate` gizli pencereyi gösterir.
+   - Renderer `features/tray/tray-sync.ts`: giriş yapılmışsa düzen listesini (`id, name, servers`) ana sürece
+     bildirir (düzen, dil ve oturum değişince); `tray:open-layout` → `openLayout` (giriş yoksa girişten sonra).
+   - **Tuzak:** iki önyükleme (`index`, `tray`) ortak modül içe aktarırsa paketleyici `out/preload/chunks/` üretir;
+     korumalı önyükleme başka dosya yükleyemez (pencere açılmaz). Açılır pencere kanalları/türleri bu yüzden ayrı
+     `src/shared/tray-popup.ts`'te; `@shared/api` tray önyüklemesinde yalnız tür olarak kullanılır. Derlemeden sonra
+     `grep require out/preload/*.js` yalnız `electron` göstermeli.
+   - Ekransız testlerde tepsi yalnız `JUMPDESK_TEST_TRAY=1` ile kurulur (test kancası `globalThis.__jumpdeskTray`:
+     labels, click, openPopup, popupVisible, mainVisible). Açılır pencere testte `offscreen`.
+   - Testler: `dev/e2e/tray.mjs` 8/8 (menüde düzen, kapatınca tepside + oturumlar kapalı, tepsiden düzen → pencere
+     + sekme, açılır pencere listesi/sunucu sayısı/arama/Enter → yeni sekme ve gizlenme, Çıkış süreci kapatır);
+     `dev/tray-position.test.mjs` 6/6.
+5. **Kullanıcı düzeltmeleri (2026-10-20):** (a) pencere kapanınca "tepside çalışıyor" bildirimi gösterilmesin →
+   `hintOnce`, `store.trayHintShown` ve çevirisi kaldırıldı; (b) tepsi simgesi uygulama simgesi değil yalnız `>_`
+   işareti olsun → `resources/tray/` yeniden üretildi: `trayTemplate(.png,@2x)` siyah `>_` (macOS şablon, Windows açık
+   görev çubuğu), `tray-light(.png,@2x)` beyaz `>_` (Linux GNOME koyu üst çubuk, Windows koyu görev çubuğu);
+   Windows'ta `nativeTheme.shouldUseDarkColorsForSystemIntegratedUI` ve `nativeTheme` `updated` olayıyla yenilenir.
+   Eski renkli `tray.png/tray-16.png` silindi.
+6. **Gönderim (2026-10-20):** kullanıcı tepsiyi kendi makinesinde denedi ("çalışıyor") ve uzun regresyonu iki kez
+   durdurdu; tamamlanan: tray 8/8 (yeni derleme), update 19/19, önceki turda smoke/tabs/windows 47/multiwindow 21/
+   tools 69/menus/panels 13/home 17/i18n/server-status 36/right-click 6/tab-keys 8/popups 4 (çalışmayanlar: ai,
+   alarm-warmup, transfer, server-address, sftp, rdp — tepsi değişikliğinden etkilenmez). Commit `fc27956` +
+   `c907ef2`; PR #8 başlığı "JumpDesk 0.2.5: system tray layouts, right-click paste, status strip on slow servers".
+   **Tuzak:** `.gitignore` `*.png` alt klasördeki görselleri yok sayıyordu; istisna `!resources/**/*.png` yapıldı
+   (yoksa CI derlemesi tepsi simgesini bulamazdı). Yeni görsel eklerken `git status`'ta göründüğü denetlenmeli.
+   Açılır pencere ilk açılışta `ready-to-show` beklenerek gösterilir (yüklenmeden boş görünüyordu; testte zamanlama hatası).

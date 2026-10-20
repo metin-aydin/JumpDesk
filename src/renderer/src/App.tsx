@@ -4,6 +4,7 @@ import { TitleBar } from '@/components/titlebar/TitleBar'
 import { useT } from '@/lib/i18n'
 import { jumpdesk } from '@/lib/jumpdesk'
 import { startNotificationSync } from '@/features/alarms/notification-sync'
+import { startTraySync } from '@/features/tray/tray-sync'
 import { Toaster } from '@/components/Toaster'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { LoginScreen } from '@/features/auth/LoginScreen'
@@ -30,6 +31,7 @@ function Main(): React.JSX.Element {
   const t = useT()
   const rightPanelOpen = useWorkspace((s) => s.rightPanelOpen)
   useEffect(() => startNotificationSync(), [])
+  useEffect(() => startTraySync(), [])
   useEffect(() => jumpdesk.notify.onClick(({ tabId, line }) => revealAlarm(tabId, line)), [])
   const right = usePanelWidth('rightPanelWidth', 320, 260, 640, 'left')
   return (

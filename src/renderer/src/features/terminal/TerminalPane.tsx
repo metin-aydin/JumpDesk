@@ -46,7 +46,7 @@ import {
   releaseWebgl,
   setWebglVisible
 } from './webgl-pool'
-import { patchHiddenRendering, setRenderingPaused } from './xterm-patches'
+import { patchHiddenRendering, resyncViewport, setRenderingPaused } from './xterm-patches'
 
 export const TERMINAL_FONT =
   '"JetBrains Mono Variable", "JetBrains Mono", "Cascadia Mono", Menlo, monospace'
@@ -55,6 +55,10 @@ const RESIZE_THROTTLE_MS = 50
 const FONT_APPLY_DELAY_MS = 150
 const IDLE_BEFORE_SETUP_MS = 400
 const MAX_WAIT_FOR_PROMPT_MS = 6000
+/** Varsayılan satır yüksekliği (yazı yüksekliğinin katı); terminal yüksekliğini doldurmak için ±1 piksel oynar. */
+const LINE_HEIGHT = 1.15
+/** Kurulum yanıtı bekleme süresi dolduktan sonra entegrasyonun kurulamadı sayılmasına kadar geçen süre. */
+const INTEGRATION_GRACE_MS = 10_000
 const APP_KEYS = ['T', 'W', 'B', 'F', 'A', 'E', 'P', 'S', 'K', 'Tab', 'Enter']
 
 export interface TerminalPaneProps {
@@ -133,11 +137,11 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   popupRef.current = popup
   const acceptRef = useRef<(index: number) => void>(() => undefined)
   const termRef = useRef<Terminal | null>(null)
-  const fitRef = useRef<FitAddon | null>(null)
   const connRef = useRef<KokoConnection | null>(null)
   const visibleRef = useRef(visible)
   /** Yazı boyutunu terminale uygular (ana etkide kurulur; görünür olunca da çağrılır). */
   const syncFontRef = useRef<() => void>(() => undefined)
+  const sizeChangedRef = useRef<() => void>(() => undefined)
   const decoratorRef = useRef<HighlightDecorator | null>(null)
   const propsRef = useRef(props)
   propsRef.current = props
@@ -178,7 +182,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const term = new Terminal({
       fontFamily: TERMINAL_FONT,
       fontSize: terminalFontSize(useFontSizes.getState()),
-      lineHeight: 1.15,
+      lineHeight: LINE_HEIGHT,
       cursorBlink: true,
       cursorStyle: 'bar',
       scrollback: 5000,
@@ -187,6 +191,8 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       customGlyphs: true,
       drawBoldTextInBrightColors: true,
       macOptionIsMeta: true,
+      // Sağ tık seçili metni kopyalar ya da yapıştırır; macOS'ta varsayılan kelime seçimi buna engel olur.
+      rightClickSelectsWord: false,
       theme: terminalTheme(useTheme.getState().info.resolved)
     })
     const fit = new FitAddon()
@@ -253,7 +259,6 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       }
     })
     termRef.current = term
-    fitRef.current = fit
 
     const live: TerminalHandle['live'] = { entries: [], commandNames: [], atPrompt: false }
     let commandSet = new Set<string>()
@@ -271,8 +276,21 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const armActivity = (): void => {
       setTimeout(() => (activityArmed = true), 1500)
     }
+    // Kurulum yanıtı bekleme süresinden sonra gelebilir (yavaş giriş betikleri, yoğun sunucu); entegrasyondan gelen
+    // her ileti oturumun entegrasyonunun çalıştığını gösterir. Yanıt gelmezse oturum bir süre daha "hazırlanıyor"
+    // sayılır, sonra kurulamadı olarak işaretlenir (durum şeridi yerine neden satırı kısa süreliğine görünüp kaybolmaz).
+    let failTimer: ReturnType<typeof setTimeout> | null = null
+    const integrationAlive = (): void => {
+      if (failTimer) {
+        clearTimeout(failTimer)
+        failTimer = null
+      }
+      const state = useSessionInfo.getState().byTab[tabId]?.integration
+      if (state === 'pending' || state === 'failed') info.patch(tabId, { integration: 'ready' })
+    }
     const integration = attachIntegration(term, {
       onCwd: (cwd) => {
+        integrationAlive()
         live.cwd = cwd
         info.patch(tabId, { cwd })
       },
@@ -283,6 +301,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       onCommand: (num, command) => info.appendCommand(tabId, num, command),
       onHistory: (history) => info.patch(tabId, { history }),
       onIps: (ips) => {
+        integrationAlive()
         info.patch(tabId, { ips })
         propsRef.current.onIps?.(ips)
       },
@@ -293,7 +312,9 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         if (assetId) cacheCommandNames(assetId, names)
       },
       onStats: (payload) => {
-        if (!disposed) recordStats(tabId, payload)
+        if (disposed) return
+        integrationAlive()
+        recordStats(tabId, payload)
       },
       onPromptEnd: (pos) => {
         submittedFrom = null
@@ -400,8 +421,51 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       return true
     })
 
+    /**
+     * Sağ tık (Windows Terminal ve PuTTY'deki gibi): seçim varsa kopyalar ve seçimi kaldırır, yoksa panodakini
+     * yapıştırır. Fareyi kullanan tam ekran programlar (vim, mc, htop) sağ tıkı kendisi alır; Shift+sağ tık yine
+     * yapıştırır.
+     */
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault()
+      if (term.modes.mouseTrackingMode !== 'none' && !e.shiftKey) return
+      if (term.hasSelection()) {
+        void navigator.clipboard.writeText(term.getSelection())
+        term.clearSelection()
+        return
+      }
+      term.focus()
+      void navigator.clipboard.readText().then((text) => {
+        if (text && !disposed) term.paste(text)
+      })
+    }
+    host.addEventListener('contextmenu', onContextMenu)
+
+    /**
+     * Hücre yüksekliği tam cihaz pikseli olduğundan terminal yüksekliği satırlara tam bölünmez; artan alan (bir satıra
+     * kadar) terminalin üstünde boşluk olarak kalır. Hücre yüksekliği ±1 piksel içinde artanı en aza indiren değere
+     * ayarlanır; aynı yükseklikteki paneller (bir satırdaki paneller) aynı değeri alır.
+     */
+    const fillHeight = (): void => {
+      const charHeight = (term as unknown as { _core?: { _charSizeService?: { height?: number } } })
+        ._core?._charSizeService?.height
+      if (!charHeight) return
+      const dpr = host.ownerDocument.defaultView?.devicePixelRatio ?? 1
+      const deviceChar = Math.ceil(charHeight * dpr)
+      const available = Math.floor(host.clientHeight * dpr)
+      const base = Math.floor(deviceChar * LINE_HEIGHT)
+      let best = base
+      for (const cell of [base - 1, base + 1])
+        if (cell > deviceChar && available % cell < available % best) best = cell
+      const lineHeight = best === base ? LINE_HEIGHT : (best + 0.5) / deviceChar
+      if (term.options.lineHeight === lineHeight) return
+      term.options.lineHeight = lineHeight
+      resyncViewport(term)
+    }
+
     const sizeChanged = (): void => {
       if (!visibleRef.current || host.clientWidth === 0) return
+      fillHeight()
       const dims = fit.proposeDimensions()
       if (!dims || !Number.isFinite(dims.cols) || dims.cols < 2 || dims.rows < 1) return
       if (dims.cols !== term.cols || dims.rows !== term.rows) {
@@ -409,6 +473,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         connRef.current?.resize(dims.cols, dims.rows)
       }
     }
+    sizeChangedRef.current = sizeChanged
 
     /**
      * Yazı boyutu değişince terminal yeniden ölçülür ve glifleri yeniden çizilir; çok sayıda oturumda bunu hepsine aynı
@@ -546,7 +611,12 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const gate = new SetupEchoGate(
       (data) => (typeof data === 'string' ? term.write(data) : writeOutput(data, () => undefined)),
       (ok) => {
-        info.patch(tabId, { integration: ok ? 'ready' : 'failed' })
+        if (ok) info.patch(tabId, { integration: 'ready' })
+        else
+          failTimer = setTimeout(() => {
+            failTimer = null
+            if (!disposed) info.patch(tabId, { integration: 'failed' })
+          }, INTEGRATION_GRACE_MS)
         if (ok) autoRunAfterPrompt = true
         else runAutoCommands()
         armActivity()
@@ -745,6 +815,8 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
 
     return () => {
       disposed = true
+      host.removeEventListener('contextmenu', onContextMenu)
+      if (failTimer) clearTimeout(failTimer)
       unsubscribeFont()
       if (fontTimer) clearTimeout(fontTimer)
       unsubscribeMoved()
@@ -788,13 +860,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     syncFontRef.current()
     acquireWebgl(term)
     setRenderingPaused(term, false)
-    requestAnimationFrame(() => {
-      const dims = fitRef.current?.proposeDimensions()
-      if (dims && (dims.cols !== term.cols || dims.rows !== term.rows)) {
-        term.resize(dims.cols, dims.rows)
-        connRef.current?.resize(dims.cols, dims.rows)
-      }
-    })
+    requestAnimationFrame(() => sizeChangedRef.current())
   }, [visible])
 
   useEffect(() => {
@@ -810,7 +876,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       ref={wrapRef}
       className={cn(
         '@container relative min-h-0 flex-1 bg-terminal px-2',
-        belowBar ? 'pt-0.5' : 'pt-1.5'
+        belowBar ? 'pt-0.5' : 'pt-1'
       )}
     >
       {/* Terminal tam satırlardan oluşur; satıra tamamlanmayan artık alan üstte kalır, durum şeridi varsa şeritle

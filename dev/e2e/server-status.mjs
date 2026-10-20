@@ -343,6 +343,47 @@ try {
   const after = await firstStrip.getAttribute('data-updated-at')
   check('updates resume after it exits', after !== during)
 
+  // 6b. Kurulum yanıtı geç gelen oturum (istem gelir gelmez uzun bir komut çalışır, kurulum ondan sonra işlenir; bekleme
+  // süresi dolar): entegrasyondan ilk ileti gelince şerit yine görünür. Entegrasyon hiç kurulamayan oturumda
+  // (base64 bulunamaz) şerit yerine nedeni yazan satır görünür.
+  const openQuick = async (firstCommand) => {
+    await page.keyboard.press('Control+Shift+T')
+    await page.waitForTimeout(300)
+    await page.getByRole('tree').getByText('jump-ops', { exact: true }).dblclick()
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll('.xterm-rows')].some(
+          (e) => e.getBoundingClientRect().width > 0 && /\$\s*$/.test(e.innerText.trim())
+        ),
+      null,
+      { timeout: 15000, polling: 50 }
+    )
+    await page.locator('.xterm-helper-textarea:visible').first().focus()
+    await page.keyboard.type(`${firstCommand}\n`)
+  }
+  await page.evaluate(() => {
+    window.__failedSeen = false
+    new MutationObserver(() => {
+      if (document.querySelector('[data-server-status-failed]')) window.__failedSeen = true
+    }).observe(document.body, { childList: true, subtree: true })
+  })
+  await openQuick('sleep 5')
+  await strips().first().waitFor({ timeout: 20000 })
+  check(
+    'late setup response still shows the strip, without a failure line in between',
+    (await strips().count()) === 1 && !(await page.evaluate(() => window.__failedSeen))
+  )
+  await openQuick('exec env -i PATH=/nonexistent bash --norc --noprofile')
+  const failedBar = page.locator('[data-server-status-failed]:visible')
+  await failedBar.waitFor({ timeout: 30000 })
+  check(
+    'failed integration explains why there is no strip',
+    (await strips().count()) === 0 &&
+      /kabuk entegrasyonu kurulamadı/.test(await failedBar.innerText()),
+    await failedBar.innerText()
+  )
+  await shot('status-04-failed')
+
   // 7. Ayar kapatılınca şeritler kaybolur
   await setEnabled(false)
   check(

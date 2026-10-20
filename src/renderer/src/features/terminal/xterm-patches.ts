@@ -51,6 +51,14 @@ function viewport(term: Terminal): ViewportInternals | null {
   return vp && typeof vp._sync === 'function' ? (vp as ViewportInternals) : null
 }
 
+/** Kaydırma alanının konumunu görünen satırdan, geçerli satır yüksekliğiyle yeniden hesaplatır. */
+export function resyncViewport(term: Terminal): void {
+  const vp = viewport(term)
+  if (!vp) return
+  vp._latestYDisp = undefined
+  vp._sync()
+}
+
 function renderService(term: Terminal): PatchedService | null {
   const core = (term as unknown as { _core?: { _renderService?: unknown } })._core
   const service = core?._renderService as PatchedService | undefined
@@ -121,12 +129,7 @@ export function patchHiddenRendering(term: Terminal): void {
     if (service._isPaused) state.pendingFocus = 'blur'
     else state.blur()
   }
-  const vp = viewport(term)
-  const resync = (): void => {
-    if (!vp) return
-    vp._latestYDisp = undefined
-    vp._sync()
-  }
+  const resync = (): void => resyncViewport(term)
   for (const name of [
     'setRenderer',
     'handleCharSizeChanged',

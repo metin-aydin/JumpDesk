@@ -13,6 +13,7 @@ import { IPC } from '@shared/api'
 import { compareVersions, type UpdateInstaller, type UpdateState } from '@shared/update'
 import { mt } from './i18n'
 import { store } from './store'
+import { markQuitting } from './quitting'
 
 /** Sürümlerin yayımlandığı GitHub deposu (electron-builder.yml `publish` ile aynı). */
 const REPO = 'metin-aydin/JumpDesk'
@@ -209,6 +210,8 @@ export function installUpdate(): void {
     return
   }
   const u = updater
+  // macOS'ta kurulum pencereleri app.quit()'ten önce kapatır; pencere kapatılınca tepsiye gizlenmesin.
+  markQuitting()
   setImmediate(() => u.quitAndInstall(false, true))
 }
 

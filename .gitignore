@@ -10,7 +10,7 @@ out
 *.png
 # Uygulama ve paket ikonları ile README ekran görüntüleri depoda tutulur.
 !build/**/*.png
-!resources/*.png
+!resources/**/*.png
 !docs/screenshots/*.png
 
 # TypeScript artımlı derleme önbelleği

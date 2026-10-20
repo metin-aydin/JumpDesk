@@ -32,6 +32,8 @@ export const serverStatus: Dictionary = {
   'En çok CPU kullananlar': 'Top CPU processes',
   'En çok bellek kullananlar': 'Top memory processes',
   'Durumu Göster': 'Show Status',
+  'Sunucu durumu alınamadı: kabuk entegrasyonu kurulamadı (bash ya da zsh, base64 ve gzip gerekir).':
+    'Server status unavailable: shell integration could not be set up (needs bash or zsh, base64 and gzip).',
   'Oturumu Yeniden Bağlayıp Sunucu Durumunu Başlat':
     'Reconnect the Session and Start Server Status',
   'Yeniden Bağlantı Gerekiyor': 'Reconnect Required',

@@ -60,7 +60,11 @@ const EN: Record<string, string> = {
   'Uç Nokta': 'Endpoint',
   Model: 'Model',
   'Dağıtım Adı': 'Deployment Name',
-  'API Sürümü': 'API Version'
+  'API Sürümü': 'API Version',
+  'Kayıtlı Düzenler': 'Saved Layouts',
+  'Kayıtlı düzen yok': 'No saved layouts',
+  "JumpDesk'i Göster": 'Show JumpDesk',
+  Çıkış: 'Quit'
 }
 
 /** Ortam değişkeniyle sabitlenen dil (testler). */
