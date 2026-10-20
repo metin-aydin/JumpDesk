@@ -1181,3 +1181,7 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    (`sleep 5` istem gelir gelmez), "failed integration explains why" (`exec env -i PATH=/nonexistent bash`).
 3. Canlı tanı tuzağı: uzun süre HMR almış dev uygulamada `import('/src/stores/…')` yeni (boş) modül örneği verir;
    `performance.getEntriesByType('resource')` ile yüklenmiş `?t=` adresi bulunup o içe aktarılmalı.
+4. Tam regresyon geçti (server-status 36, right-click 6, tab-keys 8, windows 47, tools 69, multiwindow 21, popups,
+   ai 24, panels 13, home 17, i18n, menus, tabs, alarm-warmup, transfer 39, update 19, server-address, sftp, rdp,
+   font-perf, group-perf 3×5 boşta/akışlı 33–43 ms). Commit `2f8b3b0` pushlandı; PR #8 başlığı "JumpDesk 0.2.5:
+   right-click paste, status strip on slow servers", açıklaması güncellendi. Birleştirme kullanıcıda.
