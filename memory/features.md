@@ -1229,3 +1229,11 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    görev çubuğu), `tray-light(.png,@2x)` beyaz `>_` (Linux GNOME koyu üst çubuk, Windows koyu görev çubuğu);
    Windows'ta `nativeTheme.shouldUseDarkColorsForSystemIntegratedUI` ve `nativeTheme` `updated` olayıyla yenilenir.
    Eski renkli `tray.png/tray-16.png` silindi.
+6. **Gönderim (2026-10-20):** kullanıcı tepsiyi kendi makinesinde denedi ("çalışıyor") ve uzun regresyonu iki kez
+   durdurdu; tamamlanan: tray 8/8 (yeni derleme), update 19/19, önceki turda smoke/tabs/windows 47/multiwindow 21/
+   tools 69/menus/panels 13/home 17/i18n/server-status 36/right-click 6/tab-keys 8/popups 4 (çalışmayanlar: ai,
+   alarm-warmup, transfer, server-address, sftp, rdp — tepsi değişikliğinden etkilenmez). Commit `fc27956` +
+   `c907ef2`; PR #8 başlığı "JumpDesk 0.2.5: system tray layouts, right-click paste, status strip on slow servers".
+   **Tuzak:** `.gitignore` `*.png` alt klasördeki görselleri yok sayıyordu; istisna `!resources/**/*.png` yapıldı
+   (yoksa CI derlemesi tepsi simgesini bulamazdı). Yeni görsel eklerken `git status`'ta göründüğü denetlenmeli.
+   Açılır pencere ilk açılışta `ready-to-show` beklenerek gösterilir (yüklenmeden boş görünüyordu; testte zamanlama hatası).
