@@ -1102,3 +1102,21 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
   (kenarlardan 2 px içeride piksel [248,216,217]). tools 69/69. PR #5 sürüm notu güncellendi.
 - Kullanıcı "hepsi tamam, commitle pushla, main'e PR aç" dedi: her şey zaten commitli ve pushlıydı (`dcd818a`); PR #5
   (development → main) açık, CI 5 geçti / 1 atlandı, MERGEABLE/CLEAN. Yeni PR açılmadı; birleştirme kullanıcıda.
+
+## Kullanıcı isteği — 45. tur (2026-10-20): GitHub issue'ları
+1. PR #5 birleşti (2026-10-19 12:54 UTC), **v0.2.3 yayımlandı** (Latest, 13:02 UTC). Yerelde main çekildi, eski
+   `development` silindi, yeni `development` main'den açıldı.
+2. Açık tek issue **#6** (@Mert18, 2026-10-20): "Alt + rakam ile üst düzey sekmeler arasında geçiş". Mevcut durum:
+   Ctrl+1…9 (macOS ⌘) vardı ama `ws.tabs` (grup üyeleri ayrı sayılır) üzerinden çalışıyordu; grup varken numara şeritteki
+   sırayla uyuşmuyordu; ayrı pencerede numara kısayolu yoktu.
+3. **Uygulama:** `workspace.ts` `topLevelTabs(state, windowId)` (şerit sırası, grup ilk üyesinin yerinde tek öğe,
+   etkinleşecek sekme = gruptaki odak ya da `focusedId`); `lib/shortcuts.ts` `tabNumberShortcut(e)`: Ctrl+1…9 (macOS
+   ⌘), Windows/Linux'ta Alt+1…9 da (macOS'ta Option+rakam karakter yazar → yok); Shift ve AltGr (`getModifierState
+   ('AltGraph')`; Windows'ta AltGr = Ctrl+Alt) hariç — Türkçe klavyede AltGr+7/8/9/0 `{ [ ] }` yazar. Ana pencere
+   (`use-global-shortcuts`) ve ayrı pencereler (`detached-windows` onKey) aynı yardımcıyı kullanır. Kısayollar listesi:
+   "Ctrl+1…8 / Alt+1…8", "Ctrl+9 / Alt+9".
+4. Ödünleşim: Alt+rakam artık uzak programlara gitmez (irssi/weechat pencere geçişi, bash sayısal argüman). GNOME
+   Terminal/Konsole varsayılanıyla aynı; gerekirse ayar eklenebilir (kullanıcıya soruldu).
+5. Test `dev/e2e/tab-keys.mjs` (DOM çizici): tek sekme + grup + tek sekme; Ctrl ve Alt ile 1…n sıralı seçim, 9 son
+   öğe, Alt+rakam terminale gitmez (bash "(arg: n)" yok; denetimin kendisi ESC+1 doğrudan gönderilerek doğrulandı →
+   FAIL). Sonuç 6/6. CLAUDE.md e2e listesine eklendi.
