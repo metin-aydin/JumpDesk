@@ -1135,3 +1135,8 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    gitmez, büyütülmüş grupta büyütme taşınır, tek sekmede Alt+1 terminale gider ("(arg: 1)"). PR #7 başlığı/açıklaması
    buna göre güncellenecek; "Closes #6" önceki commit'te (issue'nun istediği Alt üst düzey değil, Ctrl üst düzey oldu —
    kullanıcıya belirtildi). Issue'ya yorum için izin hâlâ bekleniyor.
+8. **Gönderim (2026-10-20):** testler geçti (tab-keys 8, tools 69, windows 47, multiwindow 21, home 17, panels 13,
+   menus, i18n, tabs, smoke). Commit `13a423f` pushlandı; PR #7 başlığı "JumpDesk 0.2.4: number keys for tabs and
+   panes", açıklaması güncellendi. Kullanıcı izniyle #6'ya İngilizce açıklama yorumu yazıldı (Ctrl şerit, Alt grup
+   paneli, ⌘/⌃ macOS, grup dışında Alt terminale gider, AltGr korunur, Keyboard Shortcuts Ctrl+Shift+K) ve issue
+   "completed" olarak kapatıldı. Not: `gh issue view --json` `stateReason` alanını desteklemiyor.
