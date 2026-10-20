@@ -5,7 +5,8 @@ import { closeTabSafely, confirmLeaveGroup } from '@/features/layouts/guard'
 import { terminalRegistry } from '@/features/terminal/registry'
 import { t, useLanguage } from '@/lib/i18n'
 import { jumpdesk } from '@/lib/jumpdesk'
-import { isAppShortcut } from '@/lib/shortcuts'
+import { isAppShortcut, numberShortcut } from '@/lib/shortcuts'
+import { applyNumberShortcut } from '@/features/workspace/number-keys'
 import { useAlarms } from '@/stores/alarms'
 import {
   MAIN_WINDOW,
@@ -117,12 +118,13 @@ function onFocus(windowId: string, win: Window): void {
 
 /**
  * Ayrı pencerede o pencerenin oturumlarına ait kısayollar: kapat, terminalde ara, paneli büyüt, Ctrl+Tab ile
- * pencerenin sekmeleri arasında gezin.
+ * pencerenin sekmeleri arasında gezin, Ctrl+1…9 ile şeritteki sekmeye, Alt+1…9 ile gruptaki panele geçiş.
  */
 function onKey(e: KeyboardEvent, windowId: string): void {
   const tabId = focusedTabOf(windowId)
   if (!tabId) return
   const ws = useWorkspace.getState()
+  const number = numberShortcut(e)
   let handled = true
   if (isAppShortcut(e, 'W')) void closeTabSafely(tabId)
   else if (isAppShortcut(e, 'S')) terminalRegistry.get(tabId)?.openSearch()
@@ -132,7 +134,8 @@ function onKey(e: KeyboardEvent, windowId: string): void {
     const i = tabs.findIndex((t) => t.id === tabId)
     const next = tabs[(i + (e.shiftKey ? -1 : 1) + tabs.length) % tabs.length]
     if (next) ws.activate(next.id)
-  } else handled = false
+  } else if (number) handled = applyNumberShortcut(number, windowId, tabId)
+  else handled = false
   if (handled) {
     e.preventDefault()
     e.stopPropagation()

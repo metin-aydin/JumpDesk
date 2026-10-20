@@ -259,6 +259,28 @@ export function activeOfWindow(
   return tabs.some((t) => t.id === id) ? id : (tabs[0]?.id ?? '')
 }
 
+/**
+ * Pencerenin sekme şeridindeki öğeler sırasıyla; her öğe için seçilince etkinleşecek sekme. Grup, ilk üyesinin yerinde
+ * tek öğedir ve şeritteki grup sekmesine tıklamak gibi odaktaki (yoksa son odaklanan) üyesini etkinleştirir.
+ */
+export function topLevelTabs(
+  state: Pick<WorkspaceStore, 'tabs' | 'detached' | 'activeId' | 'windowActive' | 'groups'>,
+  windowId: string
+): string[] {
+  const activeId = activeOfWindow(state, windowId)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const tab of tabsOfWindow(state, windowId)) {
+    const group = groupOf(state.groups, tab.id)
+    if (!group) out.push(tab.id)
+    else if (!seen.has(group.id)) {
+      seen.add(group.id)
+      out.push(group.ids.includes(activeId) ? activeId : group.focusedId)
+    }
+  }
+  return out
+}
+
 /** Grup ana pencerede mi (üyeleri ana sekmelerde). */
 export const isMainGroup = (state: Pick<WorkspaceStore, 'tabs'>, group: TabGroup): boolean =>
   group.ids.some((id) => state.tabs.some((t) => t.id === id))

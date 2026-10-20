@@ -1102,3 +1102,41 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
   (kenarlardan 2 px içeride piksel [248,216,217]). tools 69/69. PR #5 sürüm notu güncellendi.
 - Kullanıcı "hepsi tamam, commitle pushla, main'e PR aç" dedi: her şey zaten commitli ve pushlıydı (`dcd818a`); PR #5
   (development → main) açık, CI 5 geçti / 1 atlandı, MERGEABLE/CLEAN. Yeni PR açılmadı; birleştirme kullanıcıda.
+
+## Kullanıcı isteği — 45. tur (2026-10-20): GitHub issue'ları
+1. PR #5 birleşti (2026-10-19 12:54 UTC), **v0.2.3 yayımlandı** (Latest, 13:02 UTC). Yerelde main çekildi, eski
+   `development` silindi, yeni `development` main'den açıldı.
+2. Açık tek issue **#6** (@Mert18, 2026-10-20): "Alt + rakam ile üst düzey sekmeler arasında geçiş". Mevcut durum:
+   Ctrl+1…9 (macOS ⌘) vardı ama `ws.tabs` (grup üyeleri ayrı sayılır) üzerinden çalışıyordu; grup varken numara şeritteki
+   sırayla uyuşmuyordu; ayrı pencerede numara kısayolu yoktu.
+3. **Uygulama:** `workspace.ts` `topLevelTabs(state, windowId)` (şerit sırası, grup ilk üyesinin yerinde tek öğe,
+   etkinleşecek sekme = gruptaki odak ya da `focusedId`); `lib/shortcuts.ts` `tabNumberShortcut(e)`: Ctrl+1…9 (macOS
+   ⌘), Windows/Linux'ta Alt+1…9 da (macOS'ta Option+rakam karakter yazar → yok); Shift ve AltGr (`getModifierState
+   ('AltGraph')`; Windows'ta AltGr = Ctrl+Alt) hariç — Türkçe klavyede AltGr+7/8/9/0 `{ [ ] }` yazar. Ana pencere
+   (`use-global-shortcuts`) ve ayrı pencereler (`detached-windows` onKey) aynı yardımcıyı kullanır. Kısayollar listesi:
+   "Ctrl+1…8 / Alt+1…8", "Ctrl+9 / Alt+9".
+4. Ödünleşim: Alt+rakam artık uzak programlara gitmez (irssi/weechat pencere geçişi, bash sayısal argüman). GNOME
+   Terminal/Konsole varsayılanıyla aynı; gerekirse ayar eklenebilir (kullanıcıya soruldu).
+5. Test `dev/e2e/tab-keys.mjs` (DOM çizici): tek sekme + grup + tek sekme; Ctrl ve Alt ile 1…n sıralı seçim, 9 son
+   öğe, Alt+rakam terminale gitmez (bash "(arg: n)" yok; denetimin kendisi ESC+1 doğrudan gönderilerek doğrulandı →
+   FAIL). Sonuç 6/6. CLAUDE.md e2e listesine eklendi.
+6. Testler geçti (tab-keys 6, tools 69, windows 47, multiwindow 21, home 17, panels 13, menus, i18n, tabs, smoke).
+   Commit `fc48d5c` (mesajda "Closes #6" → PR main'e birleşince issue kapanır) pushlandı; **PR #7** açıldı
+   (https://github.com/metin-aydin/JumpDesk/pull/7, "JumpDesk 0.2.4: switch tabs with Alt+1…9", oturuma bağlı, CI
+   çalışıyor). Kullanıcıdan beklenen kararlar: (a) Alt+rakam terminale gitmesin (öneri) mi, (b) ayar mı; issue'ya
+   yorum yazılsın mı (dış iletişim → izin gerekir). Birleştirme kullanıcıda.
+7. **Kullanıcı kararı (2026-10-20):** "Ctrl üst düzey sekme değişimi, Alt iç sekmelerde (gruptaki paneller) değişim
+   yapsın." Uygulama: `lib/shortcuts.ts` `numberShortcut(e)` → `{ scope: 'tab' | 'pane', n }`: Ctrl+1…9 (macOS ⌘)
+   şerit, Alt+1…9 (macOS ⌃; Option+rakam karakter yazar) panel; Shift/AltGr hariç. `features/workspace/number-keys.ts`
+   `applyNumberShortcut(shortcut, windowId, tabId)`: panel kapsamında sekme grupta değilse false döner (tuş terminale
+   gider, irssi/weechat kullanılabilir); büyütülmüş grupta `toggleZoom(hedef)` büyütmeyi taşır. Ana ve ayrı pencere
+   aynı işlevi kullanır. Kısayollar listesine "Gruptaki Panele Git" / "Gruptaki Son Panele Git" eklendi (EN çeviri).
+   tab-keys.mjs 8/8: Ctrl sırası, Ctrl+9, Alt panel sırası (soldan sağa/yukarıdan aşağı), Alt+9, grupta Alt terminale
+   gitmez, büyütülmüş grupta büyütme taşınır, tek sekmede Alt+1 terminale gider ("(arg: 1)"). PR #7 başlığı/açıklaması
+   buna göre güncellenecek; "Closes #6" önceki commit'te (issue'nun istediği Alt üst düzey değil, Ctrl üst düzey oldu —
+   kullanıcıya belirtildi). Issue'ya yorum için izin hâlâ bekleniyor.
+8. **Gönderim (2026-10-20):** testler geçti (tab-keys 8, tools 69, windows 47, multiwindow 21, home 17, panels 13,
+   menus, i18n, tabs, smoke). Commit `13a423f` pushlandı; PR #7 başlığı "JumpDesk 0.2.4: number keys for tabs and
+   panes", açıklaması güncellendi. Kullanıcı izniyle #6'ya İngilizce açıklama yorumu yazıldı (Ctrl şerit, Alt grup
+   paneli, ⌘/⌃ macOS, grup dışında Alt terminale gider, AltGr korunur, Keyboard Shortcuts Ctrl+Shift+K) ve issue
+   "completed" olarak kapatıldı. Not: `gh issue view --json` `stateReason` alanını desteklemiyor.

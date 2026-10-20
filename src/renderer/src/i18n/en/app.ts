@@ -187,6 +187,8 @@ export const app: Dictionary = {
   'Önceki Sekme': 'Previous Tab',
   'Sekmeye Git': 'Go to Tab',
   'Son Sekmeye Git': 'Go to Last Tab',
+  'Gruptaki Panele Git': 'Go to Pane in Group',
+  'Gruptaki Son Panele Git': 'Go to Last Pane in Group',
   'Orta Tık': 'Middle Click',
   'Terminalde Ara (less/vim Dışında)': 'Search Terminal (Outside less/vim)',
   'Terminalde Ara (Her Yerde)': 'Search Terminal (Everywhere)',

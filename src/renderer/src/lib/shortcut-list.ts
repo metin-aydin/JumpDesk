@@ -36,8 +36,10 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: isMac ? '⌘⇧A' : 'Ctrl+Shift+A', label: t('Sekmelerde Ara') },
         { keys: 'Ctrl+Tab', label: t('Sonraki Sekme') },
         { keys: 'Ctrl+Shift+Tab', label: t('Önceki Sekme') },
-        { keys: `${ctrl}+1…8`, label: t('Sekmeye Git') },
-        { keys: `${ctrl}+9`, label: t('Son Sekmeye Git') },
+        { keys: isMac ? '⌘1…8' : 'Ctrl+1…8', label: t('Sekmeye Git') },
+        { keys: isMac ? '⌘9' : 'Ctrl+9', label: t('Son Sekmeye Git') },
+        { keys: isMac ? '⌃1…8' : 'Alt+1…8', label: t('Gruptaki Panele Git') },
+        { keys: isMac ? '⌃9' : 'Alt+9', label: t('Gruptaki Son Panele Git') },
         { keys: t('Orta Tık'), label: t('Sekmeyi Kapat') }
       ]
     },
