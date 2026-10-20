@@ -1120,3 +1120,8 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
 5. Test `dev/e2e/tab-keys.mjs` (DOM çizici): tek sekme + grup + tek sekme; Ctrl ve Alt ile 1…n sıralı seçim, 9 son
    öğe, Alt+rakam terminale gitmez (bash "(arg: n)" yok; denetimin kendisi ESC+1 doğrudan gönderilerek doğrulandı →
    FAIL). Sonuç 6/6. CLAUDE.md e2e listesine eklendi.
+6. Testler geçti (tab-keys 6, tools 69, windows 47, multiwindow 21, home 17, panels 13, menus, i18n, tabs, smoke).
+   Commit `fc48d5c` (mesajda "Closes #6" → PR main'e birleşince issue kapanır) pushlandı; **PR #7** açıldı
+   (https://github.com/metin-aydin/JumpDesk/pull/7, "JumpDesk 0.2.4: switch tabs with Alt+1…9", oturuma bağlı, CI
+   çalışıyor). Kullanıcıdan beklenen kararlar: (a) Alt+rakam terminale gitmesin (öneri) mi, (b) ayar mı; issue'ya
+   yorum yazılsın mı (dış iletişim → izin gerekir). Birleştirme kullanıcıda.
