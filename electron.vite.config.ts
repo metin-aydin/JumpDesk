@@ -11,7 +11,12 @@ export default defineConfig({
     resolve: { alias: shared }
   },
   preload: {
-    resolve: { alias: shared }
+    resolve: { alias: shared },
+    build: {
+      rollupOptions: {
+        input: { index: resolve('src/preload/index.ts'), tray: resolve('src/preload/tray.ts') }
+      }
+    }
   },
   renderer: {
     resolve: {
@@ -21,6 +26,14 @@ export default defineConfig({
       }
     },
     define: { __APP_VERSION__: JSON.stringify(pkg.version) },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          tray: resolve('src/renderer/tray.html')
+        }
+      }
+    }
   }
 })

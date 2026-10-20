@@ -6,6 +6,7 @@ import { installRequestHooks } from './net-hooks'
 import { store } from './store'
 import { initUpdater } from './updater'
 import { createMainWindow } from './window'
+import { initTray } from './tray'
 import { mt } from './i18n'
 
 app.setName('JumpDesk')
@@ -20,9 +21,11 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   let mainWindow: BrowserWindow | null = null
 
+  // Pencere kapatılmışsa (uygulama tepside) yeniden başlatmak aynı pencereyi gösterir.
   app.on('second-instance', () => {
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
     mainWindow.focus()
   })
 
@@ -58,13 +61,15 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow = createMainWindow()
     const appContentsId = mainWindow.webContents.id
     registerIpc(mainWindow)
+    initTray(mainWindow)
     attachAuthWindow(mainWindow)
     installRequestHooks((id) => id === appContentsId)
     initUpdater(mainWindow)
     await checkSession()
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
+      else if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow()
     })
   })
 

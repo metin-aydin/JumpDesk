@@ -190,6 +190,13 @@ export const app: Dictionary = {
   'Gruptaki Panele Git': 'Go to Pane in Group',
   'Gruptaki Son Panele Git': 'Go to Last Pane in Group',
   'Sağ Tık': 'Right Click',
+  'JumpDesk Düzenleri': 'JumpDesk Layouts',
+  'Düzen ara': 'Search layouts',
+  'Kayıtlı Düzenler': 'Saved Layouts',
+  'Kayıtlı düzen yok. Sekmeye sağ tıklayıp “Düzeni Kaydet…” ile kaydedebilirsiniz.':
+    'No saved layouts yet. Right-click a tab and choose “Save Layout…” to save one.',
+  'Eşleşen düzen yok': 'No matching layouts',
+  "JumpDesk'i Göster": 'Show JumpDesk',
   'Seçimi Kopyala / Yapıştır': 'Copy Selection / Paste',
   'Orta Tık': 'Middle Click',
   'Terminalde Ara (less/vim Dışında)': 'Search Terminal (Outside less/vim)',

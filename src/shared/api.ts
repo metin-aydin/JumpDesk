@@ -31,6 +31,12 @@ export const IPC = {
   notifyShow: 'notify:show',
   notifyClear: 'notify:clear',
   notifyClicked: 'notify:clicked',
+  /** Ana pencere → ana süreç: tepsi menüsünde ve açılır penceresinde gösterilecek düzenler. */
+  trayLayouts: 'tray:layouts',
+  /** Ana süreç → ana pencere: tepsiden seçilen düzeni yeni sekmede aç. */
+  trayOpenLayout: 'tray:open-layout',
+  /** Ana süreç → ana pencere: pencere kapatıldı, uygulama tepside sürüyor (oturumlar kapatılır). */
+  appHidden: 'app:hidden',
   downloadBegin: 'download:begin',
   downloadWrite: 'download:write',
   downloadEnd: 'download:end',
@@ -222,6 +228,15 @@ export interface JumpDeskApi {
     /** Ana makine adını istemcinin DNS'iyle IPv4 adresine çözer; çözülemezse null. */
     resolve(host: string): Promise<string | null>
   }
+  /** Sistem tepsisi: düzen listesi ana sürece bildirilir, tepsiden seçilen düzen burada açılır. */
+  tray: {
+    setLayouts(layouts: TrayLayout[]): void
+    onOpenLayout(cb: (layoutId: string) => void): () => void
+  }
+  /** Pencere kapatılınca uygulama tepside sürer; bu olayda açık oturumlar kapatılır. */
+  app: {
+    onHidden(cb: () => void): () => void
+  }
   notify: {
     /** Masaüstü bildirimi; tıklanınca pencere öne gelir ve `onClick` sekme kimliği ve alarm satırıyla çağrılır. */
     show(opts: { title: string; body: string; tabId: string; line: string }): void
@@ -281,4 +296,12 @@ export interface JumpDeskApi {
     /** Dosya seçtirir, çözer ve doğrular. */
     open(): Promise<TransferOpenResult>
   }
+}
+
+/** Tepside gösterilen kayıtlı düzen. */
+export interface TrayLayout {
+  id: string
+  name: string
+  /** Düzendeki sunucu sayısı. */
+  servers: number
 }

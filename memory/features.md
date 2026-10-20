@@ -1185,3 +1185,47 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    ai 24, panels 13, home 17, i18n, menus, tabs, alarm-warmup, transfer 39, update 19, server-address, sftp, rdp,
    font-perf, group-perf 3×5 boşta/akışlı 33–43 ms). Commit `2f8b3b0` pushlandı; PR #8 başlığı "JumpDesk 0.2.5:
    right-click paste, status strip on slow servers", açıklaması güncellendi. Birleştirme kullanıcıda.
+
+## Kullanıcı isteği — 48. tur (2026-10-20): sistem tepsisi simgesi ve kayıtlı düzenler (tartışma)
+1. İstek: Ubuntu/macOS sağ üstte, Windows sağ altta simge; tıklayınca kayıtlı düzenler uygulamanın tasarımında açılır
+   pencerede; düzene tıklayınca uygulama açıksa yeni sekmede, değilse uygulamayı açıp düzeni açsın.
+2. Teknik bulgu (bu makinedeki `ubuntu-appindicators@ubuntu.com/indicatorStatusIcon.js`): GNOME AppIndicator'da sol
+   tek tık menü varsa menüyü açar (çift tık beklemesiyle), menü yoksa hiçbir şey yapmaz; çift sol tık `Activate`
+   (Electron `click`), orta tık `SecondaryActivate`, sağ tık menü. Yani Ubuntu'da tek tıkla özel pencere açılamaz;
+   yalnız GNOME'un kendi (dbusmenu) menüsü. Linux'ta `tray.getBounds()` boş döner (konum yok). macOS/Windows'ta tıklama
+   olayı ve simge konumu var → özel açılır pencere mümkün.
+3. Kullanıcı kararı: pencere kapatılınca **tepside kalsın, oturumlar kapansın** (süreç yaşar, pencere yok olur; düzen
+   seçilince pencere yeniden açılıp düzen açılır). Ubuntu için iki yöntem çizilerek gösterildi (show_widget): A)
+   düzenler doğrudan GNOME menüsünde (tek tık), B) menüde "Düzenler…" → bizim tasarımda açılır pencere (iki tık).
+   macOS/Windows'ta tek tıkla bizim açılır pencere, sağ tıkta "JumpDesk'i Göster"/"Çıkış". Kullanıcının A/B seçimi
+   bekleniyor.
+4. **Kullanıcı A'yı seçti (2026-10-20). Uygulama:**
+   - `src/main/tray.ts` `initTray(win)`: simge (Linux renkli 32 px `resources/tray/tray.png`; Windows 16+32 px;
+     macOS şablon `trayTemplate.png` + `@2x`, siyah `>_` çerçeveli, ffmpeg librsvg ile SVG'den üretildi). Linux: GNOME
+     menüsü = "Kayıtlı Düzenler" (pasif başlık), düzenler, ayırıcı, "JumpDesk'i Göster", "Çıkış"; çift tık (Activate)
+     pencereyi gösterir; düzen adındaki `&` `&&` yapılır (kısayol harfi sayılmasın). macOS/Windows: sol tık bizim
+     açılır pencere (`tray.html`, `TrayPopup.tsx`: başlık, arama, düzen + sunucu sayısı, ok tuşları/Enter/Esc,
+     "JumpDesk'i Göster"; içerik yüksekliğini bildirir, pencere ona göre boyutlanır, odak kaybında gizlenir), sağ tık
+     kısa menü. Konum `tray-position.ts` `popupPosition` (simge altı/üstü, çalışma alanına sığdırma, Linux'ta sağ üst).
+   - Kapatma: tepsi varsa `close` önlenir → ana pencereye `app:hidden` (renderer `useWorkspace.reset()`: oturumlar ve
+     ayrı pencereler kapanır) → `win.hide()`; ilk seferde (Linux/Windows) bir kez bildirim (`store.trayHintShown`).
+     Pencereyi yeniden kurmak yerine gizlemek seçildi: `registerIpc/attachAuthWindow/initUpdater/notify` ana pencere
+     örneğine bağlı. `quitting.ts`: `before-quit` → gerçekten kapanıyor; güncelleme kurulumunda `markQuitting()`
+     (macOS Squirrel pencereleri önce kapatır). İkinci örnek ve macOS `activate` gizli pencereyi gösterir.
+   - Renderer `features/tray/tray-sync.ts`: giriş yapılmışsa düzen listesini (`id, name, servers`) ana sürece
+     bildirir (düzen, dil ve oturum değişince); `tray:open-layout` → `openLayout` (giriş yoksa girişten sonra).
+   - **Tuzak:** iki önyükleme (`index`, `tray`) ortak modül içe aktarırsa paketleyici `out/preload/chunks/` üretir;
+     korumalı önyükleme başka dosya yükleyemez (pencere açılmaz). Açılır pencere kanalları/türleri bu yüzden ayrı
+     `src/shared/tray-popup.ts`'te; `@shared/api` tray önyüklemesinde yalnız tür olarak kullanılır. Derlemeden sonra
+     `grep require out/preload/*.js` yalnız `electron` göstermeli.
+   - Ekransız testlerde tepsi yalnız `JUMPDESK_TEST_TRAY=1` ile kurulur (test kancası `globalThis.__jumpdeskTray`:
+     labels, click, openPopup, popupVisible, mainVisible). Açılır pencere testte `offscreen`.
+   - Testler: `dev/e2e/tray.mjs` 8/8 (menüde düzen, kapatınca tepside + oturumlar kapalı, tepsiden düzen → pencere
+     + sekme, açılır pencere listesi/sunucu sayısı/arama/Enter → yeni sekme ve gizlenme, Çıkış süreci kapatır);
+     `dev/tray-position.test.mjs` 6/6.
+5. **Kullanıcı düzeltmeleri (2026-10-20):** (a) pencere kapanınca "tepside çalışıyor" bildirimi gösterilmesin →
+   `hintOnce`, `store.trayHintShown` ve çevirisi kaldırıldı; (b) tepsi simgesi uygulama simgesi değil yalnız `>_`
+   işareti olsun → `resources/tray/` yeniden üretildi: `trayTemplate(.png,@2x)` siyah `>_` (macOS şablon, Windows açık
+   görev çubuğu), `tray-light(.png,@2x)` beyaz `>_` (Linux GNOME koyu üst çubuk, Windows koyu görev çubuğu);
+   Windows'ta `nativeTheme.shouldUseDarkColorsForSystemIntegratedUI` ve `nativeTheme` `updated` olayıyla yenilenir.
+   Eski renkli `tray.png/tray-16.png` silindi.
