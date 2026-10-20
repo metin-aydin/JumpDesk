@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Activity } from 'lucide-react'
+import { Activity, CircleAlert } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { currentLocale, useT } from '@/lib/i18n'
@@ -8,7 +8,7 @@ import { useConfirm } from '@/stores/confirm'
 import { largestDisk, usageLevel, useServerStats, type ServerStats } from '@/stores/server-stats'
 import { LEVEL_CLASS, formatPercent } from './format'
 import { ServerStatusCard, type StatFocus } from './ServerStatusCard'
-import { useStatusBarVisible } from './use-status-bar'
+import { useStatusBarState } from './use-status-bar'
 
 /** Şeritteki kısa açık kalma süresi: gün, saat ya da dakika. */
 function shortUptime(t: ReturnType<typeof useT>, seconds: number): string {
@@ -169,7 +169,7 @@ export function ServerStatusStrip({
   onReconnect: () => void
 }): React.JSX.Element | null {
   const t = useT()
-  const visible = useStatusBarVisible(tabId)
+  const state = useStatusBarState(tabId)
   const stats = useServerStats((s) => s.byTab[tabId])
   const [now, setNow] = useState(() => Date.now())
 
@@ -180,7 +180,22 @@ export function ServerStatusStrip({
     return () => clearInterval(id)
   }, [stats])
 
-  if (!visible) return null
+  if (state === 'hidden') return null
+
+  if (state === 'failed')
+    return (
+      <div
+        data-server-status-failed
+        className="flex h-6 shrink-0 items-center gap-1.5 border-b bg-muted/30 px-2 text-[11px] text-muted-foreground"
+      >
+        <CircleAlert className="size-3 shrink-0" />
+        <span className="truncate">
+          {t(
+            'Sunucu durumu alınamadı: kabuk entegrasyonu kurulamadı (bash ya da zsh, base64 ve gzip gerekir).'
+          )}
+        </span>
+      </div>
+    )
 
   if (!stats) {
     // Ölçüm döngüsü kurulum betiğiyle başlar; ayar açılmadan önce bağlanan oturum yeniden bağlanır.

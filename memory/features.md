@@ -1157,3 +1157,27 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
 5. Testler geçti (right-click 6, windows 47, tools 69, tab-keys 8, multiwindow 21, popups 4, ai 24, server-status 34,
    i18n, smoke). Commit `caf7f92` pushlandı; **PR #8** açıldı (https://github.com/metin-aydin/JumpDesk/pull/8,
    "JumpDesk 0.2.5: right-click paste in terminals", oturuma bağlı, CI çalışıyor). Birleştirme kullanıcıda.
+
+## Kullanıcı istekleri — 47. tur (2026-10-20): terminal boşlukları, bazı sunucularda durum şeridi yok
+1. **Terminalin üstünde/altında ~1 satır boşluk (ekran görüntüsü, grup paneli):** ölçüm (grup paneli, 4 yükseklik):
+   üst boşluk = 6 px `pt-1.5` + artan alan (hücre tam piksel, 19 px) → 12–23 px; alt 0 px. Alttaki boş satır imlecin
+   satırı (`tail -f` çıktısı satır sonuyla biter, imleç yeni satırda) — her terminalde vardır, kaldırılamaz.
+   **Düzeltme:** `TerminalPane` `fillHeight()` (`sizeChanged` başında, görünürken): hücre yüksekliği taban (yazı ×
+   `LINE_HEIGHT` 1.15) ±1 cihaz pikseli içinde artanı en aza indirecek biçimde seçilir (`lineHeight = (hücre+0.5)/
+   yazı`; tabansa 1.15), sonra `resyncViewport(term)` (xterm-patches'ten dışa açıldı; satır yüksekliği değişince
+   kaydırma konumu yeniden hesaplanır). Görünür olma yolundaki ayrı fit kaldırıldı (`sizeChangedRef`), `fitRef` silindi.
+   Üst dolgu `pt-1.5` → `pt-1`. Ölçüm (21 yükseklik): üst boşluk ort. 8,1 px (eskiden ~17), en çok 17. ±2 px
+   hesaplandı (ort. 2,7 artan) ama paneller arası satır aralığı farkı büyür → ±1 seçildi.
+2. **Bazı sunucularda durum şeridi görünmüyor (ayar açık):** canlı uygulama kapandığı için doğrudan bakılamadı. Kod
+   nedenleri: (a) kurulum yanıtı 3 sn içinde gelmezse (`SetupEchoGate` zaman aşımı; yavaş giriş betikleri, motd, yoğun
+   sunucu) entegrasyon 'failed' oluyordu; sonradan gelen iletiler (istatistik dahil) şeridi açmıyordu (görünürlük
+   'ready' ister) → **düzeltildi:** entegrasyondan gelen her ileti (`onCwd/onIps/onStats`) 'pending'/'failed'ı
+   'ready' yapar; zaman aşımında 10 sn (`INTEGRATION_GRACE_MS`) 'pending' kalır, sonra 'failed'. (b) Kabuk bash/zsh
+   değil ya da base64/gzip yok → kurulamaz; artık şerit yerine "Sunucu durumu alınamadı: kabuk entegrasyonu
+   kurulamadı (bash ya da zsh, base64 ve gzip gerekir)." satırı (`useStatusBarState` → 'failed', `data-server-status-
+   failed`). (c) JumpServer'da varlık türü linux/unix/macos/bsd/aix değilse entegrasyon hiç kurulmaz (şerit yok,
+   otomatik tamamlama da yok). (d) /proc'suz sistemlerde (AIX/BSD) ölçüm başlamaz.
+   Testler (server-status.mjs, 36): "late setup response still shows the strip, without a failure line in between"
+   (`sleep 5` istem gelir gelmez), "failed integration explains why" (`exec env -i PATH=/nonexistent bash`).
+3. Canlı tanı tuzağı: uzun süre HMR almış dev uygulamada `import('/src/stores/…')` yeni (boş) modül örneği verir;
+   `performance.getEntriesByType('resource')` ile yüklenmiş `?t=` adresi bulunup o içe aktarılmalı.
