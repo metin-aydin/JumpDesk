@@ -1392,3 +1392,6 @@ PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
 6. Testler: update 26/26 (yeni: no_new_privs kurulum yolu ve nedeni, kullanıcı yöneticisi yoksa iletisi, HTTPS +
    kurum kökü güvenilir/değil, tepsiden açılınca denetim ve yeniden duyuru), ai 44, tray 8, layout-folders 24,
    ai-providers 23 (Azure adresi), system-trust 9.
+7. Gönderim: commit'ler `db7ca03` (güncelleme/tepsi/sertifika), `2563e00` (sağlayıcı adları, görüntüler), `b2b44e9`;
+   PR #10 "JumpDesk 0.2.7: tray update checks, .deb installs after restarts, company certificates" (birleştirme
+   kullanıcıda).
