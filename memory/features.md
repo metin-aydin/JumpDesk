@@ -1355,3 +1355,40 @@ sürükle-bırak); (8) klasörler dışa aktarılsın.
    ai-assistant, bastion, electron, jumpserver, llm, ssh-client, terminal). PR #9 başlığı "JumpDesk 0.2.6: AI
    assistant, layout folders, inline suggestions", açıklaması yapay zeka maddeleriyle güncellendi (`gh pr edit`
    Projects (classic) GraphQL hatası verdiği için `gh api -X PATCH repos/.../pulls/9` kullanıldı).
+
+## Kullanıcı istekleri — 51. tur (2026-10-22): güncelleme sorunları, sağlayıcı adları
+PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
+1. **Tepsiden yeniden açınca güncelleme denetlenmiyordu:** `updater.ts` `checkOnReopen()` (otomatik denetim açık ve
+   son denetimden 1 dk geçtiyse; testte `JUMPDESK_TEST_REOPEN_GAP_MS`), `tray.ts` `showWindow` gizli pencereyi
+   gösterince çağırır ve `IPC.appShown` gönderir. Arayüz (`stores/update.ts`) pencere gizliyken bildirim göstermez;
+   gizlenince `announcedVersion` sıfırlanır, açılınca bekleyen sürüm yeniden duyurulur.
+2. **Tepsideyken .deb kurulumu "Parola penceresi kapatıldı" diyordu — kök neden:** `app.relaunch()` (Chromium
+   yeniden başlatıcısı) ile açılan süreç **`NoNewPrivs: 1`** taşır (`/proc/<pid>/status`); bayrak alt süreçlere geçer,
+   setuid `pkexec` yetki alamaz, polkit'e hiç gitmeden 127 döner (journal'da kayıt yok). Önceki güncellemeden sonra
+   yeniden açılıp tepside günlerce yaşayan süreç buydu; dock'tan açılan süreçte bayrak 0 olduğu için çıkıp açınca
+   çalışıyordu. Çözüm (`updater.ts`): bayrak varsa pkexec `systemd-run --user --wait --pipe --quiet --collect -E …
+   -- pkexec …` ile kullanıcının systemd yöneticisinde çalışır (bayrak devralınmaz, çıkış kodu ve stderr geri gelir;
+   `setpriv --no-new-privs` ile doğrulandı). Kurulumdan sonra yeniden açılış da `app.relaunch()` yerine
+   `systemd-run --user` ile (bu süreç bitince başlatıcı `/opt/JumpDesk/jumpdesk` çalışır, oturum değişkenleri `-E`
+   ile aktarılır) — yeni süreç bayrak taşımaz. Kullanıcı yöneticisi yoksa ve bayrak varsa "Tepsi simgesinden Çıkış ile
+   kapatıp yeniden açın" iletisi. 126 = parola penceresi kapatıldı, 127 = "Yönetici yetkisi alınamadı" + pkexec'in son
+   stderr satırı. Test kancaları `JUMPDESK_TEST_NO_NEW_PRIVS`, `JUMPDESK_TEST_SYSTEMD_RUN`.
+   **Not:** kullanıcının makinesinde şu an çalışan 0.2.6 da yeniden başlatılmış (NoNewPrivs 1) ve eski kodu taşıyor;
+   0.2.7'ye geçmeden önce bir kez tepsiden Çıkış yapıp dock'tan açması gerekir.
+3. **`net::ERR_CERT_AUTHORITY_INVALID` (kurum ağı, TLS denetimi, 0.2.2 kurulu başka makine):** Chromium Linux'ta
+   /etc/ssl/certs'i kullanmaz. `src/main/system-trust.ts` `initSystemTrust([PARTITION])`: varsayılan oturum,
+   `electron-updater` oturumu (`fromPartition('electron-updater', {cache:false})`) ve JumpServer bölümünde
+   `setCertificateVerifyProc`; yalnız hata -202 iken zincir `tls.getCACertificates('system')` köklerine göre
+   doğrulanır (`chainTrusted`: ad/IP, süre, her halka bir üstündekince (CA) imzalı, köke ulaşır); diğer her durumda -3
+   (Chromium'un sonucu). Electron 44 = Node 24.21. Test kökü `JUMPDESK_TEST_SYSTEM_CA`. Birim testi
+   `dev/system-trust.test.mjs` 9/9 (openssl ile kök/ara/yaprak üretir).
+4. **Sağlayıcı adları:** OpenAI zaten adres sormuyordu (API anahtarı + model); karışıklık "OpenAI Uyumlu"
+   adından → **"Yerel Model Sunucusu"** (Local Model Server; Ollama, LM Studio, vLLM). Azure'da tek ortak adres yok:
+   "Uç Nokta" yerine **"Kaynak Adı"** (`azureEndpoint`: yalnız ad → https://<ad>.openai.azure.com, tam adres de olur),
+   "API Sürümü" alanı kaldırıldı (varsayılan 2024-10-21, kayıtlı değer korunur).
+5. **Tepsi alt menüsü yana açılsın isteği:** GNOME Shell (ubuntu-appindicators) dbusmenu alt menülerini satır içi
+   açılır bölüm olarak çizer; yana açılan alt menü uygulamadan seçilemez (KDE'de yana açılır). Kullanıcıya seçenek
+   sunuldu (yanıt bekleniyor).
+6. Testler: update 26/26 (yeni: no_new_privs kurulum yolu ve nedeni, kullanıcı yöneticisi yoksa iletisi, HTTPS +
+   kurum kökü güvenilir/değil, tepsiden açılınca denetim ve yeniden duyuru), ai 44, tray 8, layout-folders 24,
+   ai-providers 23 (Azure adresi), system-trust 9.

@@ -79,6 +79,7 @@ boşluk eklenmez.
   sürülür; test sırasında tepside kısa süre simge görünür), açılır pencere konumu `node dev/tray-position.test.mjs`.
   Ekransız testlerde (`JUMPDESK_HIDE_WINDOW`) tepsi kurulmaz, pencereyi kapatmak eskisi gibi uygulamayı kapatır.
 - Sürüm hesabı ve sürüm notu birim testleri: `node dev/next-version.test.mjs`, `node dev/release-notes.test.mjs`.
+- Sistem sertifika deposuna güven (kurum TLS denetimi): `node dev/system-trust.test.mjs` (openssl gerekir).
 - Sunucu durumu birim testi: `node dev/server-stats.test.mjs` (kabuk betiği bash ve zsh'de bu makinenin `/proc`'uyla,
   ayrıştırıcı, kurulum komutunun 4096 bayt sınırı). Kabuk entegrasyonu betiği değişince çalıştırılır.
 
