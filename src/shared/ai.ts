@@ -14,8 +14,6 @@ export interface AiField {
   hint?: string
   /** Değerin biçimi (ör. kimlik); uymayan değer kaydedilmez. */
   pattern?: string
-  /** Model gibi alanlarda öneri listesi. */
-  options?: string[]
 }
 
 export interface AiProviderInfo {
@@ -43,8 +41,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
       {
         key: 'model',
         label: 'Model',
-        required: true,
-        options: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5-20251001']
+        required: true
       },
       {
         key: 'workspaceId',
@@ -65,8 +62,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
       {
         key: 'model',
         label: 'Model',
-        required: true,
-        options: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o']
+        required: true
       }
     ],
     defaults: { model: 'gpt-4.1' }
@@ -80,8 +76,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
       {
         key: 'model',
         label: 'Model',
-        required: true,
-        options: ['gemini-2.5-pro', 'gemini-2.5-flash']
+        required: true
       }
     ],
     defaults: { model: 'gemini-2.5-flash' }

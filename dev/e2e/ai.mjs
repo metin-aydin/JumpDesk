@@ -13,6 +13,7 @@ const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'jumpdesk-ai-'))
 
 /** Sahte sağlayıcı: soruya göre sabit öneriler döndürür, her isteği saklar. */
 const requests = []
+let modelRequests = 0
 const answer = (question) => {
   if (/disk/i.test(question))
     return {
@@ -42,6 +43,7 @@ const answer = (question) => {
 }
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/v1/models') {
+    modelRequests++
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ data: [{ id: 'test-model' }, { id: 'other-model' }] }))
     return
@@ -107,13 +109,44 @@ try {
   // Ayarlar → Yapay Zeka
   await page.keyboard.press('Control+,')
   await page.getByRole('button', { name: 'Yapay Zeka', exact: true }).click()
-  await page.getByRole('button', { name: /OpenAI Uyumlu/ }).click()
+  const providerSelect = page.getByRole('combobox', { name: 'Sağlayıcı' })
+  const featureSwitch = page.getByRole('switch', { name: 'Yapay Zeka ile Autocomplete' })
+  check(
+    'feature switches come first, provider below',
+    (await featureSwitch.boundingBox()).y < (await providerSelect.boundingBox()).y
+  )
+  check(
+    'provider is a dropdown showing its name',
+    (await providerSelect.innerText()).includes('Kullanma')
+  )
+  await providerSelect.click()
+  await page.getByRole('option', { name: 'OpenAI Uyumlu', exact: true }).click()
+  await page.waitForTimeout(300)
+  // Adres (anahtar) kaydedilmeden model listesi istenmez; model elle yazılamaz
+  const modelSelect = page.getByRole('combobox', { name: 'Model' })
+  const fieldOrder = await page.evaluate(() =>
+    [...document.querySelectorAll('[role=dialog] label')].map((l) => l.textContent.trim())
+  )
+  check(
+    'API key field sits right below the provider dropdown',
+    fieldOrder.indexOf('Sağlayıcı') + 1 === fieldOrder.indexOf('API Anahtarı (İsteğe Bağlı)'),
+    fieldOrder.join(' | ')
+  )
+  check(
+    'model list is not requested before the address is saved',
+    modelRequests === 0 &&
+      (await modelSelect.isDisabled()) &&
+      (await page.getByText('Model listesi için önce adresi girin.').count()) === 1
+  )
+  check(
+    'model name cannot be typed',
+    (await page.getByRole('textbox', { name: 'Model' }).count()) === 0
+  )
   await page.getByLabel('Adres', { exact: true }).fill(`http://127.0.0.1:${port}/v1`)
   await page.getByLabel('Adres', { exact: true }).press('Enter')
   // Model listesi sağlayıcıdan gelir; listeden seçilir
-  const modelSelect = page.getByRole('combobox')
-  await modelSelect.waitFor({ timeout: 10000 })
-  check('model list loaded from provider', (await page.getByText('2 model').count()) === 1)
+  await page.getByText('2 model').waitFor({ timeout: 10000 })
+  check('model list loaded from provider', modelRequests >= 1 && !(await modelSelect.isDisabled()))
   await modelSelect.click()
   await page.getByRole('option', { name: 'test-model' }).click()
   await page.waitForTimeout(300)

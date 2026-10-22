@@ -55,7 +55,6 @@ function TextField({
       <Input
         id={listId}
         value={draft}
-        list={field.options ? `${listId}-options` : undefined}
         placeholder={field.placeholder ? t(field.placeholder) : undefined}
         spellCheck={false}
         autoComplete="off"
@@ -64,13 +63,6 @@ function TextField({
         onKeyDown={(e) => e.key === 'Enter' && void save()}
         className="h-8 font-mono text-[12.5px]"
       />
-      {field.options && (
-        <datalist id={`${listId}-options`}>
-          {field.options.map((o) => (
-            <option key={o} value={o} />
-          ))}
-        </datalist>
-      )}
       {field.hint && <div className="text-[11.5px] text-muted-foreground">{t(field.hint)}</div>}
       {error && <div className="text-[11.5px] text-destructive">{error}</div>}
     </div>
@@ -78,18 +70,21 @@ function TextField({
 }
 
 /**
- * Model alanı: sağlayıcının, kayıtlı anahtarla kullanılabilen modelleri sağlayıcıdan alınıp listeden seçilir. Liste
- * alınamazsa (anahtar yok, ağ hatası) model adı elle yazılır.
+ * Model alanı: sağlayıcının, kayıtlı anahtarla kullanılabilen modelleri sağlayıcıdan alınıp yalnız listeden seçilir.
+ * Anahtar (OpenAI uyumlu sunucuda adres) kaydedilmeden liste istenmez ve alan pasif kalır; model adı elle yazılmaz.
  */
 function ModelField({
   provider,
   field,
   value,
+  ready,
   sourceKey
 }: {
   provider: AiProvider
   field: AiField
   value: string
+  /** Liste istenebilir mi (anahtar ya da adres kayıtlı). */
+  ready: boolean
   /** Liste bu değer değişince yeniden alınır (anahtar, adres, çalışma alanı). */
   sourceKey: string
 }): React.JSX.Element {
@@ -102,11 +97,12 @@ function ModelField({
     error: string | null
   } | null>(null)
   const requestKey = `${provider}|${sourceKey}|${nonce}`
-  const loading = result?.key !== requestKey
-  const models = result?.models ?? null
-  const error = result?.error ?? null
+  const loading = ready && result?.key !== requestKey
+  const current = ready && result?.key === requestKey ? result : null
+  const error = current?.error ?? null
 
   useEffect(() => {
+    if (!ready) return
     let alive = true
     void jumpdesk.ai.listModels(provider).then((res) => {
       if (!alive) return
@@ -119,66 +115,70 @@ function ModelField({
     return () => {
       alive = false
     }
-  }, [provider, requestKey])
+  }, [provider, requestKey, ready])
 
-  const items = models ?? []
+  const items = current?.models ?? []
   const list =
     value && !items.some((m) => m.id === value) ? [{ id: value, label: value }, ...items] : items
+  const usable = items.length > 0
   const id = `ai-${provider}-${field.key}`
+  const hint = !ready
+    ? provider === 'compatible'
+      ? t('Model listesi için önce adresi girin.')
+      : t('Model listesi için önce API anahtarını kaydedin.')
+    : loading
+      ? t('Model listesi yükleniyor…')
+      : (error ?? (usable ? null : t('Sağlayıcı kullanılabilir model döndürmedi.')))
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1.5">
         <label htmlFor={id} className="text-[12.5px] font-medium">
           {t(field.label)}
         </label>
-        <button
-          type="button"
-          title={t('Model Listesini Yenile')}
-          aria-label={t('Model Listesini Yenile')}
-          onClick={() => setNonce((n) => n + 1)}
-          className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <RotateCw className={cn('size-3', loading && 'animate-spin')} />
-        </button>
-        {items.length > 0 && (
+        {ready && (
+          <button
+            type="button"
+            title={t('Model Listesini Yenile')}
+            aria-label={t('Model Listesini Yenile')}
+            onClick={() => setNonce((n) => n + 1)}
+            className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <RotateCw className={cn('size-3', loading && 'animate-spin')} />
+          </button>
+        )}
+        {usable && (
           <span className="text-[11px] text-muted-foreground">
             {t('{n} model', { n: items.length })}
           </span>
         )}
       </div>
-      {items.length > 0 ? (
-        <Select
-          value={value || null}
-          items={list.map((m) => ({ value: m.id, label: m.label }))}
-          onValueChange={(v) => {
-            if (typeof v === 'string' && v) void useAi.getState().setField(provider, field.key, v)
-          }}
+      <Select
+        value={value || null}
+        disabled={!usable}
+        items={list.map((m) => ({ value: m.id, label: m.label }))}
+        onValueChange={(v) => {
+          if (typeof v === 'string' && v) void useAi.getState().setField(provider, field.key, v)
+        }}
+      >
+        <SelectTrigger
+          id={id}
+          aria-label={t(field.label)}
+          className="h-8 w-full font-mono text-[12.5px]"
         >
-          <SelectTrigger id={id} className="h-8 w-full font-mono text-[12.5px]">
-            <SelectValue placeholder={t('Model seçin')} />
-          </SelectTrigger>
-          <SelectContent>
-            {list.map((m) => (
-              <SelectItem key={m.id} value={m.id} className="font-mono text-[12.5px]">
-                {m.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <>
-          <TextField provider={provider} field={{ ...field, label: '' }} value={value} />
-          {!loading && (
-            <div
-              className={cn('text-[11.5px]', error ? 'text-destructive' : 'text-muted-foreground')}
-            >
-              {error ??
-                (provider === 'compatible'
-                  ? t('Model listesi için önce adresi girin.')
-                  : t('Model listesi için önce API anahtarını kaydedin.'))}
-            </div>
-          )}
-        </>
+          <SelectValue placeholder={t('Model seçin')} />
+        </SelectTrigger>
+        <SelectContent>
+          {list.map((m) => (
+            <SelectItem key={m.id} value={m.id} className="font-mono text-[12.5px]">
+              {m.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {hint && (
+        <div className={cn('text-[11.5px]', error ? 'text-destructive' : 'text-muted-foreground')}>
+          {hint}
+        </div>
       )}
     </div>
   )
@@ -188,11 +188,14 @@ function ModelField({
 function SecretField({
   provider,
   field,
-  saved
+  saved,
+  hint
 }: {
   provider: AiProvider
   field: AiField
   saved: boolean
+  /** Alanın altındaki açıklama (anahtarın nereden alınacağı). */
+  hint?: string
 }): React.JSX.Element {
   const t = useT()
   const [editing, setEditing] = useState(!saved)
@@ -254,14 +257,23 @@ function SecretField({
           )}
         </div>
       )}
+      {hint && <div className="text-[11.5px] text-muted-foreground">{hint}</div>}
       {error && <div className="text-[11.5px] text-destructive">{error}</div>}
     </div>
   )
 }
 
+/** Sağlayıcı alanları: önce gizli alanlar (API anahtarı), sonra diğerleri tanım sırasıyla. */
+const orderedFields = (fields: AiField[]): AiField[] => [
+  ...fields.filter((f) => f.secret),
+  ...fields.filter((f) => !f.secret)
+]
+
+const NO_PROVIDER = 'none'
+
 /**
- * Ayarlar → Yapay Zeka: sağlayıcı seçimi, sağlayıcının istediği alanlar (API anahtarı gizli tutulur) ve yapay zeka ile
- * açılıp kapatılan özellikler. Bu bölümdeki bilgiler dışa aktarılmaz.
+ * Ayarlar → Yapay Zeka: üstte yapay zeka ile açılıp kapatılan özellikler, altta sağlayıcı (açılır liste), API anahtarı
+ * (gizli tutulur), model ve sağlayıcının diğer alanları. Bu bölümdeki bilgiler dışa aktarılmaz.
  */
 export function AiSettingsSection(): React.JSX.Element {
   const t = useT()
@@ -299,107 +311,15 @@ export function AiSettingsSection(): React.JSX.Element {
     )
   }
 
+  const fieldsOf = (p: AiProvider): Record<string, string> => config.fields[p] ?? {}
+  const secretsOf = (p: AiProvider): string[] => config.secretsSet[p] ?? []
+  const providerItems = [
+    { value: NO_PROVIDER, label: t('Kullanma') },
+    ...AI_PROVIDERS.map((p) => ({ value: p.id, label: t(p.label) }))
+  ]
+
   return (
     <div className="space-y-5">
-      <div className="space-y-2">
-        <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-          {t('Sağlayıcı')}
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {[null, ...AI_PROVIDERS.map((p) => p.id)].map((id) => {
-            const p = id ? aiProviderInfo(id) : null
-            const selected = provider === id
-            return (
-              <button
-                key={id ?? 'none'}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => {
-                  setTest(null)
-                  void useAi.getState().setProvider(id)
-                }}
-                className={cn(
-                  'rounded-lg border px-3 py-2 text-left transition-colors hover:border-foreground/20',
-                  selected && 'border-primary/60 bg-primary/[0.05] ring-1 ring-primary/40'
-                )}
-              >
-                <div className="text-[13px] font-medium">{p ? t(p.label) : t('Kullanma')}</div>
-                <div className="text-[11.5px] leading-snug text-muted-foreground">
-                  {p ? t(p.description) : t('Yapay zeka özellikleri kapalı.')}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {info && provider && (
-        <div key={provider} className="space-y-3 rounded-lg border p-4">
-          {info.fields.map((field) =>
-            field.secret ? (
-              <SecretField
-                key={field.key}
-                provider={provider}
-                field={field}
-                saved={(config.secretsSet[provider] ?? []).includes(field.key)}
-              />
-            ) : field.key === 'model' && provider !== 'azure' ? (
-              <ModelField
-                key={field.key}
-                provider={provider}
-                field={field}
-                value={config.fields[provider]?.[field.key] ?? ''}
-                sourceKey={[
-                  (config.secretsSet[provider] ?? []).join(','),
-                  config.fields[provider]?.['baseUrl'] ?? '',
-                  config.fields[provider]?.['workspaceId'] ?? ''
-                ].join('|')}
-              />
-            ) : (
-              <TextField
-                key={field.key}
-                provider={provider}
-                field={field}
-                value={config.fields[provider]?.[field.key] ?? ''}
-              />
-            )
-          )}
-          <div className="flex items-center gap-2 pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!ready || test === 'running'}
-              onClick={() => void runTest()}
-            >
-              {test === 'running' && <Loader2 className="animate-spin" />}
-              {t('Bağlantıyı Dene')}
-            </Button>
-            {test && test !== 'running' && (
-              <span
-                className={cn(
-                  'flex min-w-0 items-center gap-1.5 text-[12px]',
-                  test.ok ? 'text-success' : 'text-destructive'
-                )}
-              >
-                {test.ok ? (
-                  <CheckCircle2 className="size-3.5 shrink-0" />
-                ) : (
-                  <ShieldAlert className="size-3.5 shrink-0" />
-                )}
-                <span className="min-w-0">{test.text}</span>
-              </span>
-            )}
-          </div>
-          {!config.encryption && (
-            <p className="text-[11.5px] text-warning">
-              {t(
-                'Bu sistemde işletim sisteminin anahtar deposu bulunamadı; API anahtarı yalnız zayıf şifrelemeyle saklanır.'
-              )}
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="space-y-2">
         <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
           {t('Yapay Zeka Özellikleri')}
@@ -415,7 +335,7 @@ export function AiSettingsSection(): React.JSX.Element {
               </div>
               {config.features.autocomplete && !ready && (
                 <div className="mt-1 text-[11.5px] text-warning">
-                  {t('Kullanmak için önce bir sağlayıcı seçip alanlarını doldurun.')}
+                  {t('Kullanmak için önce aşağıda bir sağlayıcı seçip alanlarını doldurun.')}
                 </div>
               )}
             </div>
@@ -425,6 +345,122 @@ export function AiSettingsSection(): React.JSX.Element {
               aria-label={t('Yapay Zeka ile Autocomplete')}
             />
           </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+          {t('Yapay Zeka Sağlayıcısı')}
+        </div>
+        <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-1">
+            <label htmlFor="ai-provider" className="text-[12.5px] font-medium">
+              {t('Sağlayıcı')}
+            </label>
+            <Select
+              value={provider ?? NO_PROVIDER}
+              items={providerItems}
+              onValueChange={(v) => {
+                if (typeof v !== 'string') return
+                setTest(null)
+                void useAi.getState().setProvider(v === NO_PROVIDER ? null : (v as AiProvider))
+              }}
+            >
+              <SelectTrigger
+                id="ai-provider"
+                aria-label={t('Sağlayıcı')}
+                className="h-8 w-full text-[12.5px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {providerItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value} className="text-[12.5px]">
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!provider && (
+              <div className="text-[11.5px] text-muted-foreground">
+                {t('Yapay zeka özellikleri kapalı.')}
+              </div>
+            )}
+          </div>
+
+          {info &&
+            provider &&
+            orderedFields(info.fields).map((field) =>
+              field.secret ? (
+                <SecretField
+                  key={`${provider}:${field.key}`}
+                  provider={provider}
+                  field={field}
+                  saved={secretsOf(provider).includes(field.key)}
+                  hint={t(info.description)}
+                />
+              ) : field.key === 'model' && provider !== 'azure' ? (
+                <ModelField
+                  key={`${provider}:${field.key}`}
+                  provider={provider}
+                  field={field}
+                  value={fieldsOf(provider)[field.key] ?? ''}
+                  ready={
+                    provider === 'compatible'
+                      ? Boolean(fieldsOf(provider)['baseUrl']?.trim())
+                      : secretsOf(provider).includes('apiKey')
+                  }
+                  sourceKey={[
+                    secretsOf(provider).join(','),
+                    fieldsOf(provider)['baseUrl'] ?? '',
+                    fieldsOf(provider)['workspaceId'] ?? ''
+                  ].join('|')}
+                />
+              ) : (
+                <TextField
+                  key={`${provider}:${field.key}`}
+                  provider={provider}
+                  field={field}
+                  value={fieldsOf(provider)[field.key] ?? ''}
+                />
+              )
+            )}
+
+          {provider && (
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!ready || test === 'running'}
+                onClick={() => void runTest()}
+              >
+                {test === 'running' && <Loader2 className="animate-spin" />}
+                {t('Bağlantıyı Dene')}
+              </Button>
+              {test && test !== 'running' && (
+                <span
+                  className={cn(
+                    'flex min-w-0 items-center gap-1.5 text-[12px]',
+                    test.ok ? 'text-success' : 'text-destructive'
+                  )}
+                >
+                  {test.ok ? (
+                    <CheckCircle2 className="size-3.5 shrink-0" />
+                  ) : (
+                    <ShieldAlert className="size-3.5 shrink-0" />
+                  )}
+                  <span className="min-w-0">{test.text}</span>
+                </span>
+              )}
+            </div>
+          )}
+          {provider && !config.encryption && (
+            <p className="text-[11.5px] text-warning">
+              {t(
+                'Bu sistemde işletim sisteminin anahtar deposu bulunamadı; API anahtarı yalnız zayıf şifrelemeyle saklanır.'
+              )}
+            </p>
+          )}
         </div>
       </div>
 

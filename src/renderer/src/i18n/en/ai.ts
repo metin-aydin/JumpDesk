@@ -59,8 +59,6 @@ export const ai: Dictionary = {
   'Yapay Zeka ile Autocomplete': 'AI Autocomplete',
   'Terminalde Ctrl+Space ile açılan önerilerde yapay zekaya sorabilirsiniz (iki kez Ctrl+Space). Yanıt, seçip komut satırına yazabileceğiniz komut seçenekleri olarak gelir; komut siz Enter’a basmadan çalışmaz.':
     'Ask the AI from the terminal suggestions opened with Ctrl+Space (press Ctrl+Space twice). The answer arrives as command options you can pick and write to the command line; a command never runs until you press Enter.',
-  'Kullanmak için önce bir sağlayıcı seçip alanlarını doldurun.':
-    'To use it, choose a provider and fill in its fields first.',
   'Bu bölümdeki bilgiler dışa aktarılmaz. API anahtarı işletim sisteminin anahtar deposuyla şifrelenip yalnız sizin kullanıcınıza kaydedilir ve ekrana geri getirilmez. Yapay zekaya sunucudan hiçbir veri gönderilmez; yalnız sorunuz, bu oturumdaki önceki sorularınız ve sunucunun türü (ör. Linux) gider.':
     'Nothing in this section is exported. The API key is encrypted with the operating system keyring, saved only for your user and never shown again. No data from the server is sent to the AI; only your question, your earlier questions in this session and the server type (e.g. Linux) are sent.',
 
@@ -87,5 +85,10 @@ export const ai: Dictionary = {
   'Riskli Komut': 'Risky Command',
   'Bu komut sunucuda geri alınamaz değişiklikler yapabilir ya da güvenliği etkileyebilir: {command}. Komut yalnız komut satırına yazılır; çalıştırmak için ayrıca Enter gerekir.':
     'This command may make irreversible changes on the server or affect its security: {command}. It is only written to the command line; running it still requires Enter.',
-  'Yine de Yaz': 'Write Anyway'
+  'Yine de Yaz': 'Write Anyway',
+  'Model listesi yükleniyor…': 'Loading the model list…',
+  'Sağlayıcı kullanılabilir model döndürmedi.': 'The provider returned no usable models.',
+  'Kullanmak için önce aşağıda bir sağlayıcı seçip alanlarını doldurun.':
+    'To use it, first choose a provider below and fill in its fields.',
+  'Yapay Zeka Sağlayıcısı': 'AI Provider'
 }
