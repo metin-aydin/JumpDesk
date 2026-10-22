@@ -1351,3 +1351,7 @@ sürükle-bırak); (8) klasörler dışa aktarılsın.
    `ai-explain-selection`, `ai-alarm`, `ai-rule`, `ai-snippet`; `settings-ai` özellik anahtarlarını gösterir.
    `dev/screenshots.mjs` sahte sağlayıcısı istem türüne göre yanıt verir, DOM çiziciyle çalışır (seçim için satırlar
    DOM'dan okunur).
+7. **GitHub (2026-10-22):** depo açıklaması "AI-powered desktop client for JumpServer …" yapıldı, konular eklendi (ai,
+   ai-assistant, bastion, electron, jumpserver, llm, ssh-client, terminal). PR #9 başlığı "JumpDesk 0.2.6: AI
+   assistant, layout folders, inline suggestions", açıklaması yapay zeka maddeleriyle güncellendi (`gh pr edit`
+   Projects (classic) GraphQL hatası verdiği için `gh api -X PATCH repos/.../pulls/9` kullanıldı).
