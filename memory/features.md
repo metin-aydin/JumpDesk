@@ -1388,7 +1388,7 @@ PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
    "API Sürümü" alanı kaldırıldı (varsayılan 2024-10-21, kayıtlı değer korunur).
 5. **Tepsi alt menüsü yana açılsın isteği:** GNOME Shell (ubuntu-appindicators) dbusmenu alt menülerini satır içi
    açılır bölüm olarak çizer; yana açılan alt menü uygulamadan seçilemez (KDE'de yana açılır). Kullanıcıya seçenek
-   sunuldu (yanıt bekleniyor).
+   sunuldu; **karar (2026-10-22): olduğu gibi kalsın** (GNOME'un satır içi alt menüsü; ayrı "Düzenler…" penceresi yok).
 6. Testler: update 26/26 (yeni: no_new_privs kurulum yolu ve nedeni, kullanıcı yöneticisi yoksa iletisi, HTTPS +
    kurum kökü güvenilir/değil, tepsiden açılınca denetim ve yeniden duyuru), ai 44, tray 8, layout-folders 24,
    ai-providers 23 (Azure adresi), system-trust 9.
