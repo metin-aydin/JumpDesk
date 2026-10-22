@@ -505,30 +505,28 @@ export function SessionView({
     )
   }
 
-  const overlays = (
-    <>
-      {conn.state === 'connecting' && (
-        <div className="pointer-events-none absolute inset-0 flex bg-terminal">
-          <LoadingState boxed label={connectingLabel} />
-        </div>
-      )}
-      {(conn.state === 'closed' || conn.state === 'error') && (
-        <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 border-t bg-popover/95 px-4 py-2 text-xs backdrop-blur">
-          <span
-            className={cn(
-              'size-2 rounded-full',
-              conn.state === 'error' ? 'bg-destructive' : 'bg-muted-foreground'
-            )}
-          />
-          <span className="selectable flex-1 truncate text-muted-foreground">
-            {conn.detail ?? t(conn.state === 'error' ? 'Bağlantı hatası' : 'Oturum kapandı')}
-          </span>
-          <Button size="sm" variant="outline" onClick={() => void reconnect()}>
-            <RotateCw /> {t('Yeniden bağlan')}
-          </Button>
-        </div>
-      )}
-    </>
+  const connectingOverlay = conn.state === 'connecting' && (
+    <div className="pointer-events-none absolute inset-0 flex bg-terminal">
+      <LoadingState boxed label={connectingLabel} />
+    </div>
+  )
+
+  // Oturum bitince çubuk terminalin altında yer kaplar; terminal yukarı daralır, komut satırı çubuğun altında kalmaz.
+  const endedBar = (conn.state === 'closed' || conn.state === 'error') && (
+    <div className="flex shrink-0 items-center gap-3 border-t bg-popover px-4 py-2 text-xs">
+      <span
+        className={cn(
+          'size-2 rounded-full',
+          conn.state === 'error' ? 'bg-destructive' : 'bg-muted-foreground'
+        )}
+      />
+      <span className="selectable flex-1 truncate text-muted-foreground">
+        {conn.detail ?? t(conn.state === 'error' ? 'Bağlantı hatası' : 'Oturum kapandı')}
+      </span>
+      <Button size="sm" variant="outline" onClick={() => void reconnect()}>
+        <RotateCw /> {t('Yeniden bağlan')}
+      </Button>
+    </div>
   )
 
   if (filesView) {
@@ -554,7 +552,8 @@ export function SessionView({
           active={active}
           onState={(state: RdpState, detail?: string) => onTerminalState(state, detail)}
         />
-        {overlays}
+        {endedBar}
+        {connectingOverlay}
       </div>
     )
   }
@@ -575,7 +574,8 @@ export function SessionView({
         onActivity={onActivity}
         onState={onTerminalState}
       />
-      {overlays}
+      {endedBar}
+      {connectingOverlay}
     </div>
   )
 }

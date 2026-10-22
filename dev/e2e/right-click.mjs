@@ -1,5 +1,6 @@
 // Terminalde sağ tık: seçim yoksa panodakini yapıştırır (çalıştırmaz), seçim varsa kopyalar ve seçimi kaldırır; fare
-// izleme kipindeki programlar sağ tıkı kendisi alır, Shift+sağ tık yine yapıştırır.
+// izleme kipindeki programlar sağ tıkı kendisi alır, Shift+sağ tık yine yapıştırır. Ctrl+Shift+V metni bir kez yapıştırır.
+// Oturum kapanınca "Yeniden bağlan" çubuğu terminalin altında yer alır (komut satırının üstüne binmez) ve tıklanabilir.
 // Kullanım: node dev/e2e/right-click.mjs <klasör> (mock açıkken)
 import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
@@ -102,6 +103,51 @@ try {
   await page.keyboard.press('Control+C')
   await page.keyboard.type("printf '\\e[?1000l'\n")
   await page.waitForTimeout(300)
+
+  // 4. Ctrl+Shift+V panodakini bir kez yapıştırır
+  await setClipboard('echo TEK_YAPISTIR')
+  await page.keyboard.press('Control+Shift+V')
+  await page.waitForTimeout(600)
+  const pasted = await promptLine()
+  check(
+    'Ctrl+Shift+V pastes the clipboard once',
+    pasted.endsWith('echo TEK_YAPISTIR') && pasted.split('TEK_YAPISTIR').length === 2,
+    pasted
+  )
+  await page.keyboard.press('Control+U')
+
+  // 5. Oturum kapanınca çubuk terminalin altında durur, terminal yukarı daralır ve düğme tıklanabilir
+  await page.keyboard.type('exit\n')
+  const bar = page.getByRole('button', { name: 'Yeniden bağlan' })
+  await bar.waitFor({ timeout: 5000 })
+  await page.waitForTimeout(400)
+  const layout = await page.evaluate(() => {
+    const button = [...document.querySelectorAll('button')].find(
+      (b) => b.textContent.trim() === 'Yeniden bağlan'
+    )
+    const strip = button.parentElement.getBoundingClientRect()
+    const screen = [...document.querySelectorAll('.xterm-screen')]
+      .find((e) => e.getBoundingClientRect().width > 0)
+      .getBoundingClientRect()
+    const b = button.getBoundingClientRect()
+    const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
+    return { stripTop: strip.top, screenBottom: screen.bottom, clickable: button.contains(hit) }
+  })
+  check(
+    'closed-session bar sits below the terminal and is clickable',
+    layout.screenBottom <= layout.stripTop + 0.5 && layout.clickable,
+    JSON.stringify(layout)
+  )
+  await bar.click()
+  await page.waitForFunction(
+    () =>
+      ![...document.querySelectorAll('button')].some(
+        (b) => b.textContent.trim() === 'Yeniden bağlan'
+      ),
+    null,
+    { timeout: 10000 }
+  )
+  check('reconnect button reconnects', true)
 } catch (err) {
   failed = true
   console.log(`FAIL ${err.message.split('\n')[0]}`)

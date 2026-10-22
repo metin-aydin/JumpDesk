@@ -16,7 +16,7 @@ const SCRIPT = String.raw`__jd_b64(){ base64 2>/dev/null|tr -d '\n\r';}
 __jd_osc(){ printf '\033]6973;%s;%s\007' "$1" "$2";}
 __jd_ip(){ { hostname -I 2>/dev/null||ip -4 -o addr show scope global 2>/dev/null|awk '{print $4}'|cut -d/ -f1;}|tr ' ' '\n'|grep -v '^$'|head -n 4|tr '\n' ' ';}
 __jd_last1(){ if [ -n "$ZSH_VERSION" ];then fc -l -1 2>/dev/null;else HISTTIMEFORMAT= history 1;fi;}
-__jd_prompt(){ local s=$?;__jd_osc C "$(printf '%s' "$PWD"|__jd_b64)";__jd_osc L "$(ls -1Ap 2>/dev/null|head -n 500|__jd_b64)";local h;h=$(__jd_last1);if [ -n "$h" ]&&[ "$h" != "$__jd_last" ];then __jd_last=$h;__jd_osc X "$(printf '%s' "$h"|__jd_b64)";fi;return $s;}
+__jd_prompt(){ local s=$?;__jd_osc C "$(printf '%s' "$PWD"|__jd_b64)";__jd_osc L "$(ls -1Ap 2>/dev/null|head -n 500|__jd_b64)";local h;h=$(__jd_last1);if [ -n "$h" ]&&[ "$h" != "$__jd_last" ];then __jd_last=$h;__jd_osc X "$(printf '%s' "$h"|__jd_b64)";fi;[ -n "$__jd_sp" ]&&! kill -0 $__jd_sp 2>/dev/null&&__jd_stat_start $__jd_si;return $s;}
 if [ -n "$ZSH_VERSION" ];then precmd_functions+=(__jd_prompt);PROMPT="$PROMPT%{$(printf '\033]6973;B;\007')%}"
 __jd_hist(){ fc -ln 1 2>/dev/null|tail -n 1000;};__jd_cmds(){ print -rl -- ${'$'}{(k)commands} 2>/dev/null|sort -u;}
 else PROMPT_COMMAND="__jd_prompt${'$'}{PROMPT_COMMAND:+;$PROMPT_COMMAND}"
@@ -35,14 +35,16 @@ __jd_init(){ __jd_osc I "$(__jd_ip|__jd_b64)";__jd_osc h "$(__jd_hist|gzip -c|__
  * Kurulum komutu tek satırdır ve satır düzenlemesi olmayan kabuklarda 4096 baytı aşmamalı; betik bu yüzden kısa
  * yazılır. Çıktı terminale yazıldığı için tam ekran programlar ve uzak bağlantılar (vim, less, top,
  * ssh…) öndeyken susar; aksi halde programın çıktı dizilerinin arasına girebilir. Döngü işlem tablosuna girmez
- * (alt kabukta başlatılır), Ctrl+C'den etkilenmez ve kabuk kapanınca biter.
+ * (alt kabukta başlatılır) ve kabuk kapanınca biter. Kabukla aynı süreç grubunda olduğundan istemde basılan Ctrl+C,
+ * Ctrl+\ ve Ctrl+Z ona da gider; döngü ve alt süreçleri bu sinyalleri yok sayar. Döngü yine de durmuşsa
+ * (`__jd_stat_stop` dışında) bir sonraki istemde aynı aralıkla yeniden başlatılır.
  */
 const STATS_SCRIPT = String.raw`__jd_ss(){ local a b c d pg f g tp r cm;read -r a b c d pg f g tp r </proc/$$/stat 2>/dev/null||return 1;[ "$tp" = "$pg" ]&&return 0;[ "$tp" -gt 0 ] 2>/dev/null||return 1;read -r cm </proc/$tp/comm 2>/dev/null||return 1;case "$cm" in vi*|nvim|nano|emacs|less|more|most|man|*top|mc|tmux|screen|watch|ssh|telnet|mosh*|ncdu|nmtui|whiptail|dialog|fzf|mysql|mariadb|psql|sqlplus|tig|lynx|w3m|*ftp|nload|nethogs) return 1;;esac;}
 __jd_sm(){ local l k v r;while read -r k r;do case $k in cpu*) printf '%s %s\n' "$k" "$r";;*) break;;esac;done </proc/stat;while read -r k v r;do case $k in Mem*|Buffers:|Cached:|Swap[TF]*) printf '%s %s\n' "${'$'}{k%:}" "$v";;esac;done </proc/meminfo;read -r l </proc/loadavg;printf 'load %s\n' "$l";read -r l </proc/uptime;printf 'up %s\n' "${'$'}{l%% *}";[ "$1" = 1 ]||return 0;printf 'cores %s\npg %s\nos %s\n' "$(grep -c ^processor /proc/cpuinfo)" "$(getconf PAGESIZE 2>/dev/null)" "$(. /etc/os-release 2>/dev/null;printf %s "$PRETTY_NAME")";df -Pkl 2>/dev/null|awk 'NR>1&&$2>0&&$1!~/tmpfs|overlay|squashfs/&&$6!~/^\/(dev|run|sys|proc|snap)/{m=$6;for(i=7;i<=NF;i++)m=m" "$i;print "disk",$2,$3,m}';}
 __jd_pr(){ cat /proc/[0-9]*/stat 2>/dev/null|awk '{c=$0;sub(/^[0-9]+ \(/,"",c);sub(/\) [^)]*$/,"",c);r=$0;sub(/.*\) /,"",r);split(r,f," ");print $1,f[12]+f[13],f[22],c}';}
 __jd_tp(){ local t;t=$({ printf '%s\n' "$1";echo --;printf '%s\n' "$2";}|awk '$0=="--"{s=1;next}!s{o[$1]=$2;next}{c=$0;sub(/^[^ ]+ [^ ]+ [^ ]+ /,"",c);print(($1 in o)?$2-o[$1]:$2),$3,$1,c}');[ -n "$1" ]&&printf '%s\n' "$t"|sort -rn|head -n 5|sed 's/^\([0-9-]*\) [0-9]* /pc \1 /';printf '%s\n' "$t"|sort -k2,2rn|head -n 5|sed 's/^[0-9-]* /pm /';}
 __jd_sl(){ local n=0 p c;while kill -0 $$ 2>/dev/null;do if __jd_ss;then c=$(__jd_pr);__jd_osc m "$({ __jd_sm $((n%6==0?1:0));__jd_tp "$p" "$c";}|gzip -c|__jd_b64)";p=$c;n=$((n+1));fi;[ $n = 1 ]&&sleep 1||sleep $1;done;}
-__jd_stat_start(){ [ -r /proc/stat ]||return 0;[ -n "$__jd_sp" ]&&kill -0 $__jd_sp 2>/dev/null&&return 0;__jd_sp=$( (__jd_sl ${'$'}{1:-5} </dev/null >/dev/tty 2>/dev/null & echo $!) );}
+__jd_stat_start(){ [ -r /proc/stat ]||return 0;[ -n "$__jd_sp" ]&&kill -0 $__jd_sp 2>/dev/null&&return 0;__jd_si=${'$'}{1:-5};__jd_sp=$( (trap '' INT QUIT TSTP;__jd_sl $__jd_si </dev/null >/dev/tty 2>/dev/null & echo $!) );}
 __jd_stat_stop(){ [ -n "$__jd_sp" ]&&kill $__jd_sp 2>/dev/null;__jd_sp=;}`
 
 function fromBase64(b64: string): string {

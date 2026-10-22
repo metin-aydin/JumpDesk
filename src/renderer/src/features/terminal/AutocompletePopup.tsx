@@ -3,6 +3,7 @@ import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { Suggestion, SuggestionKind } from './autocomplete'
 import { CursorPopup, type CursorAnchor } from './CursorPopup'
+import type { GhostAnchor } from './GhostText'
 
 const ICONS: Record<SuggestionKind, typeof History> = {
   history: History,
@@ -16,6 +17,8 @@ export interface AutocompleteState {
   items: Suggestion[]
   index: number
   anchor: CursorAnchor
+  /** İmleç satır sonundaysa seçili önerinin devamı komut satırında soluk gösterilir. */
+  ghost?: GhostAnchor
 }
 
 export function AutocompletePopup({
@@ -46,7 +49,7 @@ export function AutocompletePopup({
           <kbd className="shrink-0 font-mono text-[10.5px]">Ctrl+Space</kbd>
         </div>
       )}
-      <div className="py-1">
+      <div role="listbox" className="py-1">
         {state.items.length === 0 && (
           <div className="px-2.5 py-1.5 text-[12px] text-muted-foreground">{t('Öneri yok')}</div>
         )}
@@ -56,6 +59,8 @@ export function AutocompletePopup({
           return (
             <div
               key={`${item.kind}:${item.label}`}
+              role="option"
+              aria-selected={i === state.index}
               onClick={() => onPick(i)}
               className={cn(
                 'flex items-center gap-2 px-2.5 py-1',

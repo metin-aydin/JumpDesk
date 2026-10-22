@@ -24,6 +24,7 @@ import { AiAssistPopup, type AiAnchor } from '@/features/ai/AiAssistPopup'
 import { useStatusBarVisible } from '@/features/server-status/use-status-bar'
 import { useTheme } from '@/stores/theme'
 import { AutocompletePopup, type AutocompleteState } from './AutocompletePopup'
+import { GhostText, type GhostAnchor } from './GhostText'
 import type { CursorAnchor } from './CursorPopup'
 import { computeSuggestions } from './autocomplete'
 import { paintInputLine } from './command-highlight'
@@ -411,10 +412,13 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         ? e.metaKey && e.key === 'v'
         : e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'V'
       if (copyCombo) {
+        e.preventDefault()
         if (term.hasSelection()) void navigator.clipboard.writeText(term.getSelection())
         return false
       }
+      // Tarayıcının kendi yapıştırması (Ctrl+Shift+V düz metin yapıştırma) engellenir; yoksa metin iki kez gelir.
       if (pasteCombo) {
+        e.preventDefault()
         void navigator.clipboard.readText().then((text) => text && term.paste(text))
         return false
       }
@@ -547,7 +551,31 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       const sameItems =
         previous &&
         previous.items.map((i) => i.label).join('\n') === items.map((i) => i.label).join('\n')
-      setPopup({ items, index: sameItems ? previous.index : 0, anchor: cursorAnchor(screen) })
+      setPopup({
+        items,
+        index: sameItems ? previous.index : 0,
+        anchor: cursorAnchor(screen),
+        ghost: line && atEnd ? ghostAnchor(screen, wrap) : undefined
+      })
+    }
+
+    /** Soluk öneri metninin başlayacağı hücre: imleç (terminal kabına göre). */
+    const ghostAnchor = (screen: Element, wrap: Element): GhostAnchor => {
+      const sr = screen.getBoundingClientRect()
+      const wr = wrap.getBoundingClientRect()
+      const buf = term.buffer.active
+      return {
+        left: sr.left - wr.left,
+        top: sr.top - wr.top,
+        cellWidth: sr.width / term.cols,
+        cellHeight: sr.height / term.rows,
+        cols: term.cols,
+        rows: term.rows,
+        x: buf.cursorX,
+        y: buf.cursorY,
+        fontFamily: TERMINAL_FONT,
+        fontSize: term.options.fontSize ?? 13
+      }
     }
 
     /** İmlecin bulunduğu hücre (pencereye göre); öneri ve yapay zeka pencereleri buraya hizalanır. */
@@ -906,6 +934,13 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
             <ArrowDown className="size-3.5" /> {t('En Alta Kaydır')}
           </span>
         </button>
+      )}
+      {popup?.ghost && active && !aiAnchor && popup.items[popup.index] && (
+        <GhostText
+          text={popup.items[popup.index].insert.trimEnd()}
+          anchor={popup.ghost}
+          color={terminalTheme(resolvedTheme).foreground ?? 'currentColor'}
+        />
       )}
       {popup && active && !aiAnchor && (
         <AutocompletePopup
