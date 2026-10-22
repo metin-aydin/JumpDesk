@@ -1301,3 +1301,53 @@ sürükle-bırak); (8) klasörler dışa aktarılsın.
   etiketini de bulur (`getByRole('button', { name })` etkilenmez). Commit'ler `c26d667`, `b2374df`, `8ef0370`,
   `e5255da`; PR #9 "JumpDesk 0.2.6: layout folders, inline suggestions, status strip survives Ctrl+C" (sürüm
   0.2.6, birleştirme kullanıcıda).
+
+## Kullanıcı istekleri — 50. tur (2026-10-22): yapay zeka ayarları ve yeni yapay zeka özellikleri
+1. **Ayarlar → Yapay Zeka yeniden düzenlendi:** en üstte "Yapay Zeka Özellikleri" anahtarları, altta "Yapay Zeka
+   Sağlayıcısı" kutusu: "Sağlayıcı" açılır listesi (yalnız adlar: Kullanma, Anthropic (Claude), OpenAI, Google Gemini,
+   Azure OpenAI, OpenAI Uyumlu; kutu kutu kartlar kalktı) → hemen altında API anahtarı (sağlayıcı açıklaması anahtarın
+   ipucu oldu) → diğer alanlar. Model: anahtar (OpenAI uyumluda adres) kaydedilmeden liste istenmez ve seçim pasif;
+   elle model adı yazılamaz (TextField yedeği ve `AiField.options` kaldırıldı). Liste boş/hatalıysa pasif + neden.
+2. Kullanıcıya özellik önerileri soruldu (AskUserQuestion). Seçilenler: **Snippet Üret**, **Alarm/Vurgu Kuralı Üret**,
+   **Seçili Çıktıyı Açıkla**, **Alarm Olayını Açıkla**; çıktı gönderenlerde **"Yalnız onay iste"** (maskeleme yok;
+   gidecek metin onay penceresinde gösterilir). Seçilmeyenler: Komutu Açıkla, Komut Paletinden Sor, Başarısız Komutu
+   Açıkla, Log Özeti. → [[user-preferences]] yapay zeka gizlilik kuralı güncellendi.
+3. Uygulama:
+   - `AiFeatures` = autocomplete (varsayılan kapalı), snippets, rules, explainSelection, explainAlarm (yeniler varsayılan
+     açık; düğmeler yalnız özellik açık + sağlayıcı ayarlıysa görünür, `aiFeatureReady`). `AI_FEATURE_KEYS`,
+     `DEFAULT_AI_FEATURES` (`shared/ai.ts`); ana süreç her anahtarı doğrular.
+   - Ana süreç `main/ai/index.ts` `runTask(özellik, görev, kur, ayrıştır)`; görevler `prompt.ts`: `SUGGEST_TASK`,
+     `SNIPPET_TASK` (options[name, command, description, risk] 1–3), `RULE_TASK` (options[pattern, regex,
+     caseSensitive, description]; düzenli ifade derlenemezse atılır), `EXPLAIN_TASK` (summary, points ≤6,
+     suggestions ≤3). Komutlarda ortak `COMMAND_RULES`; metinler `<request>/<sample>/<text>/<context>/<question>`
+     içinde "untrusted data". IPC `ai:snippet`, `ai:rule`, `ai:explain`. Açıklama sınırı 8000 (metin) + 3000 (bağlam,
+     son kısım) karakter.
+   - `providers.ts` `CallInput.task: AiTaskSpec {name, description, schema, maxTokens}`; Gemini şeması
+     `geminiSchema()` ile JSON şemasından (türler büyük harf, additionalProperties atılır). Anthropic araç adı = görev adı.
+   - Arayüz: `features/ai/` → `AiExplainDialog` (+ `stores/ai-explain.ts`; onay: gidecek metin `pre` içinde, satır/
+     karakter sayısı, ek soru; Gönder'den önce istek yok; sonuç: özet, maddeler, "Komut Satırına Yaz" — `ai-actions.ts`
+     `writeCommand` Ctrl+E Ctrl+U + komut, riskliyse onay), `AiRuleButton` (alarm kural penceresi ve vurgu formunda ✨;
+     örnek satırla "eşleşiyor/eşleşmiyor"; Kullan formu doldurur), `AiSnippetAssist` (snippet düzenleyicinin üstünde
+     tarif → Öner → Kullan), `use-snippet-ai.tsx` (`useSnippetAi`, `useCommandExplain`: Komut başlığında "Açıkla",
+     açıklama komut alanının altında), `RiskBadge`, `RevealOnMount`.
+   - Terminal: fareyle seçim bırakılınca `SelectionChip` "Açıkla" (`data-ai-explain-chip`, fare basışı seçimi bozmaz;
+     seçim kalkınca/kaydırınca gider); komut paletinde "Seçimi Yapay Zekaya Sor". Alarm: `AlarmDetector` son 8 satırı
+     tutar (kontrol karakterleri atılır), `AlarmEvent.context`; olay satırında ✨ "Yapay Zekaya Sor".
+   - Snippet formu: komut bölümü `min-h-52` (açıklama kutusu eklenince düğmeler komut alanına binmesin).
+4. Testler: `dev/e2e/ai.mjs` 44/44 (sahte sunucu istem türünü sistem iletisinden ayırır: "snippet writer", "rule
+   writer", "terminal text explainer"; test `JUMPDESK_DISABLE_WEBGL=1` ve alarm beklemesi 0 ile açılır),
+   `dev/ai-providers.test.mjs` 21/21 (görev adı, Gemini şeması), alarm-detector 19.
+5. **Tuzaklar (50. tur):**
+   - `useEffect(() => el?.scrollIntoView(...))` uygulamayı çökertti ("destroy_ is not a function"): bu Chromium
+     sürümünde `scrollIntoView` Promise döndürüyor, React onu temizleme işlevi sanıyor. Etki gövdesi blok olmalı.
+   - Ayrı pencerede (`DetachedChrome`) sürekli bağlı, kapalı bir Base UI `Dialog` o penceredeki sağ tık menülerini
+     sürekli yeniden oluşturdu (windows/multiwindow testleri düştü). `AiExplainDialog` ayrı pencerede yalnız açıkken
+     bağlanır; ana pencerede her zaman bağlı.
+   - Alarm bağlamında readline'ın geri silmeleri (Ctrl+U) işlenir (`remember`).
+   - `ai.mjs` 5 çalıştırmadan 1'inde "java.lang.Exception: JD_ALARM_BOOM" satırı alarm olarak yakalanmadı (kök neden
+     bulunamadı; dedektördeki ekleme eşleşmeyi etkilemiyor). Tekrarlarsa yankı (`ignoreEcho`, `isEcho`) incelenmeli.
+6. **README ve ekran görüntüleri:** başlık "An AI-powered, cross-platform desktop client"; hero görüntüsünün altında
+   "AI assistant" bölümü (madde listesi, gizlilik paragrafı, 6 görüntü). Yeni görüntüler `ai-explain`,
+   `ai-explain-selection`, `ai-alarm`, `ai-rule`, `ai-snippet`; `settings-ai` özellik anahtarlarını gösterir.
+   `dev/screenshots.mjs` sahte sağlayıcısı istem türüne göre yanıt verir, DOM çiziciyle çalışır (seçim için satırlar
+   DOM'dan okunur).
