@@ -19,6 +19,8 @@ export interface AlarmEvent {
   pattern: string
   /** İlk eşleşen satır. */
   line: string
+  /** İlk eşleşmeden hemen önce gelen satırlar (yapay zekaya açıklatmak için bağlam). */
+  context?: string[]
   /** Aynı sekmede aynı kurala kısa aralıklarla gelen eşleşmeler tek olayda sayılır. */
   count: number
   firstAt: number
@@ -71,7 +73,13 @@ interface AlarmStore {
   /** Tüm kuralları verilenlerle değiştirir (içe aktarma). */
   replaceRules: (rules: AlarmRule[]) => void
   /** Eşleşmeyi kaydeder; yeni olaysa true döner (bildirim için), birleştirildiyse false. */
-  record: (tabId: string, source: string, rule: AlarmRule, line: string) => boolean
+  record: (
+    tabId: string,
+    source: string,
+    rule: AlarmRule,
+    line: string,
+    context?: string[]
+  ) => boolean
   clearEvents: () => void
   markRead: () => void
   /** Bir oturumun olaylarını okundu sayar (kullanıcı o oturuma odaklandı). */
@@ -110,7 +118,7 @@ export const useAlarms = create<AlarmStore>((set, get) => ({
     set({ rules })
   },
 
-  record: (tabId, source, rule, line) => {
+  record: (tabId, source, rule, line, context) => {
     const now = Date.now()
     const events = get().events
     const recent = events.find(
@@ -130,6 +138,7 @@ export const useAlarms = create<AlarmStore>((set, get) => ({
       ruleId: rule.id,
       pattern: rule.pattern,
       line: line.length > 400 ? `${line.slice(0, 400)}…` : line,
+      context: context?.map((l) => l.slice(0, 400)),
       count: 1,
       firstAt: now,
       lastAt: now,

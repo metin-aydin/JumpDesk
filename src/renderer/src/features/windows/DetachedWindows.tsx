@@ -3,6 +3,7 @@ import { PanelTopOpen } from 'lucide-react'
 import { TabStrip } from '@/components/titlebar/TabStrip'
 import { WindowControls } from '@/components/titlebar/WindowControls'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AiExplainDialog } from '@/features/ai/AiExplainDialog'
 import { closeWindowSafely } from '@/features/layouts/guard'
 import { WindowWorkspace } from '@/features/workspace/Workspace'
 import { useT } from '@/lib/i18n'
@@ -60,6 +61,7 @@ function DetachedChrome({
         />
       </header>
       <WindowWorkspace windowId={windowId} />
+      <AiExplainDialog windowId={windowId} />
     </>
   )
 }

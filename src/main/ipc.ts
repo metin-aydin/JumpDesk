@@ -29,7 +29,10 @@ import {
   aiTest,
   setAiConfig,
   setAiSecret,
-  type AiConfigPatch
+  type AiConfigPatch,
+  aiSnippet,
+  aiRule,
+  aiExplain
 } from './ai'
 import { currentLanguage, languageForced } from './i18n'
 import { store } from './store'
@@ -246,6 +249,9 @@ export function registerIpc(win: BrowserWindow): void {
   handle(IPC.aiTest, (language) => aiTest(language === 'tr' ? 'tr' : 'en'))
   handle(IPC.aiSuggest, (request) => aiSuggest(request))
   handle(IPC.aiListModels, (provider) => aiListModels(provider))
+  handle(IPC.aiSnippet, (request) => aiSnippet(request))
+  handle(IPC.aiRule, (request) => aiRule(request))
+  handle(IPC.aiExplain, (request) => aiExplain(request))
   handle(IPC.updateGetState, () => updateState())
   handle(IPC.updateCheck, () => checkForUpdates())
   handle(IPC.updateDownload, () => downloadUpdate())

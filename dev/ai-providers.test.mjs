@@ -24,7 +24,7 @@ await build({
   alias: { '@shared': path.join(root, 'src/shared'), electron: stub },
   logLevel: 'error'
 })
-const { callProvider, listModels } = await import(out)
+const { callProvider, geminiSchema, listModels } = await import(out)
 
 let failed = false
 const check = (name, ok, detail = '') => {
@@ -45,7 +45,29 @@ const toolReply = {
     }
   ]
 }
-const base = { system: 'S', user: 'U', secrets: { apiKey: 'sk-ant-test' } }
+const task = {
+  name: 'suggest_commands',
+  description: 'Return shell command suggestions for the administrator.',
+  maxTokens: 1024,
+  schema: {
+    type: 'object',
+    properties: {
+      suggestions: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { command: { type: 'string' }, risk: { type: 'string', enum: ['safe'] } },
+          required: ['command', 'risk'],
+          additionalProperties: false
+        }
+      },
+      note: { type: 'string' }
+    },
+    required: ['suggestions', 'note'],
+    additionalProperties: false
+  }
+}
+const base = { system: 'S', user: 'U', secrets: { apiKey: 'sk-ant-test' }, task }
 
 reply = { status: 200, body: toolReply }
 let result = await callProvider({
@@ -199,5 +221,48 @@ models = await listModels('compatible', { baseUrl: 'http://localhost:11434/v1' }
 check(
   'list compatible: all models',
   models.length === 2 && calls.at(-1).url === 'http://localhost:11434/v1/models'
+)
+// Gemini şeması JSON şemasından çevrilir: türler büyük harf, additionalProperties yok
+const converted = geminiSchema(task.schema)
+check(
+  'gemini schema: upper-case types without additionalProperties',
+  converted.type === 'OBJECT' &&
+    converted.properties.suggestions.type === 'ARRAY' &&
+    converted.properties.suggestions.items.properties.risk.type === 'STRING' &&
+    converted.properties.suggestions.items.properties.risk.enum[0] === 'safe' &&
+    !JSON.stringify(converted).includes('additionalProperties') &&
+    converted.required.join(',') === 'suggestions,note',
+  JSON.stringify(converted)
+)
+globalThis.__fakeFetch = async (url, init) => {
+  calls.push({ url, headers: init.headers, body: JSON.parse(init.body) })
+  return new Response(JSON.stringify(reply.body), { status: reply.status })
+}
+reply = {
+  status: 200,
+  body: { candidates: [{ content: { parts: [{ text: '{"suggestions":[],"note":"x"}' }] } }] }
+}
+await callProvider({
+  ...base,
+  provider: 'gemini',
+  fields: { model: 'gemini-2.5-flash' },
+  task: { ...task, maxTokens: 1500 }
+})
+check(
+  'gemini: task schema and token limit sent',
+  calls.at(-1).body.generationConfig.responseSchema.type === 'OBJECT' &&
+    calls.at(-1).body.generationConfig.maxOutputTokens === 1500
+)
+reply = { status: 200, body: toolReply }
+await callProvider({
+  ...base,
+  provider: 'anthropic',
+  fields: { model: 'claude-opus-5-5' },
+  task: { ...task, name: 'explain_text' }
+})
+check(
+  'anthropic: task name used as tool',
+  calls.at(-1).body.tools[0].name === 'explain_text' &&
+    calls.at(-1).body.tool_choice.name === 'explain_text'
 )
 process.exitCode = failed ? 1 : 0

@@ -6,7 +6,7 @@ import { SerializeAddon } from '@xterm/addon-serialize'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
-import { ArrowDown } from 'lucide-react'
+import { ArrowDown, Sparkles } from 'lucide-react'
 import { useT } from '@/lib/i18n'
 import { isAppShortcut, isMac } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
@@ -19,7 +19,8 @@ import { useSessionInfo } from '@/stores/session-info'
 import { clearStats, markStatsRequested, recordStats } from '@/stores/server-stats'
 import { cacheCommandNames, cachedCommandNames } from '@/stores/command-cache'
 import { broadcastPeers, findTab, useWorkspace } from '@/stores/workspace'
-import { aiAutocompleteReady, useAi } from '@/stores/ai'
+import { aiAutocompleteReady, aiFeatureReady, useAi } from '@/stores/ai'
+import { useAiExplain } from '@/stores/ai-explain'
 import { AiAssistPopup, type AiAnchor } from '@/features/ai/AiAssistPopup'
 import { useStatusBarVisible } from '@/features/server-status/use-status-bar'
 import { useTheme } from '@/stores/theme'
@@ -128,6 +129,46 @@ function LinkHint({ hint }: { hint: LinkHintState }): React.JSX.Element {
   )
 }
 
+/**
+ * Seçimin bırakıldığı noktanın altında (terminalin altına yakınsa üstünde) duran "Açıkla" düğmesi. Basılınca seçim
+ * bozulmasın diye fare basışı terminale geçmez.
+ */
+function SelectionChip({
+  at,
+  onExplain
+}: {
+  at: { left: number; top: number }
+  onExplain: () => void
+}): React.JSX.Element {
+  const t = useT()
+  const ref = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState(at)
+  useLayoutEffect(() => {
+    const el = ref.current
+    const parent = el?.parentElement
+    if (!el || !parent) return
+    const below = at.top + 14
+    const top =
+      below + el.offsetHeight > parent.clientHeight - 4 ? at.top - el.offsetHeight - 10 : below
+    const left = Math.max(4, Math.min(at.left - 12, parent.clientWidth - el.offsetWidth - 4))
+    setPos({ left, top })
+  }, [at])
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-ai-explain-chip
+      title={t('Seçimi Yapay Zekaya Sor')}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onExplain}
+      className="absolute z-20 inline-flex items-center gap-1 rounded-md border bg-popover px-2 py-1 text-[12px] font-medium text-popover-foreground shadow-md hover:bg-accent"
+      style={{ left: pos.left, top: pos.top }}
+    >
+      <Sparkles className="size-3.5 text-primary" /> {t('Açıkla')}
+    </button>
+  )
+}
+
 export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   const { tabId, wsUrl, visible, active } = props
   const belowBar = useStatusBarVisible(tabId) && props.integrate
@@ -158,6 +199,11 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   const [aiAnchor, setAiAnchor] = useState<AiAnchor | null>(null)
   const aiReady = useAi((s) => aiAutocompleteReady(s.config))
   const aiReadyRef = useRef(aiReady)
+  /** Seçili metni açıklatma düğmesinin konumu (terminal kabına göre); seçim yokken gösterilmez. */
+  const [selectionChip, setSelectionChip] = useState<{ left: number; top: number } | null>(null)
+  const explainReady = useAi((s) => aiFeatureReady(s.config, 'explainSelection'))
+  const explainReadyRef = useRef(explainReady)
+  explainReadyRef.current = explainReady
   aiReadyRef.current = aiReady
   const openAiRef = useRef<() => void>(() => undefined)
   const insertAiRef = useRef<(command: string) => void>(() => undefined)
@@ -445,6 +491,22 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     }
     host.addEventListener('contextmenu', onContextMenu)
 
+    /** Fareyle metin seçilince bırakılan noktanın yanında "Açıkla" düğmesi çıkar; seçim kalkınca ya da kayınca gider. */
+    const onMouseUp = (e: MouseEvent): void => {
+      if (!explainReadyRef.current) return
+      requestAnimationFrame(() => {
+        const wrap = wrapRef.current
+        if (disposed || !wrap || !term.hasSelection() || !term.getSelection().trim()) return
+        const r = wrap.getBoundingClientRect()
+        setSelectionChip({ left: e.clientX - r.left, top: e.clientY - r.top })
+      })
+    }
+    host.addEventListener('mouseup', onMouseUp)
+    term.onSelectionChange(() => {
+      if (!term.hasSelection()) setSelectionChip(null)
+    })
+    term.onScroll(() => setSelectionChip(null))
+
     /**
      * Hücre yüksekliği tam cihaz pikseli olduğundan terminal yüksekliği satırlara tam bölünmez; artan alan (bir satıra
      * kadar) terminalin üstünde boşluk olarak kalır. Hücre yüksekliği ±1 piksel içinde artanı en aza indiren değere
@@ -502,7 +564,9 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     })
 
     const highlighter = new OutputHighlighter()
-    const detector = new AlarmDetector((rule, line) => reportAlarm(tabId, rule, line))
+    const detector = new AlarmDetector((rule, line, context) =>
+      reportAlarm(tabId, rule, line, context)
+    )
     const alarmDecoder = new TextDecoder('utf-8')
     /** Kabuk entegrasyonu yokken gönderilen komutu bilmek için yazılan satır izlenir (alarm yankısı için). */
     let typedLine = ''
@@ -844,6 +908,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     return () => {
       disposed = true
       host.removeEventListener('contextmenu', onContextMenu)
+      host.removeEventListener('mouseup', onMouseUp)
       if (failTimer) clearTimeout(failTimer)
       unsubscribeFont()
       if (fontTimer) clearTimeout(fontTimer)
@@ -962,6 +1027,22 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         />
       )}
       {linkHint && <LinkHint hint={linkHint} />}
+      {selectionChip && active && explainReady && (
+        <SelectionChip
+          at={selectionChip}
+          onExplain={() => {
+            const text = termRef.current?.getSelection() ?? ''
+            setSelectionChip(null)
+            if (!text.trim()) return
+            useAiExplain.getState().open({
+              subject: 'output',
+              text,
+              tabId,
+              source: findTab(useWorkspace.getState(), tabId)?.title
+            })
+          }}
+        />
+      )}
       {search && searchBar && (
         <TerminalSearchBar
           key={searchBar.nonce}

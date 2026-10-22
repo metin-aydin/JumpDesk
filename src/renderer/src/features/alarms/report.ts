@@ -25,11 +25,16 @@ function isOnScreen(tabId: string): boolean {
  * değilse yeni olay için masaüstü bildirimi gösterilir (Ayarlar → Bildirimler'de kapatılabilir); aynı sekme + kural
  * için bildirimler seyreltilir.
  */
-export function reportAlarm(tabId: string, rule: AlarmRule, line: string): void {
+export function reportAlarm(
+  tabId: string,
+  rule: AlarmRule,
+  line: string,
+  context: string[] = []
+): void {
   const ws = useWorkspace.getState()
   const tab = findTab(ws, tabId)
   const source = tab?.title ?? t('Oturum')
-  const isNew = useAlarms.getState().record(tabId, source, rule, line)
+  const isNew = useAlarms.getState().record(tabId, source, rule, line, context)
   if (isNew) flashAlarm(tabId)
   const windowFocused = document.hasFocus()
   if ((windowFocused && ws.activeId === tabId) || detachedHasFocus(tabId)) {

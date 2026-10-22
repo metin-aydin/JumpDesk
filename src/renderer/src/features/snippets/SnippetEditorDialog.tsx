@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { openExport, openImport } from '@/features/transfer/actions'
+import { AiSnippetAssist } from '@/features/ai/AiSnippetAssist'
+import { useCommandExplain, useSnippetAi } from '@/features/ai/use-snippet-ai'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/stores/confirm'
@@ -58,6 +60,8 @@ function SnippetEditor(): React.JSX.Element {
   const dirty = !sameDraft(draft, baseline)
   const valid = draft.name.trim() !== '' && draft.command.trim() !== ''
   const groupNames = useMemo(() => [...new Set(snippets.map((s) => s.group))], [snippets])
+  const snippetAi = useSnippetAi()
+  const explain = useCommandExplain(draft.command, (command) => setDraft({ ...draft, command }))
 
   const groups = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('tr')
@@ -211,6 +215,13 @@ function SnippetEditor(): React.JSX.Element {
             save()
           }}
         >
+          {snippetAi && (
+            <AiSnippetAssist
+              onPick={(option) =>
+                setDraft({ ...draft, name: option.name, command: option.command })
+              }
+            />
+          )}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="snippet-name">{t('Ad')}</Label>
@@ -240,8 +251,11 @@ function SnippetEditor(): React.JSX.Element {
               </datalist>
             </div>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-            <Label htmlFor="snippet-command">{t('Komut')}</Label>
+          <div className="flex min-h-52 flex-1 flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label htmlFor="snippet-command">{t('Komut')}</Label>
+              {snippetAi && explain.button}
+            </div>
             <Textarea
               id="snippet-command"
               value={draft.command}
@@ -262,6 +276,7 @@ function SnippetEditor(): React.JSX.Element {
               )}
             </span>
           </div>
+          {snippetAi && explain.panel}
           <div className="flex items-center gap-2">
             {selection?.kind === 'edit' && (
               <Button

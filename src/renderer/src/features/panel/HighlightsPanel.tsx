@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { compileHighlight, useHighlights, type HighlightRule } from '@/stores/highlights'
 import { TransferContextMenu } from '@/features/transfer/TransferContextMenu'
 import { FlagToggle } from './AlarmsPanel'
+import { AiRuleButton } from '@/features/ai/AiRuleButton'
 
 /** Desenin seçilen renklerle nasıl görüneceği; şeffaf renkte terminalin kendi rengi kalır. */
 function Preview({
@@ -195,6 +196,13 @@ function AddRuleForm(): React.JSX.Element {
           Icon={CaseSensitive}
         />
         <FlagToggle label={t('Düzenli İfade')} on={regex} onChange={setRegex} Icon={Regex} />
+        <AiRuleButton
+          onPick={(rule) => {
+            setPattern(rule.pattern)
+            setRegex(rule.regex)
+            setCaseSensitive(rule.caseSensitive)
+          }}
+        />
       </div>
       <div className="flex items-center gap-1.5">
         <span className="text-[11px] text-muted-foreground">{t('Yazı')}</span>

@@ -1,4 +1,16 @@
-import type { AiConfig, AiFeatures, AiProvider, AiSuggestRequest, AiSuggestResult } from './ai'
+import type {
+  AiConfig,
+  AiExplainRequest,
+  AiExplainResult,
+  AiFeatures,
+  AiProvider,
+  AiRuleRequest,
+  AiRuleResult,
+  AiSnippetRequest,
+  AiSnippetResult,
+  AiSuggestRequest,
+  AiSuggestResult
+} from './ai'
 import type { UpdateState } from './update'
 import type {
   ApiResult,
@@ -77,6 +89,9 @@ export const IPC = {
   aiTest: 'ai:test',
   aiSuggest: 'ai:suggest',
   aiListModels: 'ai:list-models',
+  aiSnippet: 'ai:snippet',
+  aiRule: 'ai:rule',
+  aiExplain: 'ai:explain',
   updateGetState: 'update:get-state',
   updateCheck: 'update:check',
   updateDownload: 'update:download',
@@ -275,6 +290,12 @@ export interface JumpDeskApi {
       provider: AiProvider
     ): Promise<{ ok: true; models: { id: string; label: string }[] } | { ok: false; error: string }>
     suggest(request: AiSuggestRequest): Promise<AiSuggestResult>
+    /** Tariften snippet seçenekleri. */
+    snippet(request: AiSnippetRequest): Promise<AiSnippetResult>
+    /** Tariften alarm/vurgu kuralı seçenekleri. */
+    rule(request: AiRuleRequest): Promise<AiRuleResult>
+    /** Metni (seçili çıktı, alarm satırı ya da komut) açıklar; çıktı ve alarm metni kullanıcı onayından sonra gönderilir. */
+    explain(request: AiExplainRequest): Promise<AiExplainResult>
   }
   /**
    * Uygulama güncellemesi: yeni sürüm GitHub Releases'ta aranır; AppImage, .deb ve Windows kurulumunda indirilip

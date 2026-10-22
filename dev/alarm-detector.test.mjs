@@ -153,4 +153,19 @@ check(
   e.dispose()
   Date.now = realNow
 }
+{
+  // Bağlam: eşleşen satırdan önceki satırlar, geri silme işlenmiş ve kontrol karakterleri atılmış hâlde
+  const got = []
+  const d = new AlarmDetector((rule, line, context) => got.push({ line, context }))
+  d.startAfter(0)
+  d.feed('first line\n')
+  d.feed('$ tail -f lo\b\b\b\b\b\b\b\b\b\bcat app.log\x07\n')
+  d.feed('java.lang.Exception: boom\n')
+  d.dispose()
+  check(
+    'alarm context has the lines before it, cleaned',
+    got.length === 1 && got[0].context.join(' | ') === 'first line | $ cat app.log',
+    JSON.stringify(got[0]?.context)
+  )
+}
 process.exitCode = failed ? 1 : 0

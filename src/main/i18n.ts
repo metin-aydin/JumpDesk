@@ -48,6 +48,14 @@ const EN: Record<string, string> = {
     'The saved API key could not be decrypted; enter it again.',
   'Bir soru yazın.': 'Type a question.',
   'Yapay zeka ile autocomplete kapalı.': 'AI autocomplete is turned off.',
+  'Yapay zeka ile snippet üretme kapalı.': 'AI snippet writing is turned off.',
+  'Yapay zeka ile kural üretme kapalı.': 'AI rule writing is turned off.',
+  'Yapay zeka ile seçili çıktıyı açıklama kapalı.':
+    'AI explanation of selected output is turned off.',
+  'Yapay zeka ile alarm açıklama kapalı.': 'AI alarm explanation is turned off.',
+  'Snippet’in ne yapacağını yazın.': 'Describe what the snippet should do.',
+  'Neyin yakalanacağını yazın.': 'Describe what should be caught.',
+  'Açıklanacak metin boş.': 'There is no text to explain.',
   'Yapay zeka ayarları eksik. Ayarlar → Yapay Zeka bölümünü doldurun.':
     'AI settings are incomplete. Fill in Settings → AI.',
   'Yapay zeka isteği başarısız oldu.': 'The AI request failed.',

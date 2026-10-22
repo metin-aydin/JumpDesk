@@ -4,6 +4,7 @@ import {
   aiConfigured,
   AI_PROVIDERS,
   aiProviderInfo,
+  type AiFeatures,
   type AiField,
   type AiProvider
 } from '@shared/ai'
@@ -271,6 +272,47 @@ const orderedFields = (fields: AiField[]): AiField[] => [
 
 const NO_PROVIDER = 'none'
 
+/** Ayarların en üstündeki özellik anahtarları; `sendsOutput` olanlar onaydan sonra terminal metni gönderir. */
+const FEATURES: {
+  key: keyof AiFeatures
+  label: string
+  description: string
+  sendsOutput?: boolean
+}[] = [
+  {
+    key: 'autocomplete',
+    label: 'Yapay Zeka ile Autocomplete',
+    description:
+      'Terminalde Ctrl+Space ile açılan önerilerde yapay zekaya sorabilirsiniz (iki kez Ctrl+Space). Yanıt, seçip komut satırına yazabileceğiniz komut seçenekleri olarak gelir; komut siz Enter’a basmadan çalışmaz.'
+  },
+  {
+    key: 'snippets',
+    label: 'Snippet Üretme Ve Açıklama',
+    description:
+      'Snippet düzenleyicide ne yapmasını istediğinizi yazın; yapay zeka ad ve komut önerir. Yazdığınız komutu açıklatabilirsiniz.'
+  },
+  {
+    key: 'rules',
+    label: 'Alarm Ve Vurgu Kuralı Üretme',
+    description:
+      'Neyi yakalamak istediğinizi tarif edin; yapay zeka kelime ya da düzenli ifade önerir. Örnek satır verirseniz o da gönderilir ve öneriler onunla denenir.'
+  },
+  {
+    key: 'explainSelection',
+    label: 'Seçili Çıktıyı Açıklama',
+    description:
+      'Terminalde metin seçince çıkan “Açıkla” düğmesiyle seçili metin, siz gönderilecek metni görüp onayladıktan sonra yapay zekaya gider; açıklama ve inceleme komutları gelir.',
+    sendsOutput: true
+  },
+  {
+    key: 'explainAlarm',
+    label: 'Alarm Olayını Açıklama',
+    description:
+      'Alarmlar panelindeki olayda “Yapay Zekaya Sor” ile alarm satırı ve öncesindeki birkaç satır, onayınızdan sonra yapay zekaya gider.',
+    sendsOutput: true
+  }
+]
+
 /**
  * Ayarlar → Yapay Zeka: üstte yapay zeka ile açılıp kapatılan özellikler, altta sağlayıcı (açılır liste), API anahtarı
  * (gizli tutulur), model ve sağlayıcının diğer alanları. Bu bölümdeki bilgiler dışa aktarılmaz.
@@ -325,26 +367,31 @@ export function AiSettingsSection(): React.JSX.Element {
           {t('Yapay Zeka Özellikleri')}
         </div>
         <div className="divide-y rounded-lg border">
-          <div className="flex items-center gap-4 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium">{t('Yapay Zeka ile Autocomplete')}</div>
-              <div className="text-xs text-muted-foreground">
-                {t(
-                  'Terminalde Ctrl+Space ile açılan önerilerde yapay zekaya sorabilirsiniz (iki kez Ctrl+Space). Yanıt, seçip komut satırına yazabileceğiniz komut seçenekleri olarak gelir; komut siz Enter’a basmadan çalışmaz.'
+          {FEATURES.map((feature) => (
+            <div key={feature.key} className="flex items-center gap-4 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-[13px] font-medium">
+                  {t(feature.label)}
+                  {feature.sendsOutput && (
+                    <span className="rounded bg-warning/15 px-1.5 py-px text-[10.5px] font-medium text-warning">
+                      {t('Onayla Çıktı Gönderir')}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">{t(feature.description)}</div>
+                {config.features[feature.key] && !ready && (
+                  <div className="mt-1 text-[11.5px] text-warning">
+                    {t('Kullanmak için önce aşağıda bir sağlayıcı seçip alanlarını doldurun.')}
+                  </div>
                 )}
               </div>
-              {config.features.autocomplete && !ready && (
-                <div className="mt-1 text-[11.5px] text-warning">
-                  {t('Kullanmak için önce aşağıda bir sağlayıcı seçip alanlarını doldurun.')}
-                </div>
-              )}
+              <Switch
+                checked={config.features[feature.key]}
+                onCheckedChange={(v) => void useAi.getState().setFeatures({ [feature.key]: v })}
+                aria-label={t(feature.label)}
+              />
             </div>
-            <Switch
-              checked={config.features.autocomplete}
-              onCheckedChange={(v) => void useAi.getState().setFeatures({ autocomplete: v })}
-              aria-label={t('Yapay Zeka ile Autocomplete')}
-            />
-          </div>
+          ))}
         </div>
       </div>
 
@@ -468,7 +515,7 @@ export function AiSettingsSection(): React.JSX.Element {
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" />
         <span>
           {t(
-            'Bu bölümdeki bilgiler dışa aktarılmaz. API anahtarı işletim sisteminin anahtar deposuyla şifrelenip yalnız sizin kullanıcınıza kaydedilir ve ekrana geri getirilmez. Yapay zekaya sunucudan hiçbir veri gönderilmez; yalnız sorunuz, bu oturumdaki önceki sorularınız ve sunucunun türü (ör. Linux) gider.'
+            'Bu bölümdeki bilgiler dışa aktarılmaz. API anahtarı işletim sisteminin anahtar deposuyla şifrelenip yalnız sizin kullanıcınıza kaydedilir ve ekrana geri getirilmez. Yapay zekaya sunucudan kendiliğinden hiçbir veri gönderilmez: yazdıklarınız ve sunucunun türü (ör. Linux) gider; terminal metni yalnız açıklama özelliklerinde, gönderilecek metni görüp onayladığınızda gider.'
           )}
         </span>
       </div>
