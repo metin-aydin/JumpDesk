@@ -56,8 +56,8 @@ kararlar: [[architecture-decisions]].
 
 ## Durum (2026-10-14 sonu, mock'ta e2e ile doğrulandı)
 - ✅ 1 Snippet paneli (tıkla-çalıştır); liste kullanıcının kendi kayıtlarından (34. tur).
-- ✅ 2 Autocomplete (geçmiş + snippet + `compgen -c` komutları + bulunulan klasör girdileri; Tab/→ kabul, ↑↓, Esc).
-  Eksik: alt klasör yolları (`dir/xx`) için liste yok — yalnız bulunulan klasör.
+- ✅ 2 Autocomplete (geçmiş + snippet + `compgen -c` komutları + bulunulan klasör girdileri; → kabul, Ctrl+→ `/`'a
+  kadar, ↑↓, Esc). Alt klasör yolları çift Tab dosya kipinde (52. tur).
 - ✅ 3 Bağlanınca otomatik komutlar (snippet satırındaki ⚡, sunucu bazında `ServerMeta.autoRun`, ilk istemden sonra çalışır).
 - ✅ 4 Renkler: (a) komut satırı boyama, (b) çıktı vurgulama, (c) kabuk renkleri (PS1 renksizse sarılır, ls/grep alias).
 - ✅ 5 Sağ panel (başlık çubuğu düğmesi, Ctrl+Shift+B): Snippetler + Geçmiş (arama, tıkla-çalıştır, canlı ekleme).
@@ -1355,3 +1355,67 @@ sürükle-bırak); (8) klasörler dışa aktarılsın.
    ai-assistant, bastion, electron, jumpserver, llm, ssh-client, terminal). PR #9 başlığı "JumpDesk 0.2.6: AI
    assistant, layout folders, inline suggestions", açıklaması yapay zeka maddeleriyle güncellendi (`gh pr edit`
    Projects (classic) GraphQL hatası verdiği için `gh api -X PATCH repos/.../pulls/9` kullanıldı).
+
+## Kullanıcı istekleri — 51. tur (2026-10-22): güncelleme sorunları, sağlayıcı adları
+PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
+1. **Tepsiden yeniden açınca güncelleme denetlenmiyordu:** `updater.ts` `checkOnReopen()` (otomatik denetim açık ve
+   son denetimden 1 dk geçtiyse; testte `JUMPDESK_TEST_REOPEN_GAP_MS`), `tray.ts` `showWindow` gizli pencereyi
+   gösterince çağırır ve `IPC.appShown` gönderir. Arayüz (`stores/update.ts`) pencere gizliyken bildirim göstermez;
+   gizlenince `announcedVersion` sıfırlanır, açılınca bekleyen sürüm yeniden duyurulur.
+2. **Tepsideyken .deb kurulumu "Parola penceresi kapatıldı" diyordu — kök neden:** `app.relaunch()` (Chromium
+   yeniden başlatıcısı) ile açılan süreç **`NoNewPrivs: 1`** taşır (`/proc/<pid>/status`); bayrak alt süreçlere geçer,
+   setuid `pkexec` yetki alamaz, polkit'e hiç gitmeden 127 döner (journal'da kayıt yok). Önceki güncellemeden sonra
+   yeniden açılıp tepside günlerce yaşayan süreç buydu; dock'tan açılan süreçte bayrak 0 olduğu için çıkıp açınca
+   çalışıyordu. Çözüm (`updater.ts`): bayrak varsa pkexec `systemd-run --user --wait --pipe --quiet --collect -E …
+   -- pkexec …` ile kullanıcının systemd yöneticisinde çalışır (bayrak devralınmaz, çıkış kodu ve stderr geri gelir;
+   `setpriv --no-new-privs` ile doğrulandı). Kurulumdan sonra yeniden açılış da `app.relaunch()` yerine
+   `systemd-run --user` ile (bu süreç bitince başlatıcı `/opt/JumpDesk/jumpdesk` çalışır, oturum değişkenleri `-E`
+   ile aktarılır) — yeni süreç bayrak taşımaz. Kullanıcı yöneticisi yoksa ve bayrak varsa "Tepsi simgesinden Çıkış ile
+   kapatıp yeniden açın" iletisi. 126 = parola penceresi kapatıldı, 127 = "Yönetici yetkisi alınamadı" + pkexec'in son
+   stderr satırı. Test kancaları `JUMPDESK_TEST_NO_NEW_PRIVS`, `JUMPDESK_TEST_SYSTEMD_RUN`.
+   **Not:** kullanıcının makinesinde şu an çalışan 0.2.6 da yeniden başlatılmış (NoNewPrivs 1) ve eski kodu taşıyor;
+   0.2.7'ye geçmeden önce bir kez tepsiden Çıkış yapıp dock'tan açması gerekir.
+3. **`net::ERR_CERT_AUTHORITY_INVALID` (kurum ağı, TLS denetimi, 0.2.2 kurulu başka makine):** Chromium Linux'ta
+   /etc/ssl/certs'i kullanmaz. `src/main/system-trust.ts` `initSystemTrust([PARTITION])`: varsayılan oturum,
+   `electron-updater` oturumu (`fromPartition('electron-updater', {cache:false})`) ve JumpServer bölümünde
+   `setCertificateVerifyProc`; yalnız hata -202 iken zincir `tls.getCACertificates('system')` köklerine göre
+   doğrulanır (`chainTrusted`: ad/IP, süre, her halka bir üstündekince (CA) imzalı, köke ulaşır); diğer her durumda -3
+   (Chromium'un sonucu). Electron 44 = Node 24.21. Test kökü `JUMPDESK_TEST_SYSTEM_CA`. Birim testi
+   `dev/system-trust.test.mjs` 9/9 (openssl ile kök/ara/yaprak üretir).
+4. **Sağlayıcı adları:** OpenAI zaten adres sormuyordu (API anahtarı + model); karışıklık "OpenAI Uyumlu"
+   adından → **"Yerel Model Sunucusu"** (Local Model Server; Ollama, LM Studio, vLLM). Azure'da tek ortak adres yok:
+   "Uç Nokta" yerine **"Kaynak Adı"** (`azureEndpoint`: yalnız ad → https://<ad>.openai.azure.com, tam adres de olur),
+   "API Sürümü" alanı kaldırıldı (varsayılan 2024-10-21, kayıtlı değer korunur).
+5. **Tepsi alt menüsü yana açılsın isteği:** GNOME Shell (ubuntu-appindicators) dbusmenu alt menülerini satır içi
+   açılır bölüm olarak çizer; yana açılan alt menü uygulamadan seçilemez (KDE'de yana açılır). Kullanıcıya seçenek
+   sunuldu; **karar (2026-10-22): olduğu gibi kalsın** (GNOME'un satır içi alt menüsü; ayrı "Düzenler…" penceresi yok).
+6. Testler: update 26/26 (yeni: no_new_privs kurulum yolu ve nedeni, kullanıcı yöneticisi yoksa iletisi, HTTPS +
+   kurum kökü güvenilir/değil, tepsiden açılınca denetim ve yeniden duyuru), ai 44, tray 8, layout-folders 24,
+   ai-providers 23 (Azure adresi), system-trust 9.
+7. Gönderim: commit'ler `db7ca03` (güncelleme/tepsi/sertifika), `2563e00` (sağlayıcı adları, görüntüler), `b2b44e9`;
+   PR #10 "JumpDesk 0.2.7: tray update checks, .deb installs after restarts, company certificates" (birleştirme
+   kullanıcıda).
+
+## Kullanıcı istekleri — 52. tur (2026-10-22): autocomplete tuşları ve dosya kipi
+1. **Tab öneriyi kabul etmez** (kabuğa gider, bash/zsh tamamlaması çalışır); **→ tamamını**, **Ctrl+→ (macOS ⌥→)
+   bir sonraki `/` işaretine kadarını** kabul eder (baştaki `/` atlanır: `/abc/123` → `/abc/`). Kısmi kabulde liste
+   açık kalır ve aynı öneri seçili kalır (`keptLabel`, ↑/↓ ile sıfırlanır). Altbilgi
+   "→ kabul · {partial} / işaretine kadar · ↑↓ seç · Esc kapat · Ctrl+Space aç"; kısayol listesinde "Tab Tab",
+   "→", "Ctrl+→". Testlerde altbilgi aranırken `'→ kabul ·'` kullanılır (windows, smoke).
+2. **Çift Tab = dosya kipi** (`fileMode`, 450 ms içinde ikinci Tab; ilk Tab kabuğa gider, ikincisi gönderilmez;
+   yalnız entegrasyon hazır ve komut satırı açıkken). Öneriler `computePathSuggestions` (imleçten önceki sözcüğün
+   klasörü, önce klasörler, gizliler yalnız ad `.` ile başlıyorsa, en çok 300). Bulunulan klasör `live.entries`'ten;
+   diğerleri kabuktan istenir: uygulama `DIR_LISTING_KEY` = `\x1b[6973~` gönderir, kabukta bash `bind -x` (emacs ve
+   vi-insert) / zsh widget (`bindkey`, viins) `__jd_dls` imleçten önceki sözcüğün klasörünü `ls -1Ap` ile listeler ve
+   OSC `D` (ilk satır klasör) yayar; `~/` genişletilir, sözcük boşluk/`|;&` ile ayrılır. bash bu sırada satırı
+   yerinde temizleyip yeniden çizer (`\r\e[K` + istem, TERM gerekir), zsh hiçbir şey çizmez (pty ile doğrulandı).
+   Önbellek 15 sn, yanıtsız istek 3 sn sonra tekrar; çalışma dizini değişince temizlenir. Klasör kabul edilince kip
+   açık kalır ve içi listelenir; Enter, Esc, Ctrl+C, geçmişte gezinme kipi kapatır. Pencerede klasör başlığı
+   (`FolderOpen` + yol), "Klasör okunuyor…", "Klasörde eşleşen girdi yok"; liste `max-h-72` kaydırmalı, seçili öğe
+   görünür alana kaydırılır. Kurulum satırı 2644 bayt.
+3. i18n denetleyicisinde `keys` veri alanı sayıldı (kısayol tuş adları çevrilmez).
+4. Testler: autocomplete 16/16 (Tab kabul etmez, →, Ctrl+→ adımları, çift Tab, ikinci Tab kabuğa gitmez, klasör içi,
+   süzme, Esc).
+5. Gönderim: commit `dbb8285` + `718b8ce`; PR #10 başlığı "JumpDesk 0.2.7: folder suggestions with Tab Tab, tray
+   update checks, .deb installs after restarts", notları güncellendi. Regresyon: windows 47, tab-keys 8, popups 4,
+   ai 44, tools 69, server-status 37, right-click 9, multiwindow 21, panels 13 (hepsi geçti).

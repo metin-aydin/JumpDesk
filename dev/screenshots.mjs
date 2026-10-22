@@ -354,7 +354,7 @@ try {
   await page.keyboard.press('Control+,')
   await page.getByRole('button', { name: 'AI', exact: true }).click()
   await page.getByRole('combobox', { name: 'Provider' }).click()
-  await page.getByRole('option', { name: 'OpenAI Compatible', exact: true }).click()
+  await page.getByRole('option', { name: 'Local Model Server', exact: true }).click()
   const aiAddress = page.getByLabel('Address', { exact: true })
   await aiAddress.fill(`http://127.0.0.1:${aiPort}/v1`)
   await aiAddress.press('Enter')

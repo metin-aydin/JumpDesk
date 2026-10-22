@@ -87,7 +87,8 @@ const api: JumpDeskApi = {
     onOpenLayout: (cb) => subscribe(IPC.trayOpenLayout, cb)
   },
   app: {
-    onHidden: (cb) => subscribe(IPC.appHidden, () => cb())
+    onHidden: (cb) => subscribe(IPC.appHidden, () => cb()),
+    onShown: (cb) => subscribe(IPC.appShown, () => cb())
   },
   notify: {
     show: (opts) => ipcRenderer.send(IPC.notifyShow, opts),

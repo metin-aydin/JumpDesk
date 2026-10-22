@@ -5,24 +5,32 @@ import type { IDisposable, Terminal } from '@xterm/xterm'
  * OSC dizileri (`ESC ] 6973 ; <tür> ; <base64> BEL`) yayar. Türler:
  *   C = çalışma dizini, L = dizindeki girdiler (`ls -1Ap`), X = son komut (`history 1`, numarasıyla),
  *   H = geçmiş (kurulumda bir kez), I = sunucunun IP'leri, K = komut adları, B = istem sonu (girdi başlangıcı),
- *   M = sunucu durumu (arka plandaki ölçüm döngüsünden; bkz. STATS_SCRIPT).
+ *   M = sunucu durumu (arka plandaki ölçüm döngüsünden; bkz. STATS_SCRIPT), D = istenen klasörün girdileri (ilk satır
+ *   klasör, sonra `ls -1Ap`).
+ * D, uygulama `DIR_LISTING_KEY` dizisini gönderince gelir: kabukta bu diziye bağlı işlev (bash `bind -x`, zsh widget)
+ * komut satırındaki imleçten önceki sözcüğün klasörünü listeler; satır değişmez, komut geçmişine bir şey yazılmaz.
  * Küçük harfli h, k ve m; H, K ve M'nin gzip ile sıkıştırılmış hâlidir (büyük ya da sık gönderilen veri).
  */
 export const OSC_ID = 6973
 /** Entegrasyon işlevlerinin ön eki; bunu içeren komutlar geçmişe ve önerilere alınmaz. */
 export const SETUP_MARKER = '__jd_'
+/** Kabuktan imleçteki yolun klasör listesini isteyen tuş dizisi (gerçek bir tuşa karşılık gelmez). */
+export const DIR_LISTING_KEY = '\x1b[6973~'
 
 const SCRIPT = String.raw`__jd_b64(){ base64 2>/dev/null|tr -d '\n\r';}
 __jd_osc(){ printf '\033]6973;%s;%s\007' "$1" "$2";}
 __jd_ip(){ { hostname -I 2>/dev/null||ip -4 -o addr show scope global 2>/dev/null|awk '{print $4}'|cut -d/ -f1;}|tr ' ' '\n'|grep -v '^$'|head -n 4|tr '\n' ' ';}
 __jd_last1(){ if [ -n "$ZSH_VERSION" ];then fc -l -1 2>/dev/null;else HISTTIMEFORMAT= history 1;fi;}
 __jd_prompt(){ local s=$?;__jd_osc C "$(printf '%s' "$PWD"|__jd_b64)";__jd_osc L "$(ls -1Ap 2>/dev/null|head -n 500|__jd_b64)";local h;h=$(__jd_last1);if [ -n "$h" ]&&[ "$h" != "$__jd_last" ];then __jd_last=$h;__jd_osc X "$(printf '%s' "$h"|__jd_b64)";fi;[ -n "$__jd_sp" ]&&! kill -0 $__jd_sp 2>/dev/null&&__jd_stat_start $__jd_si;return $s;}
+__jd_dls(){ local w="$1" d p;w="${'$'}{w##*[[:space:]|;&]}";case "$w" in */*) d="${'$'}{w%/*}/";; *) d=;; esac;p="${'$'}{d/#\~/$HOME}";__jd_osc D "$({ printf '%s\n' "$d";ls -1Ap -- "${'$'}{p:-.}" 2>/dev/null|head -n 500;}|__jd_b64)";}
 if [ -n "$ZSH_VERSION" ];then precmd_functions+=(__jd_prompt);PROMPT="$PROMPT%{$(printf '\033]6973;B;\007')%}"
 __jd_hist(){ fc -ln 1 2>/dev/null|tail -n 1000;};__jd_cmds(){ print -rl -- ${'$'}{(k)commands} 2>/dev/null|sort -u;}
+__jd_dlw(){ __jd_dls "$LBUFFER" >/dev/tty;};zle -N __jd_dlw;bindkey '\e[6973~' __jd_dlw;bindkey -M viins '\e[6973~' __jd_dlw 2>/dev/null
 else PROMPT_COMMAND="__jd_prompt${'$'}{PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 case "$PS1" in *'\['*|*$'\033'*|*'\e'*);;*)PS1="\[\e[1;32m\]$PS1\[\e[0m\]";;esac
 PS1="$PS1\[$(printf '\033]6973;B;\007')\]"
 __jd_hist(){ HISTTIMEFORMAT= history|tail -n 1000|sed 's/^ *[0-9]* *//';};__jd_cmds(){ compgen -c 2>/dev/null|sort -u;}
+__jd_dlb(){ __jd_dls "${'$'}{READLINE_LINE:0:READLINE_POINT}";};bind -x '"\e[6973~": __jd_dlb' 2>/dev/null;bind -m vi-insert -x '"\e[6973~": __jd_dlb' 2>/dev/null
 alias ls >/dev/null 2>&1||alias ls='ls --color=auto';alias grep >/dev/null 2>&1||alias grep='grep --color=auto';fi
 __jd_init(){ __jd_osc I "$(__jd_ip|__jd_b64)";__jd_osc h "$(__jd_hist|gzip -c|__jd_b64)";[ "$1" = 1 ]&&__jd_osc k "$(__jd_cmds|head -n 5000|gzip -c|__jd_b64)";__jd_last=$(__jd_last1);[ "$2" -gt 0 ] 2>/dev/null&&__jd_stat_start "$2";return 0;}`
 
@@ -108,6 +116,8 @@ export interface IntegrationHandlers {
   onPromptEnd: (pos: { x: number; y: number }) => void
   /** Sunucu durumu örneği (ham `anahtar değer` satırları). */
   onStats?: (payload: string) => void
+  /** İstenen klasörün girdileri (`klasör` komut satırında yazıldığı gibi, ör. `logs/`, `/var/log/`). */
+  onDirListing?: (dir: string, entries: string[]) => void
 }
 
 const lines = (text: string): string[] =>
@@ -140,6 +150,11 @@ export function attachIntegration(term: Terminal, h: IntegrationHandlers): IDisp
       case 'L':
         h.onListing(lines(payload))
         break
+      case 'D': {
+        const [dir = '', ...entries] = payload.split('\n')
+        h.onDirListing?.(dir, entries.map((e) => e.replace(/\r$/, '')).filter(Boolean))
+        break
+      }
       case 'X': {
         const m = /^\s*(\d+)\*?\s+(.*)$/s.exec(payload.trim())
         const command = (m ? m[2] : payload).trim()

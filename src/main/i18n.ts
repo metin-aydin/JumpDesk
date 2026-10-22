@@ -27,8 +27,12 @@ const EN: Record<string, string> = {
   'İçe Aktar': 'Import',
   Pencere: 'Window',
   'Kurulum başlatılamadı: {message}': 'Could not start the installation: {message}',
-  'Parola penceresi kapatıldı ya da yetki verilmedi; güncelleme kurulmadı.':
-    'The password dialog was closed or authorization was denied; the update was not installed.',
+  'Parola penceresi kapatıldı; güncelleme kurulmadı.':
+    'The password window was closed; the update was not installed.',
+  'JumpDesk bu oturumda yönetici yetkisi isteyemiyor. Tepsi simgesinden "Çıkış" ile kapatıp yeniden açın, sonra tekrar deneyin.':
+    'JumpDesk cannot ask for administrator rights in this session. Quit it from the tray icon, open it again and retry.',
+  'Yönetici yetkisi alınamadı; güncelleme kurulmadı.':
+    'Administrator rights could not be obtained; the update was not installed.',
   'Güncelleme kurulamadı (çıkış kodu {code}).':
     'The update could not be installed (exit code {code}).',
   'Yapay zeka yanıt vermedi (zaman aşımı).': 'The AI provider did not respond (timed out).',
@@ -65,10 +69,9 @@ const EN: Record<string, string> = {
   'Model listesi alınamadı.': 'Could not get the model list.',
   'Çalışma Alanı Kimliği (İsteğe Bağlı)': 'Workspace ID (Optional)',
   Adres: 'Address',
-  'Uç Nokta': 'Endpoint',
+  'Kaynak Adı': 'Resource Name',
   Model: 'Model',
   'Dağıtım Adı': 'Deployment Name',
-  'API Sürümü': 'API Version',
   'Kayıtlı Düzenler': 'Saved Layouts',
   'Kayıtlı düzen yok': 'No saved layouts',
   'Klasörde düzen yok': 'No layouts in this folder',

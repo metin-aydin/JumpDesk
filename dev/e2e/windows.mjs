@@ -296,7 +296,7 @@ try {
   await page.keyboard.press('Escape')
 
   // Program çalışırken (komut satırı yok) Ctrl+Space öneri penceresini açmaz; istemde açar
-  const suggestFooter = page.getByText('Tab / → kabul', { exact: false })
+  const suggestFooter = page.getByText('→ kabul ·', { exact: false })
   await page.locator('.xterm-helper-textarea:visible').first().focus()
   await page.keyboard.type('tail -f /dev/null\n')
   await page.waitForTimeout(800)

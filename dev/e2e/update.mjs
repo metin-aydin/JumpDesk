@@ -1,11 +1,15 @@
 // Uygulama içi güncelleme. Test kendi sahte güncelleme sunucusunu açar: latest-linux.yml + AppImage dosyası (kendini
 // güncelleyebilen kurulum) ve GitHub'ın "son sürüm" yanıtı (kendini güncelleyemeyen kurulum). Kurulum adımı (dosya
-// değiştirme, yeniden açma) çalıştırılmaz. Uygulama proje kökünden açılır ki sürümü package.json'dan okunsun.
-// Kullanım: node dev/e2e/update.mjs <klasör> (mock açıkken)
+// değiştirme, yeniden açma) çalıştırılmaz. Uygulama proje kökünden açılır ki sürümü package.json'dan okunsun. Ayrıca:
+// no_new_privs taşıyan süreçte .deb kurulumu kullanıcının systemd yöneticisinden geçer (sahte systemd-run), kurum
+// köküyle imzalı HTTPS sunucusu sistem deposundaki kökle (JUMPDESK_TEST_SYSTEM_CA) güvenilir olur, tepsiye gizlenen
+// pencere yeniden açılınca güncelleme denetlenir. Kullanım: node dev/e2e/update.mjs <klasör> (mock açıkken)
 import { _electron as electron } from 'playwright-core'
+import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
+import https from 'node:https'
 import os from 'node:os'
 import path from 'node:path'
 import { login } from './helpers.mjs'
@@ -38,7 +42,7 @@ const latestYml = [
 
 let latestTag = `v${NEW_VERSION}`
 const requests = []
-const server = http.createServer((req, res) => {
+const handler = (req, res) => {
   requests.push(req.url)
   const url = new URL(req.url, 'http://localhost').pathname
   if (url === '/feed/latest-linux.yml') {
@@ -63,9 +67,65 @@ const server = http.createServer((req, res) => {
     res.writeHead(404)
     res.end()
   }
-})
+}
+const server = http.createServer(handler)
 await new Promise((r) => server.listen(0, '127.0.0.1', r))
 const base = `http://127.0.0.1:${server.address().port}`
+
+/** Kurum kökü → ara sertifika → 127.0.0.1 yaprağı (TLS denetimi yapan ağı taklit eder). */
+function corporateCerts() {
+  const dir = path.join(work, 'certs')
+  fs.mkdirSync(dir, { recursive: true })
+  const ssl = (...args) => execFileSync('openssl', args, { cwd: dir, stdio: 'pipe' })
+  fs.writeFileSync(
+    path.join(dir, 'ca.ext'),
+    'basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\n'
+  )
+  fs.writeFileSync(
+    path.join(dir, 'leaf.ext'),
+    'basicConstraints=CA:FALSE\nsubjectAltName=IP:127.0.0.1\n'
+  )
+  const make = (name, subject, ext, issuer) => {
+    ssl(
+      'req',
+      '-new',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-keyout',
+      `${name}.key`,
+      '-subj',
+      subject,
+      '-out',
+      `${name}.csr`
+    )
+    const sign = issuer
+      ? ['-CA', `${issuer}.pem`, '-CAkey', `${issuer}.key`, '-CAcreateserial']
+      : ['-signkey', `${name}.key`]
+    ssl(
+      'x509',
+      '-req',
+      '-in',
+      `${name}.csr`,
+      ...sign,
+      '-days',
+      '5',
+      '-extfile',
+      ext,
+      '-out',
+      `${name}.pem`
+    )
+  }
+  make('root', '/CN=Test Corporate Root', 'ca.ext')
+  make('inter', '/CN=Test Inspection CA', 'ca.ext', 'root')
+  make('leaf', '/CN=127.0.0.1', 'leaf.ext', 'inter')
+  const read = (name) => fs.readFileSync(path.join(dir, name), 'utf8')
+  return {
+    root: path.join(dir, 'root.pem'),
+    key: read('leaf.key'),
+    cert: `${read('leaf.pem')}${read('inter.pem')}`
+  }
+}
 
 let failed = false
 const check = (name, ok, detail = '') => {
@@ -256,6 +316,167 @@ const shotOf = (app) => async (name) => {
     await shot('update-error-c').catch(() => undefined)
   } finally {
     await app.close()
+  }
+}
+
+// 4. no_new_privs taşıyan süreç (app.relaunch() ile açılmış): kurulum kullanıcının systemd yöneticisinden geçer ve
+// pkexec'in hata nedeni gösterilir; kullanıcı yöneticisi yoksa uygulamayı yeniden açması söylenir.
+{
+  const runLog = path.join(work, 'systemd-run.log')
+  const fakeRun = path.join(work, 'fake-systemd-run.sh')
+  fs.writeFileSync(
+    fakeRun,
+    `#!/bin/sh\necho "$*" >> "${runLog}"\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n`,
+    { mode: 0o755 }
+  )
+  const denied = path.join(work, 'fake-pkexec-denied.sh')
+  fs.writeFileSync(
+    denied,
+    '#!/bin/sh\necho "Error executing command as another user: Not authorized" >&2\nexit 127\n',
+    { mode: 0o755 }
+  )
+  const run = async (name, systemdRun, expected) => {
+    const app = await launch({
+      JUMPDESK_USER_DATA: path.join(work, `user-${name}`),
+      JUMPDESK_UPDATE_URL: `${base}/feed/`,
+      JUMPDESK_UPDATE_INSTALLER: 'deb',
+      JUMPDESK_TEST_DEB_INSTALLER: denied,
+      JUMPDESK_TEST_NO_NEW_PRIVS: '1',
+      JUMPDESK_TEST_SYSTEMD_RUN: systemdRun
+    })
+    const page = await app.firstWindow()
+    try {
+      await login(app, page)
+      await page.getByText(`JumpDesk ${NEW_VERSION} yayımlandı`).waitFor({ timeout: 15000 })
+      await page.getByRole('button', { name: 'Güncelle', exact: true }).click()
+      const dialog = page.getByRole('dialog')
+      const install = dialog.getByRole('button', { name: 'Yeniden Başlat ve Kur' })
+      await install.waitFor({ timeout: 20000 })
+      await install.click()
+      await dialog.getByText(expected).waitFor({ timeout: 10000 })
+      return true
+    } catch (err) {
+      console.log(`FAIL: ${err.message}`)
+      await shotOf(app)(`update-error-${name}`).catch(() => undefined)
+      return false
+    } finally {
+      await app.close()
+    }
+  }
+  const viaUser = await run(
+    'nnp',
+    fakeRun,
+    /Yönetici yetkisi alınamadı; güncelleme kurulmadı\. \(Error executing command as another user: Not authorized\)/
+  )
+  check('no_new_privs install shows the reason from pkexec', viaUser)
+  const logged = fs.existsSync(runLog) ? fs.readFileSync(runLog, 'utf8') : ''
+  check(
+    'no_new_privs install runs through the user service manager',
+    /--user .*--wait --pipe .*-- .*fake-pkexec-denied\.sh .*\.deb/.test(logged),
+    logged.split('\n').at(-2)
+  )
+  check(
+    'no_new_privs without a user service manager asks to reopen the app',
+    await run(
+      'nnp-none',
+      path.join(work, 'no-such-systemd-run'),
+      /Tepsi simgesinden "Çıkış" ile kapatıp yeniden açın/
+    )
+  )
+}
+
+// 5. Kurum ağı (TLS denetimi): güncelleme sunucusu kurum köküyle imzalı. Kök sistem deposundaysa denetim çalışır,
+// değilse Chromium'un hatası kalır.
+{
+  const certs = corporateCerts()
+  const secure = https.createServer({ key: certs.key, cert: certs.cert }, handler)
+  await new Promise((r) => secure.listen(0, '127.0.0.1', r))
+  const secureBase = `https://127.0.0.1:${secure.address().port}`
+  const appImage = path.join(work, 'JumpDesk-0.2.0-tls.AppImage')
+  fs.writeFileSync(appImage, 'old')
+  const stateAfterCheck = async (name, env) => {
+    const app = await launch({
+      JUMPDESK_USER_DATA: path.join(work, `user-${name}`),
+      JUMPDESK_UPDATE_URL: `${secureBase}/feed/`,
+      APPIMAGE: appImage,
+      ...env
+    })
+    const page = await app.firstWindow()
+    try {
+      await login(app, page)
+      for (let i = 0; i < 60; i++) {
+        const state = await page.evaluate(() => window.jumpdesk.update.getState())
+        if (state.status === 'available' || state.status === 'error') return state
+        await page.waitForTimeout(250)
+      }
+      return null
+    } finally {
+      await app.close()
+    }
+  }
+  const trusted = await stateAfterCheck('tls-trusted', { JUMPDESK_TEST_SYSTEM_CA: certs.root })
+  check(
+    'HTTPS feed signed by a root in the system store is trusted',
+    trusted?.status === 'available' && trusted.version === NEW_VERSION,
+    JSON.stringify(trusted)
+  )
+  const untrusted = await stateAfterCheck('tls-untrusted', {
+    JUMPDESK_TEST_SYSTEM_CA: path.join(work, 'certs', 'leaf.ext')
+  })
+  check(
+    'unknown root is still rejected',
+    untrusted?.status === 'error' && /ERR_CERT_AUTHORITY_INVALID/.test(untrusted.error ?? ''),
+    JSON.stringify(untrusted)
+  )
+  secure.close()
+}
+
+// 6. Tepsiye gizlenen pencere yeniden açılınca güncelleme yeniden denetlenir ve kurulmamış sürüm yeniden duyurulur.
+{
+  const appImage = path.join(work, 'JumpDesk-0.2.0-tray.AppImage')
+  fs.writeFileSync(appImage, 'old')
+  const app = await launch({
+    JUMPDESK_USER_DATA: path.join(work, 'user-tray'),
+    JUMPDESK_UPDATE_URL: `${base}/feed/`,
+    APPIMAGE: appImage,
+    JUMPDESK_TEST_TRAY: '1',
+    JUMPDESK_TEST_REOPEN_GAP_MS: '1'
+  })
+  const page = await app.firstWindow()
+  try {
+    await login(app, page)
+    const toast = page.getByText(`JumpDesk ${NEW_VERSION} yayımlandı`)
+    await toast.waitFor({ timeout: 15000 })
+    const feedReads = () => requests.filter((u) => u.startsWith('/feed/latest-linux.yml')).length
+    const toasts = () => page.getByText(`JumpDesk ${NEW_VERSION} yayımlandı`).count()
+    const before = feedReads()
+    const shownBefore = await toasts()
+    await page.evaluate(() => window.jumpdesk.win.close())
+    await page.waitForTimeout(800)
+    await app.evaluate(() => globalThis.__jumpdeskTray.click("JumpDesk'i Göster"))
+    for (let i = 0; i < 40 && feedReads() === before; i++) await page.waitForTimeout(250)
+    check(
+      'reopening from the tray checks for updates',
+      feedReads() > before,
+      `${before} → ${feedReads()}`
+    )
+    let shownAfter = await toasts()
+    for (let i = 0; i < 40 && shownAfter <= shownBefore; i++) {
+      await page.waitForTimeout(250)
+      shownAfter = await toasts()
+    }
+    check(
+      'pending version is announced again after reopening',
+      shownAfter > shownBefore,
+      `${shownBefore} → ${shownAfter}`
+    )
+  } catch (err) {
+    failed = true
+    console.log(`FAIL: ${err.message}`)
+    await shotOf(app)('update-error-tray').catch(() => undefined)
+  } finally {
+    await app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
+    await app.close().catch(() => undefined)
   }
 }
 

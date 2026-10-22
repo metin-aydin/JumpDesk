@@ -62,7 +62,9 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: t('Sağ Tık'), label: t('Seçimi Kopyala / Yapıştır') },
         { keys: 'Ctrl+Space', label: t('Öneri Listesini Aç') },
         { keys: 'Ctrl+Space Ctrl+Space', label: t('Yapay Zekaya Sor') },
-        { keys: 'Tab / →', label: t('Öneriyi Kabul Et') }
+        { keys: 'Tab Tab', label: t('Klasördeki Dosyaları Öner') },
+        { keys: '→', label: t('Öneriyi Kabul Et') },
+        { keys: isMac ? '⌥→' : 'Ctrl+→', label: t('Öneriyi Sonraki / İşaretine Kadar Kabul Et') }
       ]
     },
     {

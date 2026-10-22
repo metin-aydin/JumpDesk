@@ -1,7 +1,7 @@
 import { app, net, type BrowserWindow } from 'electron'
 import { spawn } from 'child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import {
   AppImageUpdater,
   DebUpdater,
@@ -20,6 +20,9 @@ const REPO = 'metin-aydin/JumpDesk'
 const RELEASES_PAGE = `https://github.com/${REPO}/releases`
 const FIRST_CHECK_DELAY_MS = 15_000
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+/** Tepsiden yeniden açılan pencerede, son denetim bundan eskiyse yeniden denetlenir (testlerde değiştirilebilir). */
+const REOPEN_CHECK_GAP_MS =
+  Number(process.env['JUMPDESK_UPDATE_URL'] && process.env['JUMPDESK_TEST_REOPEN_GAP_MS']) || 60_000
 
 /**
  * Testler için: `JUMPDESK_UPDATE_URL` sürüm dosyalarının (latest*.yml) okunduğu adresi, `JUMPDESK_RELEASES_API` uygulama
@@ -165,23 +168,138 @@ export async function downloadUpdate(): Promise<UpdateState> {
 }
 
 /**
+ * Süreç `no_new_privs` ile mi çalışıyor. Chromium'un yeniden başlatıcısıyla (`app.relaunch()`) açılan süreçte bu bayrak
+ * vardır ve alt süreçlere geçer; setuid `pkexec` yönetici yetkisi alamaz. Testlerde `JUMPDESK_TEST_NO_NEW_PRIVS`.
+ */
+function noNewPrivs(): boolean {
+  if (testFeed && process.env['JUMPDESK_TEST_NO_NEW_PRIVS']) return true
+  try {
+    return /^NoNewPrivs:\s*1\s*$/m.test(readFileSync('/proc/self/status', 'utf8'))
+  } catch {
+    return false
+  }
+}
+
+/** Kullanıcının systemd yöneticisine komut çalıştırtan araç (testlerde sahtesi). */
+const systemdRun = (): string =>
+  (testFeed && process.env['JUMPDESK_TEST_SYSTEMD_RUN']) || 'systemd-run'
+
+/** Kullanıcı yöneticisinde başlatılan uygulamanın masaüstü oturumunu bulması için aktarılan değişkenler. */
+const SESSION_ENV = [
+  'DISPLAY',
+  'WAYLAND_DISPLAY',
+  'XAUTHORITY',
+  'XDG_SESSION_TYPE',
+  'XDG_CURRENT_DESKTOP',
+  'XDG_SESSION_DESKTOP',
+  'DESKTOP_SESSION',
+  'XDG_RUNTIME_DIR',
+  'DBUS_SESSION_BUS_ADDRESS',
+  'LANG',
+  'LANGUAGE',
+  'LC_ALL',
+  'PATH',
+  'JUMPDESK_WAYLAND',
+  'JUMPDESK_CHROMIUM_LOGS'
+]
+
+/**
+ * Komutu bu sürecin alt süreci olarak değil, kullanıcının systemd yöneticisinin geçici bir hizmeti olarak çalıştıran
+ * `systemd-run` argümanları; `no_new_privs` devralınmaz. `wait` ile komut bitene kadar beklenir, çıkış kodu ve hata
+ * çıktısı geri gelir.
+ */
+function userServiceArgs(command: string[], wait: boolean): string[] {
+  const env = SESSION_ENV.filter((k) => process.env[k]).flatMap((k) => [
+    '-E',
+    `${k}=${process.env[k]}`
+  ])
+  return [
+    '--user',
+    '--quiet',
+    '--collect',
+    ...(wait ? ['--wait', '--pipe'] : []),
+    ...env,
+    '--',
+    ...command
+  ]
+}
+
+/** Kullanıcı yöneticisi komut çalıştırabiliyor mu (systemd yoksa ya da kullanıcı veri yolu yoksa hayır). */
+function userServiceAvailable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(systemdRun(), userServiceArgs(['true'], true), { stdio: 'ignore' })
+    const timer = setTimeout(() => {
+      child.kill()
+      resolve(false)
+    }, 5000)
+    child.once('error', () => {
+      clearTimeout(timer)
+      resolve(false)
+    })
+    child.once('exit', (code) => {
+      clearTimeout(timer)
+      resolve(code === 0)
+    })
+  })
+}
+
+/**
+ * Kurulumdan sonra uygulama yeniden açılır. Linux paketinde bu süreç kapandıktan sonra başlatıcıyı kullanıcı
+ * yöneticisi çalıştırır: yeni süreç `no_new_privs` taşımaz, sonraki güncellemede de yetki isteyebilir. Kullanıcı
+ * yöneticisi yoksa (ve testlerde) `app.relaunch()` kullanılır.
+ */
+function relaunchAfterInstall(viaUserService: boolean): void {
+  const launcher = join(dirname(process.execPath), basename(process.execPath).replace(/-bin$/, ''))
+  if (viaUserService && !testFeed && existsSync(launcher)) {
+    const waitThenStart = 'while kill -0 "$0" 2>/dev/null; do sleep 0.2; done; exec "$1"'
+    spawn(
+      systemdRun(),
+      userServiceArgs(['/bin/sh', '-c', waitThenStart, String(process.pid), launcher], false),
+      { detached: true, stdio: 'ignore' }
+    ).unref()
+    return
+  }
+  app.relaunch()
+}
+
+/** Hata çıktısının son dolu satırı (pkexec ve dpkg nedeni oraya yazar). */
+const lastLine = (text: string): string =>
+  text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .at(-1) ?? ''
+
+/**
  * .deb paketi `pkexec` ile kurulur. Parola penceresi açıkken ana süreç beklemez (electron-updater'ın kurulumu
  * eşzamanlıdır ve pencereyi "yanıt vermiyor" durumuna düşürür); kurulum bitince uygulama yeniden açılır. Bağımlılık
- * eksikse `apt-get install -f` aynı yetkiyle çalışır. Testlerde `JUMPDESK_TEST_DEB_INSTALLER` pkexec yerine çalışır.
+ * eksikse `apt-get install -f` aynı yetkiyle çalışır. Süreç `no_new_privs` taşıyorsa pkexec kullanıcının systemd
+ * yöneticisi üzerinden çalıştırılır. Testlerde `JUMPDESK_TEST_DEB_INSTALLER` pkexec yerine çalışır.
  */
-function installDeb(file: string): void {
+async function installDeb(file: string): Promise<void> {
   set({ status: 'installing', error: undefined })
   const testInstaller = testFeed ? process.env['JUMPDESK_TEST_DEB_INSTALLER'] : undefined
-  const child = testInstaller
-    ? spawn(testInstaller, [file], { stdio: 'ignore' })
-    : spawn(
-        'pkexec',
-        ['/bin/sh', '-c', 'dpkg -i "$1" || apt-get install -f -y', 'jumpdesk-update', file],
-        { stdio: 'ignore' }
-      )
+  const command = testInstaller
+    ? [testInstaller, file]
+    : ['pkexec', '/bin/sh', '-c', 'dpkg -i "$1" || apt-get install -f -y', 'jumpdesk-update', file]
+  const restricted = noNewPrivs()
+  const viaUserService = (restricted || !testFeed) && (await userServiceAvailable())
+  const useUserService = restricted && viaUserService
+  const child = useUserService
+    ? spawn(systemdRun(), userServiceArgs(command, true), { stdio: ['ignore', 'ignore', 'pipe'] })
+    : spawn(command[0], command.slice(1), { stdio: ['ignore', 'ignore', 'pipe'] })
+  let stderr = ''
+  child.stderr?.on('data', (d: Buffer) => {
+    stderr = (stderr + d.toString()).slice(-4000)
+  })
   const fail = (error: string): void => {
     installing = false
+    if (stderr.trim()) console.error('Güncelleme kurulamadı:', stderr.trim())
     set({ status: 'downloaded', error })
+  }
+  const reason = (): string => {
+    const line = lastLine(stderr)
+    return line ? ` (${line})` : ''
   }
   child.once('error', (err) =>
     fail(mt('Kurulum başlatılamadı: {message}', { message: message(err) }))
@@ -189,12 +307,20 @@ function installDeb(file: string): void {
   child.once('exit', (code) => {
     if (code === 0) {
       store.flushNow()
-      app.relaunch()
+      relaunchAfterInstall(viaUserService)
       app.quit()
-    } else if (code === 126 || code === 127) {
-      fail(mt('Parola penceresi kapatıldı ya da yetki verilmedi; güncelleme kurulmadı.'))
+    } else if (code === 126) {
+      fail(mt('Parola penceresi kapatıldı; güncelleme kurulmadı.'))
+    } else if (code === 127 && restricted && !useUserService) {
+      fail(
+        mt(
+          'JumpDesk bu oturumda yönetici yetkisi isteyemiyor. Tepsi simgesinden "Çıkış" ile kapatıp yeniden açın, sonra tekrar deneyin.'
+        )
+      )
+    } else if (code === 127) {
+      fail(mt('Yönetici yetkisi alınamadı; güncelleme kurulmadı.') + reason())
     } else {
-      fail(mt('Güncelleme kurulamadı (çıkış kodu {code}).', { code: code ?? '?' }))
+      fail(mt('Güncelleme kurulamadı (çıkış kodu {code}).', { code: code ?? '?' }) + reason())
     }
   })
 }
@@ -206,7 +332,7 @@ export function installUpdate(): void {
   set({ error: undefined })
   store.flushNow()
   if (state.installer === 'deb' && downloadedFile) {
-    installDeb(downloadedFile)
+    void installDeb(downloadedFile)
     return
   }
   const u = updater
@@ -222,6 +348,16 @@ export function setAutoCheck(enabled: boolean): UpdateState {
 }
 
 export const updateState = (): UpdateState => state
+
+/**
+ * Pencere tepsiden yeniden gösterildi: uygulama tepside günlerce açık kalabildiği için otomatik denetim açıksa ve son
+ * denetimden bu yana bir dakikadan fazla geçtiyse yeni sürüm aranır.
+ */
+export function checkOnReopen(): void {
+  if (!app.isPackaged && !testFeed) return
+  if (!state.autoCheck || Date.now() - (state.checkedAt ?? 0) < REOPEN_CHECK_GAP_MS) return
+  void checkForUpdates()
+}
 
 /** Güncelleyiciyi kurar; otomatik denetim açıksa açılıştan kısa süre sonra ve belirli aralıklarla denetler. */
 export function initUpdater(win: BrowserWindow): void {

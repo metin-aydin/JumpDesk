@@ -6,8 +6,10 @@ const plural = (n: string | number, one: string, many: string): string =>
 export const terminal: Dictionary = {
   // Terminal
   'Öneri yok': 'No suggestions',
-  'Tab / → kabul · ↑↓ seç · Esc kapat · Ctrl+Space aç':
-    'Tab / → accept · ↑↓ select · Esc close · Ctrl+Space open',
+  'Klasör okunuyor…': 'Reading the folder…',
+  'Klasörde eşleşen girdi yok': 'No matching entries in this folder',
+  '→ kabul · {partial} / işaretine kadar · ↑↓ seç · Esc kapat · Ctrl+Space aç':
+    '→ accept · {partial} up to the next / · ↑↓ select · Esc close · Ctrl+Space open',
   'Bağlantıyı Açmak İçin {key} + Tıklayın': '{key} + Click to Open Link',
   'Terminalde Ara': 'Search Terminal',
   'Terminalde ara': 'Search terminal',

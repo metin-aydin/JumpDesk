@@ -207,6 +207,8 @@ export const app: Dictionary = {
   Yapıştır: 'Paste',
   'Öneri Listesini Aç': 'Open Suggestion List',
   'Öneriyi Kabul Et': 'Accept Suggestion',
+  'Klasördeki Dosyaları Öner': 'Suggest Files in the Folder',
+  'Öneriyi Sonraki / İşaretine Kadar Kabul Et': 'Accept Suggestion up to the Next /',
   'Sunucu Ağacı Ve Klasörler': 'Server Tree and Folders',
   'Enter / Çift Tık': 'Enter / Double-Click',
   Bağlan: 'Connect',

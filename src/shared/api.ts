@@ -49,6 +49,7 @@ export const IPC = {
   trayOpenLayout: 'tray:open-layout',
   /** Ana süreç → ana pencere: pencere kapatıldı, uygulama tepside sürüyor (oturumlar kapatılır). */
   appHidden: 'app:hidden',
+  appShown: 'app:shown',
   downloadBegin: 'download:begin',
   downloadWrite: 'download:write',
   downloadEnd: 'download:end',
@@ -251,6 +252,8 @@ export interface JumpDeskApi {
   /** Pencere kapatılınca uygulama tepside sürer; bu olayda açık oturumlar kapatılır. */
   app: {
     onHidden(cb: () => void): () => void
+    /** Tepsiye gizlenmiş pencere yeniden gösterildi. */
+    onShown(cb: () => void): () => void
   }
   notify: {
     /** Masaüstü bildirimi; tıklanınca pencere öne gelir ve `onClick` sekme kimliği ve alarm satırıyla çağrılır. */

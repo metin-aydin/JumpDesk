@@ -6,6 +6,7 @@ import {
   AI_PROVIDERS,
   aiConfigured,
   aiProviderInfo,
+  azureEndpoint,
   DEFAULT_AI_FEATURES,
   type AiConfig,
   type AiExplainRequest,
@@ -121,7 +122,11 @@ export function setAiConfig(patch: AiConfigPatch): AiConfig {
     if (!def || def.secret || typeof value !== 'string' || value.length > MAX_FIELD)
       throw new Error('Geçersiz alan')
     const trimmed = value.trim()
-    if (trimmed && (key === 'baseUrl' || key === 'endpoint') && !validUrl(trimmed))
+    if (
+      trimmed &&
+      (key === 'baseUrl' || key === 'endpoint') &&
+      !validUrl(key === 'endpoint' ? azureEndpoint(trimmed) : trimmed)
+    )
       throw new AiError(mt('Adres http:// ya da https:// ile başlamalı.'))
     // Alanlar istek adresine ve başlıklarına girer; kontrol karakteri ve biçime uymayan değer kabul edilmez.
     if (

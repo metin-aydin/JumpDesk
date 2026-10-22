@@ -1,9 +1,11 @@
 import { app, BrowserWindow, Menu, nativeTheme } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { PARTITION } from './config'
 import { attachAuthWindow, checkSession } from './auth'
 import { registerIpc } from './ipc'
 import { installRequestHooks } from './net-hooks'
 import { store } from './store'
+import { initSystemTrust } from './system-trust'
 import { initUpdater } from './updater'
 import { createMainWindow } from './window'
 import { initTray } from './tray'
@@ -55,6 +57,7 @@ if (!app.requestSingleInstanceLock()) {
     electronApp.setAppUserModelId('io.github.metin-aydin.jumpdesk')
     nativeTheme.themeSource = store.settings.theme
     buildMenu()
+    initSystemTrust([PARTITION])
 
     app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
 
