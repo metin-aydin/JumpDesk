@@ -1293,3 +1293,11 @@ sürükle-bırak); (8) klasörler dışa aktarılsın.
   `__jd_prompt` döngü ölmüşse (`__jd_sp` dolu, `kill -0` başarısız) `__jd_stat_start $__jd_si` ile yeniden başlatır.
   Yeniden üretim: python `pty.fork` + `bash --norc -i` (betik `SHELL_SCRIPTS` esbuild ile dökülür). Test
   `server-status.mjs` 6a (düzeltme geri alınınca FAIL, uygulanınca ok; toplam 37).
+- **Gönderim (2026-10-22):** tam regresyon geçti (menus 3, panels 13, home 17, tools 69, windows 47, multiwindow 21,
+  alarm-warmup 5, transfer 39, server-address 6, i18n 4, ai 24, update 19, popups 4, tab-keys 8, tray 8, autocomplete 7,
+  layout-folders 24, right-click 9, server-status 37; smoke/tabs/sftp/rdp çıktıları beklenen). `tools.mjs`'teki
+  "alarms panel has no rules/events headers" düğme etiketi span'a alındığı için "Kurallar" düğmesini de sayıyordu;
+  denetim düğme dışındaki öğelere daraltıldı. **Tuzak:** düğme metni artık ayrı span; `getByText(..., exact)` düğme
+  etiketini de bulur (`getByRole('button', { name })` etkilenmez). Commit'ler `c26d667`, `b2374df`, `8ef0370`,
+  `e5255da`; PR #9 "JumpDesk 0.2.6: layout folders, inline suggestions, status strip survives Ctrl+C" (sürüm
+  0.2.6, birleştirme kullanıcıda).
