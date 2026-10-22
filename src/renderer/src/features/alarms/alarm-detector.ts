@@ -1,6 +1,8 @@
 import { compileRule, useAlarms, type AlarmRule } from '@/stores/alarms'
 
 const MAX_PARTIAL = 4096
+/** Alarm satırıyla birlikte saklanan önceki satır sayısı. */
+const CONTEXT_LINES = 8
 /** Gönderilen komutun yankısı bu süre içinde tanınır (yavaş sunucuda yankı ve satır sonu gecikebilir). */
 const ECHO_IGNORE_MS = 15_000
 
@@ -37,9 +39,13 @@ export class AlarmDetector {
   private warmupEnds = Infinity
   /** Bağlanınca çalışacak komutlar henüz gönderilmedi; o zamana kadar eşleşmeler bildirilmez. */
   private held = false
+  /** Son görülen satırlar (görünen hâlleriyle); eşleşen satırın bağlamı olarak bildirilir. */
+  private recent: string[] = []
   private readonly unsubscribe: () => void
 
-  constructor(private readonly onMatch: (rule: AlarmRule, line: string) => void) {
+  constructor(
+    private readonly onMatch: (rule: AlarmRule, line: string, context: string[]) => void
+  ) {
     this.compile(useAlarms.getState().rules)
     this.unsubscribe = useAlarms.subscribe((s, prev) => {
       if (s.rules !== prev.rules) this.compile(s.rules)
@@ -172,13 +178,31 @@ export class AlarmDetector {
     for (const raw of lines) {
       const line = raw.replace(/\r/g, '').trimEnd()
       if (!line) continue
+      const context = this.remember(visibleLine(raw) || line.trim())
       if (this.echoes.length && this.isEcho(line)) continue
       const hit = this.compiled.find((c) => c.re.test(line))
       if (!hit) continue
       // Panelde satırın görünen son hali gösterilir (eşleşme oradaysa); üst üste çizilen istemler gösterilmez.
       const shown = visibleLine(raw)
-      this.onMatch(hit.rule, shown && hit.re.test(shown) ? shown : line.trim())
+      this.onMatch(hit.rule, shown && hit.re.test(shown) ? shown : line.trim(), context)
     }
+  }
+
+  /**
+   * Satırı son satırlara ekler ve ondan önceki satırları döndürür. Geri silme (BS) önceki karakteri siler (readline
+   * satırı Ctrl+U ya da düzeltmeyle böyle yeniden çizer), diğer kontrol karakterleri atılır.
+   */
+  private remember(line: string): string[] {
+    const before = this.recent.slice()
+    let text = ''
+    for (const ch of line) {
+      if (ch === '\b') text = text.slice(0, -1)
+      // eslint-disable-next-line no-control-regex -- kontrol karakterleri bilerek atılır
+      else if (!/[\x00-\x1f\x7f]/.test(ch) || ch === '\t') text += ch
+    }
+    this.recent.push(text)
+    if (this.recent.length > CONTEXT_LINES) this.recent.shift()
+    return before
   }
 
   dispose(): void {

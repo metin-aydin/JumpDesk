@@ -5,7 +5,8 @@
 <h1 align="center">JumpDesk</h1>
 
 <p align="center">
-  A cross-platform desktop client for <a href="https://github.com/jumpserver/jumpserver">JumpServer</a>.
+  An <strong>AI-powered</strong>, cross-platform desktop client for
+  <a href="https://github.com/jumpserver/jumpserver">JumpServer</a>.
 </p>
 
 <p align="center">
@@ -13,13 +14,55 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-JumpDesk turns your JumpServer assets into a desktop workspace: browse the server tree, open SSH, SFTP and RDP
-sessions in tabs and split views, run snippets, follow logs with highlights and alarms, and ask an AI for a command
-when you need one. It works with JumpServer v4 (Community edition) on Linux, Windows and macOS.
+JumpDesk turns your JumpServer assets into an AI-assisted desktop workspace: browse the server tree, open SSH, SFTP
+and RDP sessions in tabs and split views, run snippets and follow logs with highlights and alarms. Its built-in
+**AI assistant** turns plain language into shell commands, explains errors you select in the terminal and the alarms it
+catches, and writes snippets and alarm rules for you, with the provider of your choice, including local models.
+It works with JumpServer v4 (Community edition) on Linux, Windows and macOS.
 
 > JumpDesk is an independent project and is not affiliated with the JumpServer team.
 
 ![Four SSH sessions in a grid with log highlights and the snippets panel](docs/screenshots/split-view.png)
+
+## AI assistant
+
+JumpDesk brings AI into the terminal workflow without taking control away from you: every suggestion is written to
+the command line or into a form, and nothing runs until you press Enter or save.
+
+![An exception selected in the terminal, explained by the AI with commands to investigate](docs/screenshots/ai-explain.png)
+
+- **Explain what you select.** Select an error, a stack trace or a log excerpt in any terminal and press **Explain**.
+  The AI tells you what it means and what to check, and suggests commands to investigate that you can write to the
+  command line with one click.
+- **Explain alarms.** Ask the AI about any alarm in the Alarms panel; the alarm line is sent with the lines printed just
+  before it, so the answer has context.
+- **Commands from plain language.** Press Ctrl+Space twice in the terminal, describe what you need ("which log files
+  take the most space?") and pick one of the suggested commands. Follow-up questions keep the conversation's context.
+- **AI-written snippets.** Describe a snippet in the snippet editor and get a name and a command; have any command
+  explained before you save it.
+- **AI-written alarm and highlight rules.** Describe what to catch, optionally paste a sample line, and get words or
+  regular expressions that are tested against your sample on the spot.
+- **Your provider, your models.** Anthropic (Claude), OpenAI, Google Gemini, Azure OpenAI or any OpenAI-compatible
+  server such as Ollama, LM Studio or vLLM for fully local models. The model list is loaded from the provider with
+  your key.
+- **Safety built in.** Suggested commands are checked by local rules and flagged as *Caution* or *Dangerous*;
+  dangerous commands need an extra confirmation before they are even written to the prompt. Prompts treat terminal
+  text as untrusted data, so instructions hidden in output are not followed.
+
+| | |
+| --- | --- |
+| ![Selecting an error in the terminal shows the Explain button](docs/screenshots/ai-explain-selection.png) | ![The alarm line and the lines before it shown before sending](docs/screenshots/ai-alarm.png) |
+| **Explain** appears next to any text you select in the terminal. | **Ask AI about an alarm**: you see exactly what will be sent and confirm it. |
+| ![AI suggestions in the terminal](docs/screenshots/ai-assist.png) | ![AI-written snippet in the snippet editor](docs/screenshots/ai-snippet.png) |
+| **Ask AI** with Ctrl+Space twice; pick a command, it is written to the prompt and runs only on Enter. | **Snippets from a description**: the AI suggests a name and a command, you decide what to save. |
+| ![AI-suggested alarm rules tested against a sample line](docs/screenshots/ai-rule.png) | ![AI settings with feature switches and the provider](docs/screenshots/settings-ai.png) |
+| **Rules from a description**, each tested against your sample line. | **AI settings**: turn each AI feature on or off and pick the provider and model. |
+
+**Privacy.** AI features are optional and each one has its own switch in **Settings → AI**. JumpDesk never sends server
+data on its own: for commands, snippets and rules only what you type and the server type (for example Linux) are sent.
+Terminal text is sent only when you ask for an explanation, and only after JumpDesk has shown you the exact text and
+you have pressed **Send**. API keys are encrypted with the operating system keyring, never shown again and never
+included in exports.
 
 ## Features
 
@@ -30,12 +73,13 @@ when you need one. It works with JumpServer v4 (Community edition) on Linux, Win
   can be dragged into separate windows and back, terminal search, keyword highlights and alarm rules with desktop
   notifications.
 - **Shell integration**: command and file autocomplete, command history, colored command line, local IP detection.
-- **Snippets** that run on demand or automatically on connect, saved layouts and a command palette.
+- **Snippets** that run on demand or automatically on connect, saved layouts grouped into folders (also in the left
+  tree and the system tray) and a command palette.
 - **File manager (SFTP)** with upload and download.
 - **RDP** sessions through JumpServer's Guacamole gateway.
-- **AI autocomplete (optional)**: ask a question in the terminal and pick a suggested command. Supports Anthropic,
-  OpenAI, Google Gemini, Azure OpenAI and OpenAI-compatible servers (Ollama, LM Studio, vLLM). Only the question and the
-  server type are sent; commands are written to the prompt and never run without your Enter.
+- **AI assistant (optional)**: commands from plain language, explanations of selected output and alarms, AI-written
+  snippets and alarm/highlight rules; works with Anthropic, OpenAI, Google Gemini, Azure OpenAI and local
+  OpenAI-compatible servers. See [AI assistant](#ai-assistant).
 - **Server status strip (optional)**: CPU, memory, disk and load of Linux servers in a strip below the header, with
   a details card; measured by a small background loop in the session, nothing is installed on the server.
 - **Encrypted export/import** of snippets, rules, highlights, layouts and settings (`.jumpdesk` files).
@@ -49,14 +93,12 @@ when you need one. It works with JumpServer v4 (Community edition) on Linux, Win
 | --- | --- |
 | ![Server address screen](docs/screenshots/sign-in.png) | ![Server tree with a hover card and the home view](docs/screenshots/servers.png) |
 | **Sign in** to any JumpServer: enter its address, then use its own login page (LDAP, MFA and SSO work as usual). | **Server tree** with folders, favorites, recent connections and hover cards. |
-| ![Command autocomplete in the terminal](docs/screenshots/autocomplete.png) | ![AI suggestions in the terminal](docs/screenshots/ai-assist.png) |
-| **Autocomplete** from history, snippets and remote files. | **Ask AI** with Ctrl+Space twice; pick a command, it is written to the prompt and runs only on Enter. |
-| ![Alarms panel listing caught exceptions](docs/screenshots/alarms.png) | ![File manager panel](docs/screenshots/files.png) |
-| **Alarm rules** catch words or regular expressions in any session and notify you. | **File manager (SFTP)** for the active session: browse, upload, download. |
+| ![Command autocomplete in the terminal](docs/screenshots/autocomplete.png) | ![Alarms panel listing caught exceptions](docs/screenshots/alarms.png) |
+| **Autocomplete** from history, snippets and remote files, previewed inline as you move through the list. | **Alarm rules** catch words or regular expressions in any session and notify you. |
+| ![File manager panel](docs/screenshots/files.png) | ![Highlights panel with colored log levels](docs/screenshots/highlights.png) |
+| **File manager (SFTP)** for the active session: browse, upload, download. | **Highlights** color words or regular expressions in terminal output, such as log levels. |
 | ![Command palette](docs/screenshots/command-palette.png) | ![Export dialog](docs/screenshots/export.png) |
 | **Command palette** (Ctrl+Shift+P) for every action, tab, layout and snippet. | **Encrypted export/import** of snippets, rules, highlights, layouts and settings. |
-| ![AI provider settings](docs/screenshots/settings-ai.png) | ![Highlights panel with colored log levels](docs/screenshots/highlights.png) |
-| **AI providers**: Anthropic, OpenAI, Gemini, Azure OpenAI or a local OpenAI-compatible server. | **Highlights** color words or regular expressions in terminal output, such as log levels. |
 
 Screenshots are generated against the bundled mock server with `npm run build && npm run screenshots`.
 

@@ -13,6 +13,7 @@ import { RightPanel } from '@/features/panel/RightPanel'
 import { Sidebar } from '@/features/tree/Sidebar'
 import { TagDialog } from '@/features/tree/TagDialog'
 import { LayoutDialog } from '@/features/layouts/LayoutDialog'
+import { AiExplainDialog } from '@/features/ai/AiExplainDialog'
 import { CommandPalette } from '@/components/CommandPalette'
 import { ShortcutsDialog } from '@/components/ShortcutsDialog'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -66,6 +67,7 @@ export default function App(): React.JSX.Element {
       <Toaster />
       {loggedIn && <TagDialog />}
       {loggedIn && <LayoutDialog />}
+      {loggedIn && <AiExplainDialog />}
       {loggedIn && <CommandPalette />}
       {loggedIn && <SnippetEditorDialog />}
       {loggedIn && <ExportDialog />}

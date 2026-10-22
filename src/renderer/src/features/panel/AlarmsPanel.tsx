@@ -10,6 +10,7 @@ import {
   ListChecks,
   Plus,
   Regex,
+  Sparkles,
   Trash2,
   Upload
 } from 'lucide-react'
@@ -24,10 +25,13 @@ import {
   DialogTitle
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
+import { AiRuleButton } from '@/features/ai/AiRuleButton'
 import { openExport, openImport } from '@/features/transfer/actions'
 import { TransferContextMenu } from '@/features/transfer/TransferContextMenu'
 import { currentLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { aiFeatureReady, ensureAiLoaded, useAi } from '@/stores/ai'
+import { useAiExplain } from '@/stores/ai-explain'
 import { compileRule, useAlarms, type AlarmEvent } from '@/stores/alarms'
 import { useWorkspace } from '@/stores/workspace'
 
@@ -160,6 +164,13 @@ function RuleEditor(): React.JSX.Element {
           Icon={CaseSensitive}
         />
         <FlagToggle label={t('Düzenli İfade')} on={regex} onChange={setRegex} Icon={Regex} />
+        <AiRuleButton
+          onPick={(rule) => {
+            setPattern(rule.pattern)
+            setRegex(rule.regex)
+            setCaseSensitive(rule.caseSensitive)
+          }}
+        />
         <button
           type="button"
           aria-label={t('Kural Ekle')}
@@ -180,7 +191,16 @@ function revealEvent(event: AlarmEvent): void {
   revealAlarm(event.tabId, event.line)
 }
 
-function EventRow({ event, exists }: { event: AlarmEvent; exists: boolean }): React.JSX.Element {
+function EventRow({
+  event,
+  exists,
+  explain
+}: {
+  event: AlarmEvent
+  exists: boolean
+  /** Yapay zekaya açıklatma açık. */
+  explain: boolean
+}): React.JSX.Element {
   const t = useT()
   return (
     <div
@@ -211,8 +231,28 @@ function EventRow({ event, exists }: { event: AlarmEvent; exists: boolean }): Re
             ×{event.count}
           </span>
         )}
-        {/* Kopyala düğmesi saatin üstüne bindirilir; görünmesi satırın yüksekliğini ve diğer öğelerin yerini değiştirmez. */}
+        {/* Düğmeler saatin üstüne bindirilir; görünmeleri satırın yüksekliğini ve diğer öğelerin yerini değiştirmez. */}
         <span className="relative ml-auto flex shrink-0 items-center">
+          {explain && (
+            <button
+              type="button"
+              aria-label={t('Yapay Zekaya Sor')}
+              title={t('Alarmı Yapay Zekaya Sor')}
+              onClick={(e) => {
+                e.stopPropagation()
+                useAiExplain.getState().open({
+                  subject: 'alarm',
+                  text: event.line,
+                  context: event.context?.join('\n'),
+                  tabId: exists ? event.tabId : undefined,
+                  source: event.source
+                })
+              }}
+              className="absolute top-1/2 right-6 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded text-primary opacity-0 group-hover/ev:opacity-100 hover:bg-primary/10 focus-visible:opacity-100"
+            >
+              <Sparkles className="size-3" />
+            </button>
+          )}
           <span className="text-[10.5px] text-muted-foreground tabular-nums group-hover/ev:invisible group-focus-within/ev:invisible">
             {formatTime(event.firstAt)}
           </span>
@@ -248,6 +288,8 @@ export function AlarmsPanel(): React.JSX.Element {
   const tabIds = useWorkspace((s) => [...s.tabs, ...s.detached].map((t) => t.id).join('|'))
   const ruleCount = useAlarms((s) => s.rules.filter((r) => r.enabled).length)
   const [rulesOpen, setRulesOpen] = useState(false)
+  const explain = useAi((s) => aiFeatureReady(s.config, 'explainAlarm'))
+  useEffect(ensureAiLoaded, [])
 
   useEffect(() => {
     if (unread) useAlarms.getState().markRead()
@@ -275,6 +317,7 @@ export function AlarmsPanel(): React.JSX.Element {
               key={event.id}
               event={event}
               exists={tabIds.split('|').includes(event.tabId)}
+              explain={explain}
             />
           ))
         )}

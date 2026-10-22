@@ -294,7 +294,9 @@ try {
   await page.keyboard.press('Escape')
   check(
     'alarms panel has no rules/events headers',
-    (await page.getByText('Kurallar', { exact: true }).count()) === 0 &&
+    (await page
+      .getByText('Kurallar', { exact: true })
+      .evaluateAll((els) => els.filter((e) => !e.closest('button')).length)) === 0 &&
       (await page.getByText(/^Olaylar/).count()) === 0
   )
   await page.getByRole('button', { name: /^Kurallar/ }).click()

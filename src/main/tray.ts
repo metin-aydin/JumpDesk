@@ -12,7 +12,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import { IPC, type TrayLayout } from '@shared/api'
+import { IPC, type TrayLayout, type TrayLayoutList } from '@shared/api'
 import { TRAY_POPUP_IPC, type TrayPopupState } from '@shared/tray-popup'
 import { currentLanguage, mt } from './i18n'
 import { isQuitting, markQuitting } from './quitting'
@@ -30,6 +30,7 @@ let popup: BrowserWindow | null = null
 let popupAnchor: Rect | null = null
 let popupHeight = 160
 let layouts: TrayLayout[] = []
+let folders: string[] = []
 let mainWindow: BrowserWindow | null = null
 /** Testler menüyü ve açılır pencereyi sistem tepsisine tıklamadan kullanır. */
 let lastMenu: MenuItemConstructorOptions[] = []
@@ -77,13 +78,34 @@ function quit(): void {
 /** Linux ve Windows'ta menü etiketindeki `&` kısayol harfi sayılır; düzen adında olduğu gibi görünsün. */
 const menuLabel = (text: string): string => text.replace(/&/g, '&&')
 
+const layoutItem = (layout: TrayLayout): MenuItemConstructorOptions => ({
+  label: menuLabel(layout.name),
+  click: () => chooseLayout(layout.id)
+})
+
+/** Klasörler alt menü olarak (boş klasör pasif bir satırla), ardından klasörsüz düzenler. */
+function layoutMenuItems(): MenuItemConstructorOptions[] {
+  const items: MenuItemConstructorOptions[] = folders.map((folder) => {
+    const inside = layouts.filter((l) => l.folder === folder)
+    return {
+      label: menuLabel(folder),
+      submenu: inside.length
+        ? inside.map(layoutItem)
+        : [{ label: mt('Klasörde düzen yok'), enabled: false }]
+    }
+  })
+  for (const layout of layouts)
+    if (!layout.folder || !folders.includes(layout.folder)) items.push(layoutItem(layout))
+  return items
+}
+
 function menuTemplate(withLayouts: boolean): MenuItemConstructorOptions[] {
   const items: MenuItemConstructorOptions[] = []
   if (withLayouts) {
     items.push({ label: mt('Kayıtlı Düzenler'), enabled: false })
-    if (layouts.length === 0) items.push({ label: mt('Kayıtlı düzen yok'), enabled: false })
-    for (const layout of layouts)
-      items.push({ label: menuLabel(layout.name), click: () => chooseLayout(layout.id) })
+    if (layouts.length === 0 && folders.length === 0)
+      items.push({ label: mt('Kayıtlı düzen yok'), enabled: false })
+    items.push(...layoutMenuItems())
     items.push({ type: 'separator' })
   }
   items.push(
@@ -107,7 +129,7 @@ function refreshMenu(): void {
 }
 
 function popupState(): TrayPopupState {
-  return { layouts, language: currentLanguage(), dark: nativeTheme.shouldUseDarkColors }
+  return { folders, layouts, language: currentLanguage(), dark: nativeTheme.shouldUseDarkColors }
 }
 
 function placePopup(): void {
@@ -198,10 +220,16 @@ function registerPopupIpc(): void {
   })
 }
 
-/** Ana pencerenin bildirdiği düzen listesi; bozuk girdiler atılır. */
+/** Ana pencerenin bildirdiği düzen ve klasör listesi; bozuk girdiler atılır. */
 function setLayouts(raw: unknown): void {
-  if (!Array.isArray(raw)) return
-  layouts = raw
+  if (!raw || typeof raw !== 'object') return
+  const list = raw as Partial<TrayLayoutList>
+  if (!Array.isArray(list.layouts)) return
+  folders = (Array.isArray(list.folders) ? list.folders : [])
+    .filter((f): f is string => typeof f === 'string' && f.trim() !== '')
+    .slice(0, 100)
+    .map((f) => f.slice(0, 120))
+  layouts = list.layouts
     .filter(
       (l): l is TrayLayout =>
         typeof l === 'object' &&
@@ -211,7 +239,12 @@ function setLayouts(raw: unknown): void {
         typeof (l as TrayLayout).servers === 'number'
     )
     .slice(0, 200)
-    .map((l) => ({ id: l.id, name: l.name.slice(0, 120), servers: l.servers }))
+    .map((l) => {
+      const layout: TrayLayout = { id: l.id, name: l.name.slice(0, 120), servers: l.servers }
+      if (typeof l.folder === 'string' && folders.includes(l.folder.slice(0, 120)))
+        layout.folder = l.folder.slice(0, 120)
+      return layout
+    })
   refreshMenu()
   if (popup && !popup.isDestroyed() && popup.isVisible())
     popup.webContents.send(TRAY_POPUP_IPC.state, popupState())
@@ -250,9 +283,24 @@ export function initTray(win: BrowserWindow): void {
 
   if (process.env['JUMPDESK_TEST_TRAY'])
     (globalThis as { __jumpdeskTray?: unknown }).__jumpdeskTray = {
-      labels: () => lastMenu.map((i) => (i.type === 'separator' ? '—' : String(i.label))),
-      click: (label: string) => {
-        const item = lastMenu.find((i) => i.label === label)
+      /** Menü etiketleri; alt menü verilirse (`Klasör`) onun etiketleri. */
+      labels: (submenu?: string) => {
+        const items = submenu
+          ? ((lastMenu.find((i) => i.label === submenu)?.submenu as MenuItemConstructorOptions[]) ??
+            [])
+          : lastMenu
+        return items.map((i) =>
+          i.type === 'separator' ? '—' : `${String(i.label)}${i.submenu ? ' ▸' : ''}`
+        )
+      },
+      /** Etikete tıklar; `Klasör/Düzen` biçiminde alt menüdeki öğeye. */
+      click: (path: string) => {
+        const [first, second] = path.split('/')
+        let item = lastMenu.find((i) => i.label === (second === undefined ? path : first))
+        if (second !== undefined)
+          item = (item?.submenu as MenuItemConstructorOptions[] | undefined)?.find(
+            (i) => i.label === second
+          )
         ;(item?.click as (() => void) | undefined)?.()
         return Boolean(item)
       },

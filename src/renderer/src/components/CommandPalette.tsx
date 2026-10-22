@@ -22,6 +22,7 @@ import {
   Rocket,
   Rows2,
   Search,
+  Sparkles,
   Settings,
   SquarePen,
   SquareTerminal,
@@ -50,7 +51,7 @@ import { useT } from '@/lib/i18n'
 import { SETTINGS_SHORTCUT, isMac, shortcutLabel } from '@/lib/shortcuts'
 import { useDialogs } from '@/stores/dialogs'
 import { jumpdesk } from '@/lib/jumpdesk'
-import { openLayout, useLayoutDialog, useLayouts } from '@/stores/layouts'
+import { layoutPath, openLayout, useLayoutDialog, useLayouts } from '@/stores/layouts'
 import { closeAllSafely, closeTabSafely, ungroupSafely } from '@/features/layouts/guard'
 import { useRightPanel } from '@/stores/right-panel'
 import {
@@ -58,10 +59,12 @@ import {
   openGroupInNewWindow,
   openInNewWindow
 } from '@/features/windows/detached-windows'
+import { aiFeatureReady, useAi } from '@/stores/ai'
+import { useAiExplain } from '@/stores/ai-explain'
 import { useTabSearch } from '@/stores/tab-search'
 import { useTheme } from '@/stores/theme'
 import { useTreeCommands } from '@/stores/tree-commands'
-import { groupOf, tabTitle, useWorkspace, windowIdOf } from '@/stores/workspace'
+import { findTab, groupOf, tabTitle, useWorkspace, windowIdOf } from '@/stores/workspace'
 
 interface PaletteCommand {
   id: string
@@ -342,7 +345,7 @@ function buildCommands(
         },
         ...useLayouts.getState().layouts.map((layout) => ({
           id: `layout-${layout.id}`,
-          label: t('Düzeni Aç: {name}', { name: layout.name }),
+          label: t('Düzeni Aç: {name}', { name: layoutPath(layout) }),
           Icon: LayoutDashboard,
           run: () => openLayout(layout)
         }))
@@ -360,6 +363,24 @@ function buildCommands(
           shortcut: isMac ? '⌘F' : 'Ctrl+F',
           run: () => terminal.openSearch()
         },
+        ...(aiFeatureReady(useAi.getState().config, 'explainSelection') &&
+        terminal.term.getSelection().trim()
+          ? [
+              {
+                id: 'term-ai-explain',
+                label: t('Seçimi Yapay Zekaya Sor'),
+                Icon: Sparkles,
+                keywords: [t('açıkla')],
+                run: () =>
+                  useAiExplain.getState().open({
+                    subject: 'output' as const,
+                    text: terminal.term.getSelection(),
+                    tabId: terminal.tabId,
+                    source: findTab(ws, terminal.tabId)?.title
+                  })
+              }
+            ]
+          : []),
         ...useSnippets.getState().snippets.map((snippet) => ({
           id: `snippet-${snippet.id}`,
           label: t('Snippet Çalıştır: {name}', { name: snippet.name }),

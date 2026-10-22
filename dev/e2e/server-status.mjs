@@ -2,7 +2,7 @@
 // başlatır, yeni oturumda kendiliğinden gelir; şeritle terminal arasında boşluk kalmaz; dar panelde çipler kayar
 // (tekerlek, yalnız fare üzerindeyken görünen ince gösterge), açık kalma süresi sabit kalır; her çip kendi kartını açar
 // (CPU/bellek geçmişi ve en çok kullanan işlemler, en büyük disk, çekirdek başına kullanım); kart sabit genişlikte ve
-// pencerenin içinde açılır; tam ekran program (less) öndeyken ölçüm durur. Terminal metni okunabilsin diye DOM
+// pencerenin içinde açılır; tam ekran program (less) öndeyken ölçüm durur; art arda Ctrl+C ölçümü durdurmaz. Terminal metni okunabilsin diye DOM
 // çizicide çalışır. Kullanım: node dev/e2e/server-status.mjs <klasör> (mock açıkken)
 import { _electron as electron } from 'playwright-core'
 import fs from 'node:fs'
@@ -342,6 +342,25 @@ try {
   await page.waitForTimeout(7000)
   const after = await firstStrip.getAttribute('data-updated-at')
   check('updates resume after it exits', after !== during)
+
+  // 6a. İstemde ve çalışan komutta art arda Ctrl+C ölçüm döngüsünü durdurmaz
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('Control+C')
+    await page.waitForTimeout(150)
+  }
+  await page.keyboard.type('sleep 30\n')
+  await page.waitForTimeout(500)
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('Control+C')
+    await page.waitForTimeout(150)
+  }
+  await page.waitForTimeout(1500)
+  const afterInterrupt = await firstStrip.getAttribute('data-updated-at')
+  await page.waitForTimeout(7000)
+  check(
+    'repeated Ctrl+C does not stop the sampling',
+    (await firstStrip.getAttribute('data-updated-at')) !== afterInterrupt
+  )
 
   // 6b. Kurulum yanıtı geç gelen oturum (istem gelir gelmez uzun bir komut çalışır, kurulum ondan sonra işlenir; bekleme
   // süresi dolar): entegrasyondan ilk ileti gelince şerit yine görünür. Entegrasyon hiç kurulamayan oturumda

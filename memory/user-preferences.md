@@ -40,7 +40,12 @@ metadata:
   olmaz. (2026-10-16)
 - Arayüz İngilizce (varsayılan) ve Türkçe; dil ayarı Ayarlar → Dil. Yeni ekran/metin eklenince iki dil de eksiksiz
   olmalı ("eksik bırakma"). (2026-10-16)
-- Yapay zeka: sağlayıcı ve anahtar ayarları dışa aktarılmaz; yapay zekaya sunucudan hiçbir veri gönderilmez (yalnız
-  sunucu türü); öneriler komut olarak seçilir, kullanıcı çalıştırır. (2026-10-16)
+- Yapay zeka: sağlayıcı ve anahtar ayarları dışa aktarılmaz; yapay zekaya sunucudan kendiliğinden hiçbir veri
+  gönderilmez (yalnız kullanıcının yazdıkları ve sunucu türü); öneriler komut olarak seçilir, kullanıcı çalıştırır.
+  (2026-10-16) **Güncelleme (2026-10-22):** terminal çıktısı yalnız "Seçili Çıktıyı Açıkla" ve "Alarm Olayını
+  Açıkla"da, gidecek metin gösterilip her seferinde onay alınarak gönderilir (kullanıcı "yalnız onay iste" seçti,
+  maskeleme istemedi). Her yapay zeka özelliği Ayarlar → Yapay Zeka'nın en üstünde ayrı anahtarla açılıp kapanır.
+- Ayarlar → Yapay Zeka: sağlayıcı açılır listede yalnız adıyla, API anahtarının hemen üstünde; anahtar girilmeden
+  model listesi yüklenmez, model adı elle yazılamaz (2026-10-22).
 - Terminalde altta boşluk istemez; geçmişte yukarıdayken "En Alta Kaydır" bandı (iki satır, tema renginden şeffafa).
   (2026-10-16)

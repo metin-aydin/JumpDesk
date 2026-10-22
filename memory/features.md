@@ -1237,3 +1237,121 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    **Tuzak:** `.gitignore` `*.png` alt klasördeki görselleri yok sayıyordu; istisna `!resources/**/*.png` yapıldı
    (yoksa CI derlemesi tepsi simgesini bulamazdı). Yeni görsel eklerken `git status`'ta göründüğü denetlenmeli.
    Açılır pencere ilk açılışta `ready-to-show` beklenerek gösterilir (yüklenmeden boş görünüyordu; testte zamanlama hatası).
+
+## Kullanıcı istekleri — 49. tur (2026-10-22)
+İstekler: (1) düzenleri klasörleme + tepside klasör alt menüsü; (2) autocomplete'te seçili önerinin devamı komut
+satırında soluk görünsün (VS Code satır içi önizleme gibi; Tab/→ kabul aynı kalır, Enter yalnız yazılanı çalıştırır);
+(3) düğme metinleri ortalı değil (yukarıda); (4) "Oturum kapandı / Yeniden bağlan" çubuğu komut satırının üstüne
+biniyordu, terminalin altında yer kaplamalı; (5) Ctrl+Shift+V iki kez yapıştırıyordu; (6) art arda Ctrl+C sunucu durum
+şeridini donduruyordu; (7) klasörler ana ekranda sola hizalı olsun, sol ağaçta da "Kayıtlı Düzenler" (yeni klasör,
+sürükle-bırak); (8) klasörler dışa aktarılsın.
+- (1,7,8) **Düzen klasörleri** (tek seviye, ad = kimlik, büyük/küçük harf duyarsız benzersiz):
+  - Veri `stores/layouts.ts`: `SavedLayout.folder?`, ayrı sıralı liste `folders` (kullanıcı anahtarı `layoutFolders`,
+    boş klasörler de tutulur). `sanitizeFolders` (düzenlerin kullandığı ama listede olmayanları ekler, yazımı eşitler),
+    `groupByFolder`, `layoutPath` ("Klasör / Düzen"), eylemler `createFolder` (varsa onu döndürür), `renameFolder`
+    (başka klasörün adıysa false), `removeFolder` (düzenler klasörsüz kalır), `moveToFolder(id, ad|null)`,
+    `saveCurrent(ad, grup, klasör?)` (verilmezse üzerine yazılan düzenin klasörü korunur), `replaceAll(düzenler, klasörler)`.
+  - Pencere `LayoutDialog.tsx` kipleri: save (Klasör seçimi: Klasör Yok / klasörler / Yeni Klasör… → ad kutusu),
+    rename, folder (yeni; `layoutId` verilirse düzen içine taşınır), folder-rename ("Bu adda bir klasör var.").
+  - Ortak: `features/layouts/layout-dnd.ts` (HTML5 sürükle-bırak türü `application/x-jumpdesk-layout`,
+    `layoutDragProps`, `useDropTarget(klasör|null)`, `useLayoutDrag`), `LayoutMenus.tsx` (`LayoutMenuItems`: Aç,
+    Yeniden Adlandır, Klasöre Taşı ▸, Klasörden Çıkar, Sil; `FolderMenuItems`: Klasörü Yeniden Adlandır, Klasörü Sil).
+  - Ana ekran `SavedLayouts.tsx`: başlıkta "Yeni Klasör"; klasörler önce (başlık bölüm başlığıyla aynı sol hizada,
+    kartlar `pl-5.5` ile klasör simgesi hizasında, kapalılar `layoutFoldersClosed`), sonra klasörsüz kartlar; klasördeki
+    düzen sürüklenirken klasörsüz alan yoksa "Klasörden çıkarmak için buraya bırakın." alanı belirir. Bırakma vurgusu
+    `ring` (yerleşimi kaydırmaz).
+  - Sol ağaç `LayoutTree.tsx`: `ServerTree` kaydırma alanının en üstünde, ağaç satırlarıyla aynı ölçüde (h-7, girinti
+    14, `zoom` ölçeği); kök "Kayıtlı Düzenler" (sayı, üzerine gelince + düğmesi = Yeni Klasör, sağ tık Yeni Klasör…),
+    klasör ve düzen satırları; çift tık/Enter açar; düzen satırı klasöre ya da klasördeki düzene bırakılınca o klasöre,
+    köke bırakılınca dışarı. Açıklık `layoutTreeOpen` (varsayılan kapalı). `role=tree` kullanılmaz (testler
+    `getByRole('tree')` ile sunucu ağacını bulur). Sanal liste `scrollMargin` = bölüm yüksekliği
+    (`getBoundingClientRect`, `zoom` altında `offsetHeight` güvenilmez), satır `top: v.start - layoutsHeight`.
+  - Tepsi: `TrayLayoutList {folders, layouts}` (`TrayLayout.folder?`); GNOME menüsünde klasörler alt menü (boşsa pasif
+    "Klasörde düzen yok"), sonra klasörsüz düzenler; açılır pencerede klasör satırı (tık/Enter/→ açar, ← kapatır,
+    alttaki düzenler girintili), aramada düz liste "Klasör › Düzen". Test kancası `labels(altMenü?)`, `click('Klasör/Düzen')`.
+  - Komut paleti "Düzeni Aç: Klasör / Düzen". Dışa aktarım: `sections.layoutFolders` düzenler bölümüyle birlikte
+    (eski sürüm alanı yok sayar), özet kartında "N klasör"; yalnız klasör varsa da bölüm boş sayılmaz.
+  - Test `dev/e2e/layout-folders.mjs` 24/24.
+- (2) **Satır içi önizleme** `features/terminal/GhostText.tsx`: `AutocompleteState.ghost` (imleç satır sonundaysa;
+  ekranın kaba göre konumu, hücre boyu, sütun/satır, imleç hücresi, yazı tipi); terminal kabına mutlak bindirilir, her
+  karakter bir hücrede, satır sonunda alta geçer, tampona yazılmaz; renk tema ön planı %45. Öneri satırları
+  `role=option aria-selected`. Test `dev/e2e/autocomplete.mjs` 7/7.
+- (3) Ölçüm: kullanıcının arayüz yazı boyutu **11** (pencere yakınlaştırma 11/13≈0,846; bilgi
+  `~/.config/JumpDesk/Partitions/jumpserver/Local Storage` içinde, ana pencere `jumpserver` bölümünü kullanır). Bu
+  ölçekte düğme yazısının üstünde 6, taban çizgisinin altında 10 px kalıyordu. Çözüm `components/ui/button.tsx`
+  `wrapLabels`: düğmedeki metin `<span data-slot="button-label" class="relative top-[0.4px]
+  [text-box:trim-both_cap_alphabetic]">` içine alınır (ardışık metinler birleşir, yalnız boşluk olanlar sarılmaz).
+  Ölçüm (`text-box` kırpma + 0,4 px): ui 11→8/8, 12→9/9, 13→~10/10, 14→1 px alçak (yuvarlama), 15→11/11, 16→1 px
+  alçak, 18→yarım px yüksek. `text-box-trim` düz metin alt öğesine (anonim esnek öğe) uygulanmaz; span şart.
+  Ubuntu yazı tipi 12 px: ascent 11, descent 2 (tuval ölçümü). Offscreen ve ekrandaki çizim aynı sonucu verir.
+- (4) `SessionView.tsx`: `endedBar` akışta (`shrink-0`), terminal/RDP altında; `connectingOverlay` mutlak kaldı.
+- (5) `TerminalPane.tsx` kopyala/yapıştır kısayolunda `e.preventDefault()` (Chromium'un Ctrl+Shift+V düz metin
+  yapıştırması da çalışıyordu). Test: `dev/e2e/right-click.mjs` 9/9 (eski derlemede iki yeni test FAIL'di).
+- (6) **Ctrl+C ölçüm döngüsünü öldürüyordu (yalnız bash):** döngü `$( ( __jd_sl & echo $! ) )` ile kabuğun süreç
+  grubunda; istemde Ctrl+C SIGINT'i ona da gönderir, `sleep` ölür, bash döngüsü de çıkar (zsh'te çıkmıyordu). Çözüm
+  `shell-integration.ts`: alt kabukta `trap '' INT QUIT TSTP` (yok sayılan sinyaller alt süreçlere geçer) ve
+  `__jd_prompt` döngü ölmüşse (`__jd_sp` dolu, `kill -0` başarısız) `__jd_stat_start $__jd_si` ile yeniden başlatır.
+  Yeniden üretim: python `pty.fork` + `bash --norc -i` (betik `SHELL_SCRIPTS` esbuild ile dökülür). Test
+  `server-status.mjs` 6a (düzeltme geri alınınca FAIL, uygulanınca ok; toplam 37).
+- **Gönderim (2026-10-22):** tam regresyon geçti (menus 3, panels 13, home 17, tools 69, windows 47, multiwindow 21,
+  alarm-warmup 5, transfer 39, server-address 6, i18n 4, ai 24, update 19, popups 4, tab-keys 8, tray 8, autocomplete 7,
+  layout-folders 24, right-click 9, server-status 37; smoke/tabs/sftp/rdp çıktıları beklenen). `tools.mjs`'teki
+  "alarms panel has no rules/events headers" düğme etiketi span'a alındığı için "Kurallar" düğmesini de sayıyordu;
+  denetim düğme dışındaki öğelere daraltıldı. **Tuzak:** düğme metni artık ayrı span; `getByText(..., exact)` düğme
+  etiketini de bulur (`getByRole('button', { name })` etkilenmez). Commit'ler `c26d667`, `b2374df`, `8ef0370`,
+  `e5255da`; PR #9 "JumpDesk 0.2.6: layout folders, inline suggestions, status strip survives Ctrl+C" (sürüm
+  0.2.6, birleştirme kullanıcıda).
+
+## Kullanıcı istekleri — 50. tur (2026-10-22): yapay zeka ayarları ve yeni yapay zeka özellikleri
+1. **Ayarlar → Yapay Zeka yeniden düzenlendi:** en üstte "Yapay Zeka Özellikleri" anahtarları, altta "Yapay Zeka
+   Sağlayıcısı" kutusu: "Sağlayıcı" açılır listesi (yalnız adlar: Kullanma, Anthropic (Claude), OpenAI, Google Gemini,
+   Azure OpenAI, OpenAI Uyumlu; kutu kutu kartlar kalktı) → hemen altında API anahtarı (sağlayıcı açıklaması anahtarın
+   ipucu oldu) → diğer alanlar. Model: anahtar (OpenAI uyumluda adres) kaydedilmeden liste istenmez ve seçim pasif;
+   elle model adı yazılamaz (TextField yedeği ve `AiField.options` kaldırıldı). Liste boş/hatalıysa pasif + neden.
+2. Kullanıcıya özellik önerileri soruldu (AskUserQuestion). Seçilenler: **Snippet Üret**, **Alarm/Vurgu Kuralı Üret**,
+   **Seçili Çıktıyı Açıkla**, **Alarm Olayını Açıkla**; çıktı gönderenlerde **"Yalnız onay iste"** (maskeleme yok;
+   gidecek metin onay penceresinde gösterilir). Seçilmeyenler: Komutu Açıkla, Komut Paletinden Sor, Başarısız Komutu
+   Açıkla, Log Özeti. → [[user-preferences]] yapay zeka gizlilik kuralı güncellendi.
+3. Uygulama:
+   - `AiFeatures` = autocomplete (varsayılan kapalı), snippets, rules, explainSelection, explainAlarm (yeniler varsayılan
+     açık; düğmeler yalnız özellik açık + sağlayıcı ayarlıysa görünür, `aiFeatureReady`). `AI_FEATURE_KEYS`,
+     `DEFAULT_AI_FEATURES` (`shared/ai.ts`); ana süreç her anahtarı doğrular.
+   - Ana süreç `main/ai/index.ts` `runTask(özellik, görev, kur, ayrıştır)`; görevler `prompt.ts`: `SUGGEST_TASK`,
+     `SNIPPET_TASK` (options[name, command, description, risk] 1–3), `RULE_TASK` (options[pattern, regex,
+     caseSensitive, description]; düzenli ifade derlenemezse atılır), `EXPLAIN_TASK` (summary, points ≤6,
+     suggestions ≤3). Komutlarda ortak `COMMAND_RULES`; metinler `<request>/<sample>/<text>/<context>/<question>`
+     içinde "untrusted data". IPC `ai:snippet`, `ai:rule`, `ai:explain`. Açıklama sınırı 8000 (metin) + 3000 (bağlam,
+     son kısım) karakter.
+   - `providers.ts` `CallInput.task: AiTaskSpec {name, description, schema, maxTokens}`; Gemini şeması
+     `geminiSchema()` ile JSON şemasından (türler büyük harf, additionalProperties atılır). Anthropic araç adı = görev adı.
+   - Arayüz: `features/ai/` → `AiExplainDialog` (+ `stores/ai-explain.ts`; onay: gidecek metin `pre` içinde, satır/
+     karakter sayısı, ek soru; Gönder'den önce istek yok; sonuç: özet, maddeler, "Komut Satırına Yaz" — `ai-actions.ts`
+     `writeCommand` Ctrl+E Ctrl+U + komut, riskliyse onay), `AiRuleButton` (alarm kural penceresi ve vurgu formunda ✨;
+     örnek satırla "eşleşiyor/eşleşmiyor"; Kullan formu doldurur), `AiSnippetAssist` (snippet düzenleyicinin üstünde
+     tarif → Öner → Kullan), `use-snippet-ai.tsx` (`useSnippetAi`, `useCommandExplain`: Komut başlığında "Açıkla",
+     açıklama komut alanının altında), `RiskBadge`, `RevealOnMount`.
+   - Terminal: fareyle seçim bırakılınca `SelectionChip` "Açıkla" (`data-ai-explain-chip`, fare basışı seçimi bozmaz;
+     seçim kalkınca/kaydırınca gider); komut paletinde "Seçimi Yapay Zekaya Sor". Alarm: `AlarmDetector` son 8 satırı
+     tutar (kontrol karakterleri atılır), `AlarmEvent.context`; olay satırında ✨ "Yapay Zekaya Sor".
+   - Snippet formu: komut bölümü `min-h-52` (açıklama kutusu eklenince düğmeler komut alanına binmesin).
+4. Testler: `dev/e2e/ai.mjs` 44/44 (sahte sunucu istem türünü sistem iletisinden ayırır: "snippet writer", "rule
+   writer", "terminal text explainer"; test `JUMPDESK_DISABLE_WEBGL=1` ve alarm beklemesi 0 ile açılır),
+   `dev/ai-providers.test.mjs` 21/21 (görev adı, Gemini şeması), alarm-detector 19.
+5. **Tuzaklar (50. tur):**
+   - `useEffect(() => el?.scrollIntoView(...))` uygulamayı çökertti ("destroy_ is not a function"): bu Chromium
+     sürümünde `scrollIntoView` Promise döndürüyor, React onu temizleme işlevi sanıyor. Etki gövdesi blok olmalı.
+   - Ayrı pencerede (`DetachedChrome`) sürekli bağlı, kapalı bir Base UI `Dialog` o penceredeki sağ tık menülerini
+     sürekli yeniden oluşturdu (windows/multiwindow testleri düştü). `AiExplainDialog` ayrı pencerede yalnız açıkken
+     bağlanır; ana pencerede her zaman bağlı.
+   - Alarm bağlamında readline'ın geri silmeleri (Ctrl+U) işlenir (`remember`).
+   - `ai.mjs` 5 çalıştırmadan 1'inde "java.lang.Exception: JD_ALARM_BOOM" satırı alarm olarak yakalanmadı (kök neden
+     bulunamadı; dedektördeki ekleme eşleşmeyi etkilemiyor). Tekrarlarsa yankı (`ignoreEcho`, `isEcho`) incelenmeli.
+6. **README ve ekran görüntüleri:** başlık "An AI-powered, cross-platform desktop client"; hero görüntüsünün altında
+   "AI assistant" bölümü (madde listesi, gizlilik paragrafı, 6 görüntü). Yeni görüntüler `ai-explain`,
+   `ai-explain-selection`, `ai-alarm`, `ai-rule`, `ai-snippet`; `settings-ai` özellik anahtarlarını gösterir.
+   `dev/screenshots.mjs` sahte sağlayıcısı istem türüne göre yanıt verir, DOM çiziciyle çalışır (seçim için satırlar
+   DOM'dan okunur).
+7. **GitHub (2026-10-22):** depo açıklaması "AI-powered desktop client for JumpServer …" yapıldı, konular eklendi (ai,
+   ai-assistant, bastion, electron, jumpserver, llm, ssh-client, terminal). PR #9 başlığı "JumpDesk 0.2.6: AI
+   assistant, layout folders, inline suggestions", açıklaması yapay zeka maddeleriyle güncellendi (`gh pr edit`
+   Projects (classic) GraphQL hatası verdiği için `gh api -X PATCH repos/.../pulls/9` kullanıldı).

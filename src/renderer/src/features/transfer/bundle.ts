@@ -8,7 +8,13 @@ import {
   type FontSizes
 } from '@/stores/font-sizes'
 import { sanitizeHighlights, useHighlights, type HighlightRule } from '@/stores/highlights'
-import { countServers, sanitizeLayouts, useLayouts, type SavedLayout } from '@/stores/layouts'
+import {
+  countServers,
+  sanitizeFolders,
+  sanitizeLayouts,
+  useLayouts,
+  type SavedLayout
+} from '@/stores/layouts'
 import {
   currentNotificationSettings,
   sanitizeNotificationSettings,
@@ -45,6 +51,8 @@ export interface BundleSections {
   alarms?: AlarmRule[]
   highlights?: HighlightRule[]
   layouts?: SavedLayout[]
+  /** Düzen klasörleri (gösterim sırası); düzenler bölümüyle birlikte aktarılır. */
+  layoutFolders?: string[]
   settings?: SettingsSection
 }
 
@@ -86,6 +94,7 @@ export function buildBundle(
 ): ExportBundle {
   const out: BundleSections = {}
   for (const id of sections) Object.assign(out, { [id]: collect(id) })
+  if (sections.includes('layouts')) out.layoutFolders = useLayouts.getState().folders
   return {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
@@ -139,7 +148,10 @@ export function parseBundle(payload: Record<string, unknown>): ExportBundle | nu
   if ('snippets' in s) sections.snippets = sanitizeSnippets(s['snippets'])
   if ('alarms' in s) sections.alarms = sanitizeAlarms(s['alarms'])
   if ('highlights' in s) sections.highlights = sanitizeHighlights(s['highlights'])
-  if ('layouts' in s) sections.layouts = sanitizeLayouts(s['layouts'])
+  if ('layouts' in s) {
+    sections.layouts = sanitizeLayouts(s['layouts'])
+    sections.layoutFolders = sanitizeFolders(s['layoutFolders'], sections.layouts).folders
+  }
   if ('settings' in s) sections.settings = sanitizeSettings(s['settings'])
   if (!SECTION_IDS.some((id) => sections[id] !== undefined)) return null
   return {
@@ -169,7 +181,7 @@ export function applySection(bundle: ExportBundle, id: SectionId): void {
       if (s.highlights) useHighlights.getState().replaceAll(s.highlights)
       return
     case 'layouts':
-      if (s.layouts) useLayouts.getState().replaceAll(s.layouts)
+      if (s.layouts) useLayouts.getState().replaceAll(s.layouts, s.layoutFolders)
       return
     case 'settings':
       if (!s.settings) return
@@ -242,11 +254,15 @@ export function summarize(id: SectionId, sections: BundleSections): SectionSumma
       const list = sections.layouts
       if (!list) return null
       const servers = list.reduce((n, l) => n + countServers(l.items), 0)
+      const folders = sections.layoutFolders?.length ?? 0
       return {
         count: list.length,
         unit: t('düzen', { n: list.length }),
-        details: [t('{n} sunucu', { n: servers })],
-        empty: !list.length
+        details: [
+          t('{n} sunucu', { n: servers }),
+          ...(folders ? [t('{n} klasör', { n: folders })] : [])
+        ],
+        empty: !list.length && !folders
       }
     }
     case 'settings': {
@@ -277,5 +293,6 @@ export function summarize(id: SectionId, sections: BundleSections): SectionSumma
 export function currentSections(): BundleSections {
   const out: BundleSections = {}
   for (const id of SECTION_IDS) Object.assign(out, { [id]: collect(id) })
+  out.layoutFolders = useLayouts.getState().folders
   return out
 }

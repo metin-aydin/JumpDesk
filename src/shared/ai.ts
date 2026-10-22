@@ -14,8 +14,6 @@ export interface AiField {
   hint?: string
   /** Değerin biçimi (ör. kimlik); uymayan değer kaydedilmez. */
   pattern?: string
-  /** Model gibi alanlarda öneri listesi. */
-  options?: string[]
 }
 
 export interface AiProviderInfo {
@@ -43,8 +41,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
       {
         key: 'model',
         label: 'Model',
-        required: true,
-        options: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-4-5-20251001']
+        required: true
       },
       {
         key: 'workspaceId',
@@ -65,8 +62,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
       {
         key: 'model',
         label: 'Model',
-        required: true,
-        options: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o']
+        required: true
       }
     ],
     defaults: { model: 'gpt-4.1' }
@@ -80,8 +76,7 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
       {
         key: 'model',
         label: 'Model',
-        required: true,
-        options: ['gemini-2.5-pro', 'gemini-2.5-flash']
+        required: true
       }
     ],
     defaults: { model: 'gemini-2.5-flash' }
@@ -128,6 +123,30 @@ export const aiProviderInfo = (id: AiProvider): AiProviderInfo =>
 export interface AiFeatures {
   /** Autocomplete penceresinde yapay zekaya sorup komut önerisi alma. */
   autocomplete: boolean
+  /** Snippet düzenleyicide tariften snippet üretme ve komutu açıklatma. */
+  snippets: boolean
+  /** Alarm ve vurgu kurallarında tariften kelime ya da düzenli ifade üretme. */
+  rules: boolean
+  /** Terminalde seçili metni (onaydan sonra) gönderip açıklama ve düzeltme komutları alma. */
+  explainSelection: boolean
+  /** Alarm olayının satırını ve öncesini (onaydan sonra) gönderip açıklama alma. */
+  explainAlarm: boolean
+}
+
+export const AI_FEATURE_KEYS = [
+  'autocomplete',
+  'snippets',
+  'rules',
+  'explainSelection',
+  'explainAlarm'
+] as const satisfies readonly (keyof AiFeatures)[]
+
+export const DEFAULT_AI_FEATURES: AiFeatures = {
+  autocomplete: false,
+  snippets: true,
+  rules: true,
+  explainSelection: true,
+  explainAlarm: true
 }
 
 /** Arayüze verilen ayarlar: gizli alanların değeri yoktur, yalnız hangilerinin kayıtlı olduğu bilinir. */
@@ -164,6 +183,69 @@ export interface AiSuggestRequest {
 
 export type AiSuggestResult =
   { ok: true; suggestions: AiSuggestion[]; note: string } | { ok: false; error: string }
+
+/** Snippet üretme isteği: kullanıcının tarifi. */
+export interface AiSnippetRequest {
+  description: string
+  language: 'en' | 'tr'
+}
+
+export interface AiSnippetOption {
+  name: string
+  command: string
+  description: string
+  risk: AiRisk
+}
+
+export type AiSnippetResult =
+  { ok: true; options: AiSnippetOption[]; note: string } | { ok: false; error: string }
+
+/** Kural üretme isteği: neyin yakalanacağının tarifi ve isteğe bağlı örnek satır (kullanıcının yazdığı). */
+export interface AiRuleRequest {
+  description: string
+  sample: string
+  language: 'en' | 'tr'
+}
+
+export interface AiRuleOption {
+  pattern: string
+  regex: boolean
+  caseSensitive: boolean
+  description: string
+}
+
+export type AiRuleResult =
+  { ok: true; options: AiRuleOption[]; note: string } | { ok: false; error: string }
+
+/**
+ * Açıklanan metnin türü: terminalde seçilen çıktı, alarm satırı (öncesindeki satırlarla) ya da bir komut (snippet).
+ * Çıktı ve alarm metni sunucudan gelir; kullanıcı her gönderimi onaylar.
+ */
+export type AiExplainSubject = 'output' | 'alarm' | 'command'
+
+export interface AiExplainRequest {
+  subject: AiExplainSubject
+  text: string
+  /** Alarm satırından önceki satırlar. */
+  context: string
+  /** Kullanıcının ek sorusu (isteğe bağlı). */
+  question: string
+  platform: string
+  language: 'en' | 'tr'
+}
+
+export interface AiExplanation {
+  summary: string
+  points: string[]
+  suggestions: AiSuggestion[]
+  note: string
+}
+
+export type AiExplainResult = ({ ok: true } & AiExplanation) | { ok: false; error: string }
+
+/** Açıklama isteğinde gönderilebilecek en uzun metin ve bağlam (karakter). */
+export const AI_EXPLAIN_MAX_TEXT = 8000
+export const AI_EXPLAIN_MAX_CONTEXT = 3000
 
 /** Ayarların eksiksiz olup olmadığı (sağlayıcı seçili, zorunlu alanlar ve anahtar dolu). */
 export function aiConfigured(config: AiConfig): boolean {

@@ -118,6 +118,7 @@ export const app: Dictionary = {
   düzen: ({ n }) => plural(n, 'layout', 'layouts'),
   'ayar grubu': ({ n }) => plural(n, 'settings group', 'settings groups'),
   '{n} grup': ({ n }) => `${n} ${plural(n, 'group', 'groups')}`,
+  '{n} klasör': ({ n }) => `${n} ${plural(n, 'folder', 'folders')}`,
   '{n} aktif': '{n} active',
   '{n} düzenli ifade': ({ n }) => `${n} ${plural(n, 'regular expression', 'regular expressions')}`,
   '{n} sunucu': ({ n }) => `${n} ${plural(n, 'server', 'servers')}`,

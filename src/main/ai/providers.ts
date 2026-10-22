@@ -1,13 +1,18 @@
 import { net } from 'electron'
 import type { AiProvider } from '@shared/ai'
 import { mt } from '../i18n'
-import { SUGGESTION_SCHEMA } from './prompt'
 
 const TIMEOUT_MS = 45_000
-const MAX_TOKENS = 1024
-const TOOL_NAME = 'suggest_commands'
 
 export class AiError extends Error {}
+
+/** Yapılandırılmış yanıt isteyen görev: araç/şema adı, açıklaması, JSON şeması ve yanıt için en çok jeton. */
+export interface AiTaskSpec {
+  name: string
+  description: string
+  schema: Record<string, unknown>
+  maxTokens: number
+}
 
 interface CallInput {
   provider: AiProvider
@@ -15,27 +20,28 @@ interface CallInput {
   secrets: Record<string, string>
   system: string
   user: string
+  task: AiTaskSpec
 }
 
-/** Gemini'nin yapılandırılmış çıktı şeması (OpenAPI alt kümesi). */
-const GEMINI_SCHEMA = {
-  type: 'OBJECT',
-  properties: {
-    suggestions: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          command: { type: 'STRING' },
-          description: { type: 'STRING' },
-          risk: { type: 'STRING', enum: ['safe', 'caution', 'dangerous'] }
-        },
-        required: ['command', 'description', 'risk']
-      }
-    },
-    note: { type: 'STRING' }
-  },
-  required: ['suggestions', 'note']
+/**
+ * Gemini'nin yapılandırılmış çıktı şeması (OpenAPI alt kümesi): JSON şemasındaki türler büyük harfe çevrilir,
+ * desteklenmeyen `additionalProperties` atılır.
+ */
+export function geminiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(geminiSchema)
+  if (!schema || typeof schema !== 'object') return schema
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'additionalProperties') continue
+    if (key === 'type' && typeof value === 'string') out[key] = value.toUpperCase()
+    else if (key === 'properties' && value && typeof value === 'object')
+      out[key] = Object.fromEntries(
+        Object.entries(value).map(([name, prop]) => [name, geminiSchema(prop)])
+      )
+    else if (key === 'items') out[key] = geminiSchema(value)
+    else out[key] = value
+  }
+  return out
 }
 
 const trimSlash = (url: string): string => url.trim().replace(/\/+$/, '')
@@ -131,17 +137,17 @@ async function anthropic(input: CallInput): Promise<unknown> {
   const send = (forced: boolean): Promise<unknown> =>
     post('https://api.anthropic.com/v1/messages', anthropicHeaders(input.fields, input.secrets), {
       model,
-      max_tokens: MAX_TOKENS,
+      max_tokens: input.task.maxTokens,
       system: input.system,
       messages: [{ role: 'user', content: input.user }],
       tools: [
         {
-          name: TOOL_NAME,
-          description: 'Return shell command suggestions for the administrator.',
-          input_schema: SUGGESTION_SCHEMA
+          name: input.task.name,
+          description: input.task.description,
+          input_schema: input.task.schema
         }
       ],
-      tool_choice: forced ? { type: 'tool', name: TOOL_NAME } : { type: 'auto' }
+      tool_choice: forced ? { type: 'tool', name: input.task.name } : { type: 'auto' }
     })
   let data: { content?: { type: string; input?: unknown; text?: string }[] }
   if (noForcedTool.has(model)) data = (await send(false)) as typeof data
@@ -163,7 +169,7 @@ async function anthropic(input: CallInput): Promise<unknown> {
 function chatContent(data: unknown): unknown {
   const message = (data as { choices?: { message?: { content?: string; refusal?: string } }[] })
     .choices?.[0]?.message
-  if (message?.refusal) return { suggestions: [], note: message.refusal }
+  if (message?.refusal) return { note: message.refusal }
   return jsonFromText(message?.content)
 }
 
@@ -172,10 +178,10 @@ const chatMessages = (input: CallInput): { role: string; content: string }[] => 
   { role: 'user', content: input.user }
 ]
 
-const jsonSchemaFormat = {
+const jsonSchemaFormat = (task: AiTaskSpec): unknown => ({
   type: 'json_schema',
-  json_schema: { name: TOOL_NAME, strict: true, schema: SUGGESTION_SCHEMA }
-}
+  json_schema: { name: task.name, strict: true, schema: task.schema }
+})
 
 async function openai(input: CallInput): Promise<unknown> {
   return chatContent(
@@ -185,7 +191,7 @@ async function openai(input: CallInput): Promise<unknown> {
       {
         model: input.fields['model'],
         messages: chatMessages(input),
-        response_format: jsonSchemaFormat
+        response_format: jsonSchemaFormat(input.task)
       }
     )
   )
@@ -199,7 +205,7 @@ async function azure(input: CallInput): Promise<unknown> {
     await post(
       url,
       { 'api-key': input.secrets['apiKey'] ?? '' },
-      { messages: chatMessages(input), response_format: jsonSchemaFormat }
+      { messages: chatMessages(input), response_format: jsonSchemaFormat(input.task) }
     )
   )
 }
@@ -232,8 +238,8 @@ async function gemini(input: CallInput): Promise<unknown> {
       contents: [{ role: 'user', parts: [{ text: input.user }] }],
       generationConfig: {
         responseMimeType: 'application/json',
-        responseSchema: GEMINI_SCHEMA,
-        maxOutputTokens: MAX_TOKENS
+        responseSchema: geminiSchema(input.task.schema),
+        maxOutputTokens: input.task.maxTokens
       }
     }
   )) as { candidates?: { content?: { parts?: { text?: string }[] } }[] }

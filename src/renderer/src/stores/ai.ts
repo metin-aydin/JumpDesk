@@ -35,3 +35,13 @@ onUserScope(() => {
 /** Autocomplete'te yapay zeka kullanılabilir mi (özellik açık ve ayarlar eksiksiz). */
 export const aiAutocompleteReady = (config: AiConfig | null): boolean =>
   Boolean(config?.features.autocomplete && aiConfigured(config))
+
+/** Yapay zeka özelliği kullanılabilir mi (özellik açık ve ayarlar eksiksiz). */
+export const aiFeatureReady = (config: AiConfig | null, feature: keyof AiFeatures): boolean =>
+  Boolean(config?.features[feature] && aiConfigured(config))
+
+/** Yapay zeka ayarları henüz yüklenmediyse yükler (özelliklerin düğmeleri ayarlara göre görünür). */
+export function ensureAiLoaded(): void {
+  const { config, load } = useAi.getState()
+  if (!config && currentUserScope()) void load()
+}

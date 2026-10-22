@@ -83,7 +83,7 @@ const api: JumpDeskApi = {
     resolve: (host) => ipcRenderer.invoke(IPC.netResolve, host)
   },
   tray: {
-    setLayouts: (layouts) => ipcRenderer.send(IPC.trayLayouts, layouts),
+    setLayouts: (list) => ipcRenderer.send(IPC.trayLayouts, list),
     onOpenLayout: (cb) => subscribe(IPC.trayOpenLayout, cb)
   },
   app: {
@@ -110,7 +110,10 @@ const api: JumpDeskApi = {
     setSecret: (provider, key, value) => ipcRenderer.invoke(IPC.aiSetSecret, provider, key, value),
     test: (language) => ipcRenderer.invoke(IPC.aiTest, language),
     suggest: (request) => ipcRenderer.invoke(IPC.aiSuggest, request),
-    listModels: (provider) => ipcRenderer.invoke(IPC.aiListModels, provider)
+    listModels: (provider) => ipcRenderer.invoke(IPC.aiListModels, provider),
+    snippet: (request) => ipcRenderer.invoke(IPC.aiSnippet, request),
+    rule: (request) => ipcRenderer.invoke(IPC.aiRule, request),
+    explain: (request) => ipcRenderer.invoke(IPC.aiExplain, request)
   },
   update: {
     getState: () => ipcRenderer.invoke(IPC.updateGetState),

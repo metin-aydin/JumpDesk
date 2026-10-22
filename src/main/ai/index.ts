@@ -1,23 +1,49 @@
 import { safeStorage } from 'electron'
 import {
+  AI_EXPLAIN_MAX_CONTEXT,
+  AI_EXPLAIN_MAX_TEXT,
+  AI_FEATURE_KEYS,
   AI_PROVIDERS,
   aiConfigured,
   aiProviderInfo,
+  DEFAULT_AI_FEATURES,
   type AiConfig,
+  type AiExplainRequest,
+  type AiExplainResult,
   type AiFeatures,
   type AiProvider,
+  type AiRuleRequest,
+  type AiRuleResult,
+  type AiSnippetRequest,
+  type AiSnippetResult,
   type AiSuggestRequest,
   type AiSuggestResult
 } from '@shared/ai'
 import { hasControlChars } from '@shared/ai-safety'
 import { mt } from '../i18n'
 import { store, type StoredAi } from '../store'
-import { AiError, callProvider, listModels } from './providers'
-import { parseSuggestions, systemPrompt, userPrompt } from './prompt'
+import { AiError, callProvider, listModels, type AiTaskSpec } from './providers'
+import {
+  EXPLAIN_TASK,
+  explainSystemPrompt,
+  explainUserPrompt,
+  parseExplanation,
+  parseRules,
+  parseSnippets,
+  parseSuggestions,
+  RULE_TASK,
+  ruleSystemPrompt,
+  ruleUserPrompt,
+  SNIPPET_TASK,
+  snippetSystemPrompt,
+  snippetUserPrompt,
+  SUGGEST_TASK,
+  systemPrompt,
+  userPrompt
+} from './prompt'
 
 const MAX_FIELD = 2000
 const MAX_SECRET = 4000
-const DEFAULT_FEATURES: AiFeatures = { autocomplete: false }
 
 const isProvider = (v: unknown): v is AiProvider => AI_PROVIDERS.some((p) => p.id === v)
 
@@ -27,7 +53,7 @@ function stored(): StoredAi {
     provider: ai?.provider ?? null,
     fields: ai?.fields ?? {},
     secrets: ai?.secrets ?? {},
-    features: { ...DEFAULT_FEATURES, ...ai?.features }
+    features: { ...DEFAULT_AI_FEATURES, ...ai?.features }
   }
 }
 
@@ -106,8 +132,10 @@ export function setAiConfig(patch: AiConfigPatch): AiConfig {
     ai.fields[provider] = { ...ai.fields[provider], [key]: trimmed }
   }
   if (patch.features) {
-    if (typeof patch.features.autocomplete === 'boolean')
-      ai.features.autocomplete = patch.features.autocomplete
+    for (const key of AI_FEATURE_KEYS) {
+      const value = patch.features[key]
+      if (typeof value === 'boolean') ai.features[key] = value
+    }
   }
   store.setUserAi(ai)
   return aiConfig()
@@ -169,30 +197,122 @@ function cleanRequest(raw: unknown): AiSuggestRequest {
   return { question, history, platform, language: r.language === 'tr' ? 'tr' : 'en' }
 }
 
-export async function aiSuggest(raw: unknown, requireFeature = true): Promise<AiSuggestResult> {
+const FEATURE_OFF: Record<keyof AiFeatures, string> = {
+  autocomplete: 'Yapay zeka ile autocomplete kapalı.',
+  snippets: 'Yapay zeka ile snippet üretme kapalı.',
+  rules: 'Yapay zeka ile kural üretme kapalı.',
+  explainSelection: 'Yapay zeka ile seçili çıktıyı açıklama kapalı.',
+  explainAlarm: 'Yapay zeka ile alarm açıklama kapalı.'
+}
+
+/**
+ * Seçili sağlayıcıya görev isteğini gönderir: özellik kapalıysa ya da ayarlar eksikse istek gitmez. Hata iletileri
+ * kullanıcının dilindedir; sağlayıcıdan gelmeyen beklenmedik hatalar genel bir iletiyle bildirilir.
+ */
+async function runTask<T>(
+  feature: keyof AiFeatures | null,
+  task: AiTaskSpec,
+  build: () => { system: string; user: string },
+  parse: (raw: unknown) => T
+): Promise<({ ok: true } & T) | { ok: false; error: string }> {
   try {
     const config = aiConfig()
-    if (requireFeature && !config.features.autocomplete)
-      throw new AiError(mt('Yapay zeka ile autocomplete kapalı.'))
+    if (feature && !config.features[feature]) throw new AiError(mt(FEATURE_OFF[feature]))
     if (!config.provider || !aiConfigured(config))
       throw new AiError(mt('Yapay zeka ayarları eksik. Ayarlar → Yapay Zeka bölümünü doldurun.'))
-    const req = cleanRequest(raw)
-    const result = parseSuggestions(
-      await callProvider({
-        provider: config.provider,
-        fields: config.fields[config.provider] ?? {},
-        secrets: secretsOf(config.provider),
-        system: systemPrompt(req),
-        user: userPrompt(req)
-      })
-    )
-    return { ok: true, ...result }
+    const prompt = build()
+    const raw = await callProvider({
+      provider: config.provider,
+      fields: config.fields[config.provider] ?? {},
+      secrets: secretsOf(config.provider),
+      ...prompt,
+      task
+    })
+    return { ok: true, ...parse(raw) }
   } catch (err) {
     return {
       ok: false,
       error: err instanceof AiError ? err.message : mt('Yapay zeka isteği başarısız oldu.')
     }
   }
+}
+
+export function aiSuggest(raw: unknown, requireFeature = true): Promise<AiSuggestResult> {
+  return runTask(
+    requireFeature ? 'autocomplete' : null,
+    SUGGEST_TASK,
+    () => {
+      const req = cleanRequest(raw)
+      return { system: systemPrompt(req), user: userPrompt(req) }
+    },
+    parseSuggestions
+  )
+}
+
+const cleanLanguage = (value: unknown): 'en' | 'tr' => (value === 'tr' ? 'tr' : 'en')
+const cleanPlatform = (value: unknown): string =>
+  ['linux', 'unix', 'windows', 'macos', 'bsd'].includes(String(value)) ? String(value) : 'linux'
+const text = (value: unknown, max: number): string =>
+  typeof value === 'string' ? value.slice(0, max) : ''
+
+/** Tariften snippet seçenekleri (yalnız kullanıcının yazdığı tarif gönderilir). */
+export function aiSnippet(raw: unknown): Promise<AiSnippetResult> {
+  return runTask(
+    'snippets',
+    SNIPPET_TASK,
+    () => {
+      const r = (raw ?? {}) as Partial<AiSnippetRequest>
+      const description = text(r.description, 1000).trim()
+      if (!description) throw new AiError(mt('Snippet’in ne yapacağını yazın.'))
+      const req = { description, language: cleanLanguage(r.language) }
+      return { system: snippetSystemPrompt(req), user: snippetUserPrompt(req) }
+    },
+    parseSnippets
+  )
+}
+
+/** Tariften (ve isteğe bağlı örnek satırdan) alarm/vurgu kuralı seçenekleri. */
+export function aiRule(raw: unknown): Promise<AiRuleResult> {
+  return runTask(
+    'rules',
+    RULE_TASK,
+    () => {
+      const r = (raw ?? {}) as Partial<AiRuleRequest>
+      const description = text(r.description, 1000).trim()
+      if (!description) throw new AiError(mt('Neyin yakalanacağını yazın.'))
+      const req = { description, sample: text(r.sample, 500), language: cleanLanguage(r.language) }
+      return { system: ruleSystemPrompt(req), user: ruleUserPrompt(req) }
+    },
+    parseRules
+  )
+}
+
+/**
+ * Metni açıklar. Seçili çıktı ve alarm metni sunucudan gelir; arayüz göndermeden önce metni gösterip onay alır.
+ * Komut açıklaması snippet özelliğine bağlıdır.
+ */
+export function aiExplain(raw: unknown): Promise<AiExplainResult> {
+  const r = (raw ?? {}) as Partial<AiExplainRequest>
+  const subject = r.subject === 'alarm' || r.subject === 'command' ? r.subject : 'output'
+  const feature: keyof AiFeatures =
+    subject === 'alarm' ? 'explainAlarm' : subject === 'command' ? 'snippets' : 'explainSelection'
+  return runTask(
+    feature,
+    EXPLAIN_TASK,
+    () => {
+      const req: AiExplainRequest = {
+        subject,
+        text: text(r.text, AI_EXPLAIN_MAX_TEXT),
+        context: text(r.context, AI_EXPLAIN_MAX_CONTEXT),
+        question: text(r.question, 1000),
+        platform: cleanPlatform(r.platform),
+        language: cleanLanguage(r.language)
+      }
+      if (!req.text.trim()) throw new AiError(mt('Açıklanacak metin boş.'))
+      return { system: explainSystemPrompt(req), user: explainUserPrompt(req) }
+    },
+    parseExplanation
+  )
 }
 
 /** Ayarların denenmesi: sabit, zararsız bir soruyla istek gönderilir. */

@@ -285,8 +285,16 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
 - **Eski kayıt taşıma:** ilk `setUserScope`'ta `jumpdesk.legacyOwner` yoksa tüm `jumpdesk.<ad>` anahtarları bu kullanıcıya
   `<ad>` olarak taşınıp silinir; `provideLegacyValue` ile localStorage dışı değerler (tema) de yazılır. Ana süreçte
   `jumpdesk.json` içindeki eski `servers` aynı şekilde ilk kullanıcıya geçer.
-- Kullanıcı anahtarları: alarmRules, highlightRules, layouts, fontSizes, terminalPreferences, snippets,
-  snippetGroupsOpen, notificationSettings, theme, leftPanelOpen, sidebarWidth, rightPanelWidth.
+- Kullanıcı anahtarları: alarmRules, highlightRules, layouts, layoutFolders, layoutFoldersClosed, layoutTreeOpen,
+  fontSizes, terminalPreferences, snippets, snippetGroupsOpen, notificationSettings, theme, leftPanelOpen, sidebarWidth,
+  rightPanelWidth.
+- **Ana pencerenin localStorage'ı** `~/.config/JumpDesk/Partitions/jumpserver/Local Storage/leveldb` (pencere
+  `jumpserver` bölümünü kullanır; `~/.config/JumpDesk/Local Storage` boştur). Kullanıcının ayarını (ör. arayüz yazı
+  boyutu) okumak için yalnız ilgili anahtar `grep -ao` ile çekilir; diğer içerik okunmaz.
+- **Düğme metni** `components/ui/button.tsx` `wrapLabels`: metin `data-slot="button-label"` span'ına alınır
+  (`text-box: trim-both cap alphabetic` + `top: 0.4px`); düğme içeriği büyük harf yüksekliğine göre ortalanır.
+- **Sanal ağacın üstünde ek bölüm** (`ServerTree` → `LayoutTree`): `useVirtualizer({ scrollMargin })` ve satır
+  `top = v.start - scrollMargin`; yükseklik `getBoundingClientRect` ile (CSS `zoom` altında).
 - **Snippet deposu** `stores/snippets.ts` (`sanitizeSnippets`, `groupSnippets`, `snippetById`); düzenleyici
   `features/snippets/SnippetEditorDialog.tsx` (`useDialogs.openSnippetEditor(id?)`).
 - **Alarm bekletme:** `AlarmDetector.hold()` / `release(ms)`; `startAfter(ms)` bağlantı süresini `warmupEnds`'e yazar,
