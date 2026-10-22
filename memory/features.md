@@ -56,8 +56,8 @@ kararlar: [[architecture-decisions]].
 
 ## Durum (2026-10-14 sonu, mock'ta e2e ile doğrulandı)
 - ✅ 1 Snippet paneli (tıkla-çalıştır); liste kullanıcının kendi kayıtlarından (34. tur).
-- ✅ 2 Autocomplete (geçmiş + snippet + `compgen -c` komutları + bulunulan klasör girdileri; Tab/→ kabul, ↑↓, Esc).
-  Eksik: alt klasör yolları (`dir/xx`) için liste yok — yalnız bulunulan klasör.
+- ✅ 2 Autocomplete (geçmiş + snippet + `compgen -c` komutları + bulunulan klasör girdileri; → kabul, Ctrl+→ `/`'a
+  kadar, ↑↓, Esc). Alt klasör yolları çift Tab dosya kipinde (52. tur).
 - ✅ 3 Bağlanınca otomatik komutlar (snippet satırındaki ⚡, sunucu bazında `ServerMeta.autoRun`, ilk istemden sonra çalışır).
 - ✅ 4 Renkler: (a) komut satırı boyama, (b) çıktı vurgulama, (c) kabuk renkleri (PS1 renksizse sarılır, ls/grep alias).
 - ✅ 5 Sağ panel (başlık çubuğu düğmesi, Ctrl+Shift+B): Snippetler + Geçmiş (arama, tıkla-çalıştır, canlı ekleme).
@@ -1395,3 +1395,24 @@ PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
 7. Gönderim: commit'ler `db7ca03` (güncelleme/tepsi/sertifika), `2563e00` (sağlayıcı adları, görüntüler), `b2b44e9`;
    PR #10 "JumpDesk 0.2.7: tray update checks, .deb installs after restarts, company certificates" (birleştirme
    kullanıcıda).
+
+## Kullanıcı istekleri — 52. tur (2026-10-22): autocomplete tuşları ve dosya kipi
+1. **Tab öneriyi kabul etmez** (kabuğa gider, bash/zsh tamamlaması çalışır); **→ tamamını**, **Ctrl+→ (macOS ⌥→)
+   bir sonraki `/` işaretine kadarını** kabul eder (baştaki `/` atlanır: `/abc/123` → `/abc/`). Kısmi kabulde liste
+   açık kalır ve aynı öneri seçili kalır (`keptLabel`, ↑/↓ ile sıfırlanır). Altbilgi
+   "→ kabul · {partial} / işaretine kadar · ↑↓ seç · Esc kapat · Ctrl+Space aç"; kısayol listesinde "Tab Tab",
+   "→", "Ctrl+→". Testlerde altbilgi aranırken `'→ kabul ·'` kullanılır (windows, smoke).
+2. **Çift Tab = dosya kipi** (`fileMode`, 450 ms içinde ikinci Tab; ilk Tab kabuğa gider, ikincisi gönderilmez;
+   yalnız entegrasyon hazır ve komut satırı açıkken). Öneriler `computePathSuggestions` (imleçten önceki sözcüğün
+   klasörü, önce klasörler, gizliler yalnız ad `.` ile başlıyorsa, en çok 300). Bulunulan klasör `live.entries`'ten;
+   diğerleri kabuktan istenir: uygulama `DIR_LISTING_KEY` = `\x1b[6973~` gönderir, kabukta bash `bind -x` (emacs ve
+   vi-insert) / zsh widget (`bindkey`, viins) `__jd_dls` imleçten önceki sözcüğün klasörünü `ls -1Ap` ile listeler ve
+   OSC `D` (ilk satır klasör) yayar; `~/` genişletilir, sözcük boşluk/`|;&` ile ayrılır. bash bu sırada satırı
+   yerinde temizleyip yeniden çizer (`\r\e[K` + istem, TERM gerekir), zsh hiçbir şey çizmez (pty ile doğrulandı).
+   Önbellek 15 sn, yanıtsız istek 3 sn sonra tekrar; çalışma dizini değişince temizlenir. Klasör kabul edilince kip
+   açık kalır ve içi listelenir; Enter, Esc, Ctrl+C, geçmişte gezinme kipi kapatır. Pencerede klasör başlığı
+   (`FolderOpen` + yol), "Klasör okunuyor…", "Klasörde eşleşen girdi yok"; liste `max-h-72` kaydırmalı, seçili öğe
+   görünür alana kaydırılır. Kurulum satırı 2644 bayt.
+3. i18n denetleyicisinde `keys` veri alanı sayıldı (kısayol tuş adları çevrilmez).
+4. Testler: autocomplete 16/16 (Tab kabul etmez, →, Ctrl+→ adımları, çift Tab, ikinci Tab kabuğa gitmez, klasör içi,
+   süzme, Esc).
