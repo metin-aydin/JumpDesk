@@ -1,3 +1,4 @@
+import { Children } from 'react'
 import { Button as ButtonPrimitive } from '@base-ui/react/button'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
@@ -37,10 +38,45 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Düğmedeki metin büyük harf yüksekliğine kırpılmış bir kutuya alınır: düğme içeriği ortaladığında harfler, yazı
+ * tipinin üst ve alt boşluklarından bağımsız olarak ortada durur. Harfler çizilirken piksel ızgarasına yukarı doğru
+ * oturduğundan kutu 0,4 piksel aşağıdan başlar; böylece yakınlaştırılmış pencerede de en fazla bir piksel sapar.
+ */
+function wrapLabels(children: React.ReactNode): React.ReactNode {
+  const out: React.ReactNode[] = []
+  let text = ''
+  const flush = (): void => {
+    if (text.trim())
+      out.push(
+        <span
+          key={`label-${out.length}`}
+          data-slot="button-label"
+          className="relative top-[0.4px] [text-box:trim-both_cap_alphabetic]"
+        >
+          {text}
+        </span>
+      )
+    else if (text) out.push(text)
+    text = ''
+  }
+  for (const child of Children.toArray(children)) {
+    if (typeof child === 'string' || typeof child === 'number') {
+      text += child
+      continue
+    }
+    flush()
+    out.push(child)
+  }
+  flush()
+  return out
+}
+
 function Button({
   className,
   variant = 'default',
   size = 'default',
+  children,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
@@ -48,7 +84,9 @@ function Button({
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {typeof children === 'function' ? children : wrapLabels(children)}
+    </ButtonPrimitive>
   )
 }
 
