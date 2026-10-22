@@ -1237,3 +1237,59 @@ Kullanıcı projeyi public yapmak istedi; özel bilgiler tarandı ve kullanıcı
    **Tuzak:** `.gitignore` `*.png` alt klasördeki görselleri yok sayıyordu; istisna `!resources/**/*.png` yapıldı
    (yoksa CI derlemesi tepsi simgesini bulamazdı). Yeni görsel eklerken `git status`'ta göründüğü denetlenmeli.
    Açılır pencere ilk açılışta `ready-to-show` beklenerek gösterilir (yüklenmeden boş görünüyordu; testte zamanlama hatası).
+
+## Kullanıcı istekleri — 49. tur (2026-10-22)
+İstekler: (1) düzenleri klasörleme + tepside klasör alt menüsü; (2) autocomplete'te seçili önerinin devamı komut
+satırında soluk görünsün (VS Code satır içi önizleme gibi; Tab/→ kabul aynı kalır, Enter yalnız yazılanı çalıştırır);
+(3) düğme metinleri ortalı değil (yukarıda); (4) "Oturum kapandı / Yeniden bağlan" çubuğu komut satırının üstüne
+biniyordu, terminalin altında yer kaplamalı; (5) Ctrl+Shift+V iki kez yapıştırıyordu; (6) art arda Ctrl+C sunucu durum
+şeridini donduruyordu; (7) klasörler ana ekranda sola hizalı olsun, sol ağaçta da "Kayıtlı Düzenler" (yeni klasör,
+sürükle-bırak); (8) klasörler dışa aktarılsın.
+- (1,7,8) **Düzen klasörleri** (tek seviye, ad = kimlik, büyük/küçük harf duyarsız benzersiz):
+  - Veri `stores/layouts.ts`: `SavedLayout.folder?`, ayrı sıralı liste `folders` (kullanıcı anahtarı `layoutFolders`,
+    boş klasörler de tutulur). `sanitizeFolders` (düzenlerin kullandığı ama listede olmayanları ekler, yazımı eşitler),
+    `groupByFolder`, `layoutPath` ("Klasör / Düzen"), eylemler `createFolder` (varsa onu döndürür), `renameFolder`
+    (başka klasörün adıysa false), `removeFolder` (düzenler klasörsüz kalır), `moveToFolder(id, ad|null)`,
+    `saveCurrent(ad, grup, klasör?)` (verilmezse üzerine yazılan düzenin klasörü korunur), `replaceAll(düzenler, klasörler)`.
+  - Pencere `LayoutDialog.tsx` kipleri: save (Klasör seçimi: Klasör Yok / klasörler / Yeni Klasör… → ad kutusu),
+    rename, folder (yeni; `layoutId` verilirse düzen içine taşınır), folder-rename ("Bu adda bir klasör var.").
+  - Ortak: `features/layouts/layout-dnd.ts` (HTML5 sürükle-bırak türü `application/x-jumpdesk-layout`,
+    `layoutDragProps`, `useDropTarget(klasör|null)`, `useLayoutDrag`), `LayoutMenus.tsx` (`LayoutMenuItems`: Aç,
+    Yeniden Adlandır, Klasöre Taşı ▸, Klasörden Çıkar, Sil; `FolderMenuItems`: Klasörü Yeniden Adlandır, Klasörü Sil).
+  - Ana ekran `SavedLayouts.tsx`: başlıkta "Yeni Klasör"; klasörler önce (başlık bölüm başlığıyla aynı sol hizada,
+    kartlar `pl-5.5` ile klasör simgesi hizasında, kapalılar `layoutFoldersClosed`), sonra klasörsüz kartlar; klasördeki
+    düzen sürüklenirken klasörsüz alan yoksa "Klasörden çıkarmak için buraya bırakın." alanı belirir. Bırakma vurgusu
+    `ring` (yerleşimi kaydırmaz).
+  - Sol ağaç `LayoutTree.tsx`: `ServerTree` kaydırma alanının en üstünde, ağaç satırlarıyla aynı ölçüde (h-7, girinti
+    14, `zoom` ölçeği); kök "Kayıtlı Düzenler" (sayı, üzerine gelince + düğmesi = Yeni Klasör, sağ tık Yeni Klasör…),
+    klasör ve düzen satırları; çift tık/Enter açar; düzen satırı klasöre ya da klasördeki düzene bırakılınca o klasöre,
+    köke bırakılınca dışarı. Açıklık `layoutTreeOpen` (varsayılan kapalı). `role=tree` kullanılmaz (testler
+    `getByRole('tree')` ile sunucu ağacını bulur). Sanal liste `scrollMargin` = bölüm yüksekliği
+    (`getBoundingClientRect`, `zoom` altında `offsetHeight` güvenilmez), satır `top: v.start - layoutsHeight`.
+  - Tepsi: `TrayLayoutList {folders, layouts}` (`TrayLayout.folder?`); GNOME menüsünde klasörler alt menü (boşsa pasif
+    "Klasörde düzen yok"), sonra klasörsüz düzenler; açılır pencerede klasör satırı (tık/Enter/→ açar, ← kapatır,
+    alttaki düzenler girintili), aramada düz liste "Klasör › Düzen". Test kancası `labels(altMenü?)`, `click('Klasör/Düzen')`.
+  - Komut paleti "Düzeni Aç: Klasör / Düzen". Dışa aktarım: `sections.layoutFolders` düzenler bölümüyle birlikte
+    (eski sürüm alanı yok sayar), özet kartında "N klasör"; yalnız klasör varsa da bölüm boş sayılmaz.
+  - Test `dev/e2e/layout-folders.mjs` 24/24.
+- (2) **Satır içi önizleme** `features/terminal/GhostText.tsx`: `AutocompleteState.ghost` (imleç satır sonundaysa;
+  ekranın kaba göre konumu, hücre boyu, sütun/satır, imleç hücresi, yazı tipi); terminal kabına mutlak bindirilir, her
+  karakter bir hücrede, satır sonunda alta geçer, tampona yazılmaz; renk tema ön planı %45. Öneri satırları
+  `role=option aria-selected`. Test `dev/e2e/autocomplete.mjs` 7/7.
+- (3) Ölçüm: kullanıcının arayüz yazı boyutu **11** (pencere yakınlaştırma 11/13≈0,846; bilgi
+  `~/.config/JumpDesk/Partitions/jumpserver/Local Storage` içinde, ana pencere `jumpserver` bölümünü kullanır). Bu
+  ölçekte düğme yazısının üstünde 6, taban çizgisinin altında 10 px kalıyordu. Çözüm `components/ui/button.tsx`
+  `wrapLabels`: düğmedeki metin `<span data-slot="button-label" class="relative top-[0.4px]
+  [text-box:trim-both_cap_alphabetic]">` içine alınır (ardışık metinler birleşir, yalnız boşluk olanlar sarılmaz).
+  Ölçüm (`text-box` kırpma + 0,4 px): ui 11→8/8, 12→9/9, 13→~10/10, 14→1 px alçak (yuvarlama), 15→11/11, 16→1 px
+  alçak, 18→yarım px yüksek. `text-box-trim` düz metin alt öğesine (anonim esnek öğe) uygulanmaz; span şart.
+  Ubuntu yazı tipi 12 px: ascent 11, descent 2 (tuval ölçümü). Offscreen ve ekrandaki çizim aynı sonucu verir.
+- (4) `SessionView.tsx`: `endedBar` akışta (`shrink-0`), terminal/RDP altında; `connectingOverlay` mutlak kaldı.
+- (5) `TerminalPane.tsx` kopyala/yapıştır kısayolunda `e.preventDefault()` (Chromium'un Ctrl+Shift+V düz metin
+  yapıştırması da çalışıyordu). Test: `dev/e2e/right-click.mjs` 9/9 (eski derlemede iki yeni test FAIL'di).
+- (6) **Ctrl+C ölçüm döngüsünü öldürüyordu (yalnız bash):** döngü `$( ( __jd_sl & echo $! ) )` ile kabuğun süreç
+  grubunda; istemde Ctrl+C SIGINT'i ona da gönderir, `sleep` ölür, bash döngüsü de çıkar (zsh'te çıkmıyordu). Çözüm
+  `shell-integration.ts`: alt kabukta `trap '' INT QUIT TSTP` (yok sayılan sinyaller alt süreçlere geçer) ve
+  `__jd_prompt` döngü ölmüşse (`__jd_sp` dolu, `kill -0` başarısız) `__jd_stat_start $__jd_si` ile yeniden başlatır.
+  Yeniden üretim: python `pty.fork` + `bash --norc -i` (betik `SHELL_SCRIPTS` esbuild ile dökülür). Test
+  `server-status.mjs` 6a (düzeltme geri alınınca FAIL, uygulanınca ok; toplam 37).
