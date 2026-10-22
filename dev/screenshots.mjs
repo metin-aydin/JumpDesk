@@ -1,5 +1,5 @@
 // README ekran görüntüleri: İngilizce arayüz, koyu tema, İngilizce adlı mock veri seti (MOCK_DATA=showcase) ve sahte
-// bir OpenAI uyumlu sağlayıcı. Mock sunucuyu kendisi ayrı bir portta açar; çalışan geliştirme mock'una dokunmaz.
+// bir OpenAI uyumlu sağlayıcı (komut önerisi, snippet, kural ve açıklama yanıtları). Mock sunucuyu kendisi ayrı bir portta açar; çalışan geliştirme mock'una dokunmaz.
 // Kullanım: npm run build && node dev/screenshots.mjs [klasör]   (varsayılan docs/screenshots)
 import { _electron as electron } from 'playwright-core'
 import { spawn } from 'node:child_process'
@@ -45,35 +45,117 @@ await new Promise((resolve, reject) => {
   mock.once('exit', (code) => reject(new Error(`mock server exited (${code})`)))
 })
 
-/** Sahte yapay zeka sağlayıcısı: model listesi ve her soruya aynı üç öneri. */
+/** Sahte yapay zeka sağlayıcısı: model listesi; istem türüne göre (öneri, snippet, kural, açıklama) sabit yanıtlar. */
+const AI_ANSWERS = {
+  suggest: {
+    suggestions: [
+      {
+        command: 'du -ah /var/log | sort -rh | head -n 10',
+        description: 'Lists the 10 largest files and folders under /var/log',
+        risk: 'safe'
+      },
+      {
+        command: 'find /var/log -type f -size +100M -exec ls -lh {} +',
+        description: 'Shows log files larger than 100 MB',
+        risk: 'safe'
+      },
+      {
+        command: 'journalctl --vacuum-size=500M',
+        description: 'Shrinks the systemd journal to 500 MB',
+        risk: 'caution'
+      }
+    ],
+    note: ''
+  },
+  snippet: {
+    options: [
+      {
+        name: 'Orders API Errors',
+        command: "tail -f logs/app.log | grep --line-buffered -E 'ERROR|Exception'",
+        description: 'Follows the application log and shows only errors and exceptions',
+        risk: 'safe'
+      },
+      {
+        name: 'Orders Service Errors (Last Hour)',
+        command: "journalctl -u orders --since '1 hour ago' -p err",
+        description: 'Shows error-level journal entries of the orders service from the last hour',
+        risk: 'safe'
+      }
+    ],
+    note: ''
+  },
+  rule: {
+    options: [
+      {
+        pattern: 'IllegalStateException|SQLTimeoutException',
+        regex: true,
+        caseSensitive: true,
+        description: 'Order state errors and database timeouts'
+      },
+      {
+        pattern: 'already closed',
+        regex: false,
+        caseSensitive: false,
+        description: 'Operations on orders that are already closed'
+      },
+      {
+        pattern: 'Connection (refused|reset)',
+        regex: true,
+        caseSensitive: false,
+        description: 'Refused or reset connections'
+      }
+    ],
+    note: ''
+  },
+  explain: {
+    summary:
+      'Cancelling order 48213 failed because the order was already closed: OrderService.cancel throws IllegalStateException for orders that are no longer open.',
+    points: [
+      'The exception is thrown in OrderService.cancel (OrderService.java:118), called from OrderController.cancel.',
+      'This is an application-level error, not an infrastructure problem; the service itself keeps answering requests.',
+      'A double submit or a client with a stale order state usually causes it.',
+      'Check whether the same order was cancelled more than once around this time.'
+    ],
+    suggestions: [
+      {
+        command: "grep -n '48213' logs/app.log",
+        description: 'Shows every log line about order 48213',
+        risk: 'safe'
+      },
+      {
+        command: "grep -c 'IllegalStateException' logs/app.log",
+        description: 'Counts how often this error occurred',
+        risk: 'safe'
+      },
+      {
+        command: "grep -B2 -A3 'Request failed' logs/app.log | tail -n 40",
+        description: 'Shows the latest failures with the lines around them',
+        risk: 'safe'
+      }
+    ],
+    note: ''
+  }
+}
+const aiKind = (system) =>
+  /snippet writer/.test(system)
+    ? 'snippet'
+    : /rule writer/.test(system)
+      ? 'rule'
+      : /terminal text explainer/.test(system)
+        ? 'explain'
+        : 'suggest'
 const ai = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'application/json' })
   if (req.method === 'GET' && req.url === '/v1/models') {
     res.end(JSON.stringify({ data: [{ id: 'llama3.1:8b' }, { id: 'qwen2.5-coder:7b' }] }))
     return
   }
-  req.resume()
+  let body = ''
+  req.on('data', (c) => (body += c))
   req.on('end', () => {
-    const answer = {
-      suggestions: [
-        {
-          command: 'du -ah /var/log | sort -rh | head -n 10',
-          description: 'Lists the 10 largest files and folders under /var/log',
-          risk: 'safe'
-        },
-        {
-          command: 'find /var/log -type f -size +100M -exec ls -lh {} +',
-          description: 'Shows log files larger than 100 MB',
-          risk: 'safe'
-        },
-        {
-          command: 'journalctl --vacuum-size=500M',
-          description: 'Shrinks the systemd journal to 500 MB',
-          risk: 'caution'
-        }
-      ],
-      note: ''
-    }
+    const json = JSON.parse(body || '{}')
+    const system = json.messages?.find((m) => m.role === 'system')?.content ?? ''
+    const answer = AI_ANSWERS[aiKind(system)]
     res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answer) } }] }))
   })
 })
@@ -87,6 +169,8 @@ const env = {
   JUMPDESK_HIDE_WINDOW: '1',
   JUMPDESK_OFFSCREEN: '1',
   JUMPDESK_NO_NOTIFY: '1',
+  // Seçim için terminal satırları DOM'dan okunur.
+  JUMPDESK_DISABLE_WEBGL: '1',
   JUMPDESK_ALARM_WARMUP_MS: '0',
   JUMPDESK_ALARM_SNIPPET_WAIT_MS: '0',
   JUMPDESK_USER_DATA: path.join(work, 'user-data')
@@ -269,12 +353,13 @@ try {
   // 8. Yapay zeka ayarları
   await page.keyboard.press('Control+,')
   await page.getByRole('button', { name: 'AI', exact: true }).click()
-  await page.getByRole('button', { name: /OpenAI Compatible/ }).click()
+  await page.getByRole('combobox', { name: 'Provider' }).click()
+  await page.getByRole('option', { name: 'OpenAI Compatible', exact: true }).click()
   const aiAddress = page.getByLabel('Address', { exact: true })
   await aiAddress.fill(`http://127.0.0.1:${aiPort}/v1`)
   await aiAddress.press('Enter')
-  const modelSelect = page.getByRole('combobox')
-  await modelSelect.waitFor({ timeout: 10000 })
+  await page.getByText('2 models').waitFor({ timeout: 10000 })
+  const modelSelect = page.getByRole('combobox', { name: 'Model' })
   await modelSelect.click()
   await page.getByRole('option', { name: 'llama3.1:8b' }).click()
   await page.waitForTimeout(300)
@@ -308,8 +393,91 @@ try {
   await askDialog.getByRole('option').first().waitFor({ timeout: 10000 })
   await shot('ai-assist')
   await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 
-  // 10. Dışa aktarım ekranı
+  // 10. Seçili çıktıyı açıklama: hata satırları seçilir, "Explain" → onay → açıklama ve komutlar
+  await terminal().nth(0).focus()
+  await page.keyboard.type('clear; cat logs/app.log\n', { delay: 10 })
+  await page.waitForTimeout(1200)
+  const rowBox = (text) =>
+    page.evaluate((t) => {
+      const container = [...document.querySelectorAll('.xterm-rows')].find(
+        (e) => e.getBoundingClientRect().width > 0
+      )
+      const row = [...container.children].find((r) => r.textContent.includes(t))
+      const r = row.getBoundingClientRect()
+      const width = (row.textContent.trimEnd().length / row.textContent.length) * r.width
+      return { left: r.left, right: r.left + width, y: r.top + r.height / 2 }
+    }, text)
+  const from = await rowBox('Request failed')
+  const to = await rowBox('OrderController.cancel')
+  await page.mouse.move(from.left + 2, from.y)
+  await page.mouse.down()
+  await page.mouse.move(to.right - 2, to.y, { steps: 8 })
+  await page.mouse.up()
+  await page.locator('[data-ai-explain-chip]').waitFor({ timeout: 5000 })
+  await shot('ai-explain-selection')
+  await page.locator('[data-ai-explain-chip]').click()
+  const explainDialog = page.getByRole('dialog', { name: 'Ask AI About the Selection' })
+  await explainDialog.waitFor({ timeout: 5000 })
+  await explainDialog.getByRole('button', { name: 'Send' }).click()
+  await explainDialog.locator('[data-ai-explanation]').waitFor({ timeout: 10000 })
+  await shot('ai-explain')
+  await explainDialog
+    .locator('[data-slot=dialog-footer]')
+    .getByRole('button', { name: 'Close' })
+    .click()
+  await page.waitForTimeout(300)
+
+  // 11. Alarm olayını açıklama: gönderilecek metin (alarm satırı ve öncesi) onaydan önce gösterilir
+  await palette('Open Alarms Panel')
+  await page.waitForTimeout(500)
+  const alarmEvent = page.getByRole('button', { name: /IllegalStateException/ }).first()
+  await alarmEvent.hover()
+  await alarmEvent.getByRole('button', { name: 'Ask AI' }).click()
+  const alarmDialog = page.getByRole('dialog', { name: 'Ask AI About the Alarm' })
+  await alarmDialog.waitFor({ timeout: 5000 })
+  await alarmDialog.getByLabel('Extra Question').fill('Is this caused by the database?')
+  await shot('ai-alarm')
+  await alarmDialog.getByRole('button', { name: 'Cancel' }).click()
+  await page.waitForTimeout(300)
+
+  // 12. Yapay zekayla kural: tarif ve örnek satır, öneriler örnekle denenir
+  await page.getByRole('button', { name: /^Rules/ }).click()
+  const rulesDialog = page.getByRole('dialog', { name: 'Alarm Rules' })
+  await rulesDialog.getByRole('button', { name: 'Create a Rule with AI' }).click()
+  await page
+    .getByLabel('Description of What to Catch')
+    .fill('order state errors and database timeouts')
+  await page
+    .getByLabel('Sample Line')
+    .fill('java.lang.IllegalStateException: Order 48213 is already closed')
+  await page.getByRole('button', { name: 'Suggest Rules' }).click()
+  await page.getByRole('list', { name: 'Suggested Rules' }).waitFor({ timeout: 10000 })
+  await shot('ai-rule')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Control+Shift+B')
+
+  // 13. Yapay zekayla snippet: tarif → öneriler → Use forma koyar
+  await palette('Edit Snippets')
+  const editor = page.getByRole('dialog')
+  await editor.getByRole('button', { name: 'New Snippet' }).click()
+  await editor
+    .getByLabel('Snippet Description')
+    .fill('follow the orders API log and show only errors')
+  await editor.getByRole('button', { name: 'Suggest', exact: true }).click()
+  const snippetOptions = editor.getByRole('list', { name: 'Suggested Snippets' })
+  await snippetOptions.waitFor({ timeout: 10000 })
+  await snippetOptions.getByRole('button', { name: 'Use' }).first().click()
+  await page.waitForTimeout(300)
+  await shot('ai-snippet')
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // 14. Dışa aktarım ekranı
   await palette('Export')
   await page.getByRole('dialog').waitFor({ timeout: 5000 })
   await shot('export')
