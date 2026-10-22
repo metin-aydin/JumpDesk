@@ -1416,3 +1416,6 @@ PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
 3. i18n denetleyicisinde `keys` veri alanı sayıldı (kısayol tuş adları çevrilmez).
 4. Testler: autocomplete 16/16 (Tab kabul etmez, →, Ctrl+→ adımları, çift Tab, ikinci Tab kabuğa gitmez, klasör içi,
    süzme, Esc).
+5. Gönderim: commit `dbb8285` + `718b8ce`; PR #10 başlığı "JumpDesk 0.2.7: folder suggestions with Tab Tab, tray
+   update checks, .deb installs after restarts", notları güncellendi. Regresyon: windows 47, tab-keys 8, popups 4,
+   ai 44, tools 69, server-status 37, right-click 9, multiwindow 21, panels 13 (hepsi geçti).
