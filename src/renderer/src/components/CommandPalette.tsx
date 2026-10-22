@@ -50,7 +50,7 @@ import { useT } from '@/lib/i18n'
 import { SETTINGS_SHORTCUT, isMac, shortcutLabel } from '@/lib/shortcuts'
 import { useDialogs } from '@/stores/dialogs'
 import { jumpdesk } from '@/lib/jumpdesk'
-import { openLayout, useLayoutDialog, useLayouts } from '@/stores/layouts'
+import { layoutPath, openLayout, useLayoutDialog, useLayouts } from '@/stores/layouts'
 import { closeAllSafely, closeTabSafely, ungroupSafely } from '@/features/layouts/guard'
 import { useRightPanel } from '@/stores/right-panel'
 import {
@@ -342,7 +342,7 @@ function buildCommands(
         },
         ...useLayouts.getState().layouts.map((layout) => ({
           id: `layout-${layout.id}`,
-          label: t('Düzeni Aç: {name}', { name: layout.name }),
+          label: t('Düzeni Aç: {name}', { name: layoutPath(layout) }),
           Icon: LayoutDashboard,
           run: () => openLayout(layout)
         }))

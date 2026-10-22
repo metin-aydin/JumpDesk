@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TreeInstance } from '@headless-tree/core'
 import {
   asyncDataLoaderFeature,
@@ -24,6 +24,7 @@ import { AssetHoverCard } from './AssetHoverCard'
 import { FolderContextMenu } from './FolderContextMenu'
 import { ROOT_ID, TreeDataSource, assetItemId, nodeItemId, type TreeItemData } from './tree-data'
 import { connectToAsset } from '@/features/workspace/connect'
+import { LayoutTree } from '@/features/layouts/LayoutTree'
 
 const ROW_HEIGHT = 28
 const INDENT = 14
@@ -205,11 +206,24 @@ export function ServerTree(): React.JSX.Element {
   const items = tree.getItems()
   const scale = useTreeScale()
   const rowHeight = ROW_HEIGHT * scale
+  // Sunucu ağacı, kaydırma alanının üstündeki "Kayıtlı Düzenler" bölümünün altından başlar.
+  const layoutsRef = useRef<HTMLDivElement>(null)
+  const [layoutsHeight, setLayoutsHeight] = useState(0)
+  useLayoutEffect(() => {
+    const el = layoutsRef.current
+    if (!el) return
+    const measure = (): void => setLayoutsHeight(el.getBoundingClientRect().height)
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    measure()
+    return () => ro.disconnect()
+  }, [])
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
-    overscan: 12
+    overscan: 12,
+    scrollMargin: layoutsHeight
   })
   const virtualizerRef = useRef(virtualizer)
   virtualizerRef.current = virtualizer
@@ -274,6 +288,9 @@ export function ServerTree(): React.JSX.Element {
       className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2"
     >
       {hovered && <AssetHoverCard item={hovered.data} anchor={hovered.rect} />}
+      <div ref={layoutsRef} style={scale === 1 ? undefined : { zoom: scale }}>
+        <LayoutTree />
+      </div>
       <div
         {...tree.getContainerProps(t('Sunucular'))}
         onKeyDown={(e) => {
@@ -294,7 +311,7 @@ export function ServerTree(): React.JSX.Element {
             <div
               key={item.getKey()}
               className="absolute inset-x-0"
-              style={{ top: v.start, height: rowHeight }}
+              style={{ top: v.start - layoutsHeight, height: rowHeight }}
             >
               <div style={scale === 1 ? undefined : { zoom: scale }}>
                 <TreeRow item={item} hover={hover} />

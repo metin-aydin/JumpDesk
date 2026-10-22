@@ -83,7 +83,7 @@ const api: JumpDeskApi = {
     resolve: (host) => ipcRenderer.invoke(IPC.netResolve, host)
   },
   tray: {
-    setLayouts: (layouts) => ipcRenderer.send(IPC.trayLayouts, layouts),
+    setLayouts: (list) => ipcRenderer.send(IPC.trayLayouts, list),
     onOpenLayout: (cb) => subscribe(IPC.trayOpenLayout, cb)
   },
   app: {

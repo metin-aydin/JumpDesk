@@ -131,5 +131,28 @@ export const workspace: Dictionary = {
   'Yeniden Adlandır': 'Rename',
   'Açmak İçin Çift Tıklayın': 'Double-Click to Open',
   'Düzeni Aç': 'Open Layout',
-  'Kayıtlı Düzenler': 'Saved Layouts'
+  'Kayıtlı Düzenler': 'Saved Layouts',
+  'Klasör Yok': 'No Folder',
+  'Kayıtlı düzen yok': 'No saved layouts',
+  'Yeni Klasör…': 'New Folder…',
+  'Klasör adı (ör. Üretim)': 'Folder name (e.g. Production)',
+  'Yeni Klasörün Adı': 'New Folder Name',
+  'Bu adda bir klasör var.': 'A folder with this name already exists.',
+  'Yeni Klasör': 'New Folder',
+  'Klasörü Yeniden Adlandır': 'Rename Folder',
+  'Klasör oluşturulur ve "{name}" düzeni içine taşınır.':
+    'The folder is created and the "{name}" layout is moved into it.',
+  'Düzenleri klasörlere ayırarak gruplayın.': 'Group your layouts into folders.',
+  'Klasörün yeni adını yazın.': 'Enter a new name for the folder.',
+  Oluştur: 'Create',
+  'Klasöre Taşı': 'Move to Folder',
+  'Klasörden Çıkar': 'Remove from Folder',
+  'Klasörü Sil': 'Delete Folder',
+  '"{name}" klasörü silindi': '"{name}" folder deleted',
+  'Klasör boş. Düzenleri buraya sürükleyin ya da düzene sağ tıklayıp “Klasöre Taşı” seçin.':
+    'This folder is empty. Drag layouts here, or right-click a layout and choose “Move to Folder”.',
+  'Düzenleri Gruplamak İçin Klasör Oluştur': 'Create a Folder to Group Layouts',
+  'Klasörden çıkarmak için buraya bırakın.': 'Drop here to remove from its folder.',
+  'İçindeki {n} düzen klasör dışına taşındı.': ({ n }) =>
+    `${n} ${plural(n, 'layout was', 'layouts were')} moved out of the folder.`
 }

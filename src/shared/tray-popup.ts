@@ -16,6 +16,7 @@ export const TRAY_POPUP_IPC = {
 
 /** Tepsi açılır penceresinin durumu (her açılışta ana süreçten gelir). */
 export interface TrayPopupState {
+  folders: string[]
   layouts: TrayLayout[]
   language: 'en' | 'tr'
   dark: boolean

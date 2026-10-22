@@ -63,6 +63,7 @@ const EN: Record<string, string> = {
   'API Sürümü': 'API Version',
   'Kayıtlı Düzenler': 'Saved Layouts',
   'Kayıtlı düzen yok': 'No saved layouts',
+  'Klasörde düzen yok': 'No layouts in this folder',
   "JumpDesk'i Göster": 'Show JumpDesk',
   Çıkış: 'Quit'
 }

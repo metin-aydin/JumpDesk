@@ -230,7 +230,7 @@ export interface JumpDeskApi {
   }
   /** Sistem tepsisi: düzen listesi ana sürece bildirilir, tepsiden seçilen düzen burada açılır. */
   tray: {
-    setLayouts(layouts: TrayLayout[]): void
+    setLayouts(list: TrayLayoutList): void
     onOpenLayout(cb: (layoutId: string) => void): () => void
   }
   /** Pencere kapatılınca uygulama tepside sürer; bu olayda açık oturumlar kapatılır. */
@@ -304,4 +304,12 @@ export interface TrayLayout {
   name: string
   /** Düzendeki sunucu sayısı. */
   servers: number
+  /** Düzenin klasörü; tepside klasörün alt menüsünde gösterilir. */
+  folder?: string
+}
+
+/** Tepsideki düzen listesi: klasörler (gösterim sırasıyla, boş olanlar dahil) ve düzenler. */
+export interface TrayLayoutList {
+  folders: string[]
+  layouts: TrayLayout[]
 }

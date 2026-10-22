@@ -40,9 +40,17 @@ export interface SavedLayout {
   name: string
   items: LayoutItem[]
   createdAt: number
+  /** Düzenin bulunduğu klasörün adı; yoksa düzen klasörsüzdür. */
+  folder?: string
 }
 
 const KEY = 'layouts'
+const FOLDERS_KEY = 'layoutFolders'
+const MAX_FOLDER_NAME = 80
+
+const folderKey = (name: string): string => name.trim().toLocaleLowerCase('tr')
+const cleanFolderName = (name: unknown): string =>
+  typeof name === 'string' ? name.trim().slice(0, MAX_FOLDER_NAME) : ''
 
 const validAsset = (a: unknown): a is AssetRef =>
   Boolean(a) && typeof (a as AssetRef).id === 'string' && typeof (a as AssetRef).name === 'string'
@@ -67,23 +75,71 @@ export function sanitizeLayouts(raw: unknown): SavedLayout[] {
         if (i.type !== 'group' || i.sizes === undefined || validSizes(i.sizes)) return i
         return { type: 'group' as const, mode: i.mode, assets: i.assets }
       })
-    if (items.length)
-      out.push({
-        id: l.id,
-        name: l.name,
-        items,
-        createdAt: typeof l.createdAt === 'number' ? l.createdAt : Date.now()
-      })
+    if (!items.length) continue
+    const layout: SavedLayout = {
+      id: l.id,
+      name: l.name,
+      items,
+      createdAt: typeof l.createdAt === 'number' ? l.createdAt : Date.now()
+    }
+    const folder = cleanFolderName(l.folder)
+    if (folder) layout.folder = folder
+    out.push(layout)
   }
   return out
 }
 
-function read(): SavedLayout[] {
-  return sanitizeLayouts(readUserJson(KEY))
+/**
+ * Klasör listesini doğrular: adlar kırpılır, büyük/küçük harf farkıyla yinelenenler atılır; düzenlerin kullandığı ama
+ * listede olmayan klasörler sona eklenir. Düzenlerin klasör adı listedeki yazımla eşitlenir.
+ */
+export function sanitizeFolders(
+  raw: unknown,
+  layouts: SavedLayout[]
+): { folders: string[]; layouts: SavedLayout[] } {
+  const folders: string[] = []
+  const byKey = new Map<string, string>()
+  const add = (value: unknown): void => {
+    const name = cleanFolderName(value)
+    if (!name || byKey.has(folderKey(name))) return
+    byKey.set(folderKey(name), name)
+    folders.push(name)
+  }
+  if (Array.isArray(raw)) raw.forEach(add)
+  layouts.forEach((l) => add(l.folder))
+  return {
+    folders,
+    layouts: layouts.map((l) =>
+      l.folder && byKey.get(folderKey(l.folder)) !== l.folder
+        ? { ...l, folder: byKey.get(folderKey(l.folder)) }
+        : l
+    )
+  }
 }
 
-function write(layouts: SavedLayout[]): void {
+function read(): { folders: string[]; layouts: SavedLayout[] } {
+  return sanitizeFolders(readUserJson(FOLDERS_KEY), sanitizeLayouts(readUserJson(KEY)))
+}
+
+function write(layouts: SavedLayout[], folders?: string[]): void {
   writeUserJson(KEY, layouts)
+  if (folders) writeUserJson(FOLDERS_KEY, folders)
+}
+
+/** Klasörler (kayıt sırasıyla, her birinin düzenleriyle) ve klasörsüz düzenler. */
+export function groupByFolder(
+  layouts: SavedLayout[],
+  folders: string[]
+): { folders: { name: string; layouts: SavedLayout[] }[]; loose: SavedLayout[] } {
+  return {
+    folders: folders.map((name) => ({ name, layouts: layouts.filter((l) => l.folder === name) })),
+    loose: layouts.filter((l) => !l.folder || !folders.includes(l.folder))
+  }
+}
+
+/** Listede ve aramada gösterilen ad: klasördeki düzen "Klasör / Düzen". */
+export function layoutPath(layout: SavedLayout): string {
+  return layout.folder ? `${layout.folder} / ${layout.name}` : layout.name
 }
 
 /** Grubun panel oranları (hepsi eşitse yok). */
@@ -179,39 +235,71 @@ export function openLayout(layout: SavedLayout): void {
 
 interface LayoutStore {
   layouts: SavedLayout[]
+  /** Klasör adları (gösterim sırası); boş klasörler de tutulur. */
+  folders: string[]
   /**
    * Verilen grubu (yoksa tüm açık oturumları) verilen adla kaydeder; aynı adlı düzen varsa üzerine yazar. Grup
-   * kaydedildiyse grup sekmesi düzenin adını alır.
+   * kaydedildiyse grup sekmesi düzenin adını alır. `folder`: düzenin klasörü (`null` klasörsüz; verilmezse üzerine
+   * yazılan düzenin klasörü korunur), yoksa oluşturulur.
    */
-  saveCurrent: (name: string, groupId?: string) => SavedLayout | null
+  saveCurrent: (name: string, groupId?: string, folder?: string | null) => SavedLayout | null
   rename: (id: string, name: string) => void
   /** Grubun şu anki sunucularını, sırasını ve yerleşimini bağlı olduğu düzene yazar. */
   updateFromGroup: (groupId: string) => void
   remove: (id: string) => void
-  /** Tüm düzenleri verilenlerle değiştirir (içe aktarma); açık gruplardan silinen düzenlere bağlı olanların adı kalkar. */
-  replaceAll: (layouts: SavedLayout[]) => void
+  /** Klasör oluşturur; aynı adda (büyük/küçük harf farkı gözetmeden) klasör varsa onun adını döndürür. */
+  createFolder: (name: string) => string | null
+  /** Klasörün adını değiştirir; başka bir klasör bu adı kullanıyorsa değiştirmez ve `false` döner. */
+  renameFolder: (from: string, to: string) => boolean
+  /** Klasörü siler; içindeki düzenler klasörsüz kalır. */
+  removeFolder: (name: string) => void
+  /** Düzeni klasöre taşır (`null` klasörden çıkarır); klasör yoksa oluşturulur. */
+  moveToFolder: (id: string, folder: string | null) => void
+  /**
+   * Tüm düzenleri (ve klasörleri) verilenlerle değiştirir (içe aktarma); açık gruplardan silinen düzenlere bağlı
+   * olanların adı kalkar.
+   */
+  replaceAll: (layouts: SavedLayout[], folders?: string[]) => void
 }
 
+const withoutFolder = (layout: SavedLayout): SavedLayout => {
+  const copy = { ...layout }
+  delete copy.folder
+  return copy
+}
+
+/** Klasör listesinde aynı adlı (büyük/küçük harf farkı gözetmeden) klasör. */
+const findFolder = (folders: string[], name: string): string | undefined =>
+  folders.find((f) => folderKey(f) === folderKey(name))
+
 export const useLayouts = create<LayoutStore>((set, get) => ({
-  layouts: read(),
-  saveCurrent: (name, groupId) => {
+  ...read(),
+  saveCurrent: (name, groupId, folder) => {
     const items = groupId ? captureGroup(groupId) : captureLayout()
     const trimmed = name.trim()
     if (!items.length || !trimmed) return null
     const existing = get().layouts.find(
       (l) => l.name.toLocaleLowerCase('tr') === trimmed.toLocaleLowerCase('tr')
     )
+    let folders = get().folders
+    let target = folder === undefined ? existing?.folder : folder
+    if (target) {
+      const known = findFolder(folders, target)
+      target = known ?? cleanFolderName(target)
+      if (!known && target) folders = [...folders, target]
+    }
     const layout: SavedLayout = {
       id: existing?.id ?? `layout-${Date.now().toString(36)}`,
       name: trimmed,
       items,
       createdAt: Date.now()
     }
+    if (target) layout.folder = target
     const layouts = existing
       ? get().layouts.map((l) => (l.id === existing.id ? layout : l))
       : [...get().layouts, layout]
-    write(layouts)
-    set({ layouts })
+    write(layouts, folders)
+    set({ layouts, folders })
     if (groupId) useWorkspace.getState().nameGroup(groupId, layout.name, layout.id, 0)
     return layout
   },
@@ -248,9 +336,50 @@ export const useLayouts = create<LayoutStore>((set, get) => ({
     const ws = useWorkspace.getState()
     ws.groups.filter((g) => g.layoutId === id).forEach((g) => ws.unnameGroup(g.id))
   },
-  replaceAll: (layouts) => {
-    write(layouts)
-    set({ layouts })
+  createFolder: (name) => {
+    const clean = cleanFolderName(name)
+    if (!clean) return null
+    const known = findFolder(get().folders, clean)
+    if (known) return known
+    const folders = [...get().folders, clean]
+    writeUserJson(FOLDERS_KEY, folders)
+    set({ folders })
+    return clean
+  },
+  renameFolder: (from, to) => {
+    const clean = cleanFolderName(to)
+    if (!clean || !get().folders.includes(from)) return false
+    const other = findFolder(get().folders, clean)
+    if (other && other !== from) return false
+    const folders = get().folders.map((f) => (f === from ? clean : f))
+    const layouts = get().layouts.map((l) => (l.folder === from ? { ...l, folder: clean } : l))
+    write(layouts, folders)
+    set({ layouts, folders })
+    return true
+  },
+  removeFolder: (name) => {
+    const folders = get().folders.filter((f) => f !== name)
+    const layouts = get().layouts.map((l) => (l.folder === name ? withoutFolder(l) : l))
+    write(layouts, folders)
+    set({ layouts, folders })
+  },
+  moveToFolder: (id, folder) => {
+    let folders = get().folders
+    let target: string | undefined
+    if (folder) {
+      target = findFolder(folders, folder) ?? (cleanFolderName(folder) || undefined)
+      if (target && !folders.includes(target)) folders = [...folders, target]
+    }
+    const layouts = get().layouts.map((l) =>
+      l.id !== id ? l : target ? { ...l, folder: target } : withoutFolder(l)
+    )
+    write(layouts, folders)
+    set({ layouts, folders })
+  },
+  replaceAll: (incoming, incomingFolders) => {
+    const { layouts, folders } = sanitizeFolders(incomingFolders, incoming)
+    write(layouts, folders)
+    set({ layouts, folders })
     const ws = useWorkspace.getState()
     ws.groups
       .filter((g) => g.layoutId && !layouts.some((l) => l.id === g.layoutId))
@@ -258,16 +387,25 @@ export const useLayouts = create<LayoutStore>((set, get) => ({
   }
 }))
 
-onUserScope(() => useLayouts.setState({ layouts: read() }))
+onUserScope(() => useLayouts.setState(read()))
+
+export type LayoutDialogState =
+  | { mode: 'save'; groupId?: string }
+  | { mode: 'rename'; layout: SavedLayout }
+  | { mode: 'folder'; layoutId?: string }
+  | { mode: 'folder-rename'; folder: string }
 
 interface LayoutDialogStore {
   /**
-   * `save`: grubu (verilmezse tüm açık oturumları) düzen olarak kaydet; `rename`: var olan düzenin adını değiştir.
+   * `save`: grubu (verilmezse tüm açık oturumları) düzen olarak kaydet; `rename`: var olan düzenin adını değiştir;
+   * `folder`: yeni klasör (düzen verildiyse oraya taşınır); `folder-rename`: klasörün adını değiştir.
    */
-  state: { mode: 'save'; groupId?: string } | { mode: 'rename'; layout: SavedLayout } | null
+  state: LayoutDialogState | null
   /** Grup verilmezse etkin sekmenin grubu kaydedilir; `null` tüm açık oturumları kaydeder. */
   openSave: (groupId?: string | null) => void
   openRename: (layout: SavedLayout) => void
+  openNewFolder: (layoutId?: string) => void
+  openRenameFolder: (folder: string) => void
   close: () => void
 }
 
@@ -279,6 +417,8 @@ export const useLayoutDialog = create<LayoutDialogStore>((set) => ({
     set({ state: { mode: 'save', groupId: target } })
   },
   openRename: (layout) => set({ state: { mode: 'rename', layout } }),
+  openNewFolder: (layoutId) => set({ state: { mode: 'folder', layoutId } }),
+  openRenameFolder: (folder) => set({ state: { mode: 'folder-rename', folder } }),
   close: () => set({ state: null })
 }))
 

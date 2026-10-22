@@ -5,7 +5,7 @@ import { countServers, openLayout, useLayouts } from '@/stores/layouts'
 import { useWorkspace } from '@/stores/workspace'
 
 /**
- * Sistem tepsisiyle eşitleme: giriş yapmış kullanıcının kayıtlı düzenleri ana sürece bildirilir (tepsi menüsü ve
+ * Sistem tepsisiyle eşitleme: giriş yapmış kullanıcının kayıtlı düzenleri ve klasörleri ana sürece bildirilir (tepsi menüsü ve
  * açılır penceresi, pencere kapalıyken de bu listeyi gösterir; dil değişince menü yeniden kurulsun diye yine
  * bildirilir). Tepsiden seçilen düzen yeni sekmede açılır; oturum açık değilse girişten sonra açılır. Pencere
  * kapatılınca uygulama tepside sürer ve açık oturumlar kapatılır.
@@ -13,16 +13,19 @@ import { useWorkspace } from '@/stores/workspace'
 export function startTraySync(): () => void {
   let pending: string | null = null
   const loggedIn = (): boolean => useAuth.getState().state?.status === 'logged-in'
-  const push = (): void =>
-    jumpdesk.tray.setLayouts(
-      loggedIn()
-        ? useLayouts.getState().layouts.map((l) => ({
-            id: l.id,
-            name: l.name,
-            servers: countServers(l.items)
-          }))
-        : []
-    )
+  const push = (): void => {
+    if (!loggedIn()) return jumpdesk.tray.setLayouts({ folders: [], layouts: [] })
+    const { layouts, folders } = useLayouts.getState()
+    jumpdesk.tray.setLayouts({
+      folders,
+      layouts: layouts.map((l) => ({
+        id: l.id,
+        name: l.name,
+        servers: countServers(l.items),
+        ...(l.folder ? { folder: l.folder } : {})
+      }))
+    })
+  }
   const open = (id: string): void => {
     const layout = useLayouts.getState().layouts.find((l) => l.id === id)
     if (layout) openLayout(layout)
