@@ -88,20 +88,26 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
     fields: [
       {
         key: 'endpoint',
-        label: 'Uç Nokta',
+        label: 'Kaynak Adı',
         required: true,
-        placeholder: 'https://<kaynak>.openai.azure.com'
+        placeholder: 'sirket-openai',
+        hint: 'Azure portalındaki Azure OpenAI kaynağınızın adı; istekler https://<kaynak adı>.openai.azure.com adresine gider. Tam adres de yazılabilir.'
       },
-      { key: 'deployment', label: 'Dağıtım Adı', required: true },
-      { key: 'apiVersion', label: 'API Sürümü', required: true },
+      {
+        key: 'deployment',
+        label: 'Dağıtım Adı',
+        required: true,
+        hint: "Azure AI Foundry'de modele verdiğiniz dağıtım adı."
+      },
       { key: 'apiKey', label: 'API Anahtarı', secret: true, required: true }
     ],
     defaults: { apiVersion: '2024-10-21' }
   },
   {
     id: 'compatible',
-    label: 'OpenAI Uyumlu',
-    description: 'Ollama, LM Studio, vLLM gibi OpenAI uyumlu bir sunucu (kurum içi model).',
+    label: 'Yerel Model Sunucusu',
+    description:
+      'Ollama, LM Studio, vLLM gibi kendi bilgisayarınızda ya da kurum içinde çalışan, OpenAI API biçimini konuşan bir sunucu.',
     fields: [
       {
         key: 'baseUrl',
@@ -115,6 +121,12 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
     defaults: {}
   }
 ]
+
+/** Azure OpenAI adresi: yalnız kaynak adı yazıldıysa https://<ad>.openai.azure.com, tam adres olduğu gibi. */
+export function azureEndpoint(value: string): string {
+  const v = value.trim().replace(/\/+$/, '')
+  return /^[a-z0-9][a-z0-9-]{0,62}$/i.test(v) ? `https://${v}.openai.azure.com` : v
+}
 
 export const aiProviderInfo = (id: AiProvider): AiProviderInfo =>
   AI_PROVIDERS.find((p) => p.id === id) ?? AI_PROVIDERS[0]

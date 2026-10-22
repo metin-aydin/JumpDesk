@@ -174,7 +174,7 @@ try {
     (await page.getByRole('dialog').getByRole('switch').count()) === 5
   )
   await providerSelect.click()
-  await page.getByRole('option', { name: 'OpenAI Uyumlu', exact: true }).click()
+  await page.getByRole('option', { name: 'Yerel Model Sunucusu', exact: true }).click()
   await page.waitForTimeout(300)
   // Adres (anahtar) kaydedilmeden model listesi istenmez; model elle yazılamaz
   const modelSelect = page.getByRole('combobox', { name: 'Model' })

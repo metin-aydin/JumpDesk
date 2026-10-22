@@ -6,7 +6,7 @@ export const ai: Dictionary = {
   OpenAI: 'OpenAI',
   'Google Gemini': 'Google Gemini',
   'Azure OpenAI': 'Azure OpenAI',
-  'OpenAI Uyumlu': 'OpenAI Compatible',
+  'Yerel Model Sunucusu': 'Local Model Server',
   'Claude modelleri; anahtar console.anthropic.com adresinden alınır.':
     'Claude models; get a key at console.anthropic.com.',
   'OpenAI modelleri; anahtar platform.openai.com adresinden alınır.':
@@ -14,8 +14,8 @@ export const ai: Dictionary = {
   'Gemini modelleri; anahtar aistudio.google.com adresinden alınır.':
     'Gemini models; get a key at aistudio.google.com.',
   'Kurumunuzun Azure OpenAI kaynağı.': "Your organization's Azure OpenAI resource.",
-  'Ollama, LM Studio, vLLM gibi OpenAI uyumlu bir sunucu (kurum içi model).':
-    'An OpenAI-compatible server such as Ollama, LM Studio or vLLM (on-premises model).',
+  'Ollama, LM Studio, vLLM gibi kendi bilgisayarınızda ya da kurum içinde çalışan, OpenAI API biçimini konuşan bir sunucu.':
+    'A server running on your computer or in your organization, such as Ollama, LM Studio or vLLM, that speaks the OpenAI API format.',
   'API Anahtarı': 'API Key',
   'API Anahtarı (İsteğe Bağlı)': 'API Key (Optional)',
   'Çalışma Alanı Kimliği (İsteğe Bağlı)': 'Workspace ID (Optional)',
@@ -23,9 +23,13 @@ export const ai: Dictionary = {
   'Bir çalışma alanına bağlı olmayan kuruluş anahtarlarında gerekir: console.anthropic.com → Settings → Workspaces.':
     'Required for organization keys that are not scoped to a workspace: console.anthropic.com → Settings → Workspaces.',
   Model: 'Model',
-  'Uç Nokta': 'Endpoint',
+  'Kaynak Adı': 'Resource Name',
+  'sirket-openai': 'company-openai',
+  'Azure portalındaki Azure OpenAI kaynağınızın adı; istekler https://<kaynak adı>.openai.azure.com adresine gider. Tam adres de yazılabilir.':
+    'The name of your Azure OpenAI resource in the Azure portal; requests go to https://<resource name>.openai.azure.com. A full address also works.',
   'Dağıtım Adı': 'Deployment Name',
-  'API Sürümü': 'API Version',
+  "Azure AI Foundry'de modele verdiğiniz dağıtım adı.":
+    'The deployment name you gave the model in Azure AI Foundry.',
   Adres: 'Address',
   'sk-ant-…': 'sk-ant-…',
   'sk-…': 'sk-…',

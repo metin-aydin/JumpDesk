@@ -265,4 +265,31 @@ check(
   calls.at(-1).body.tools[0].name === 'explain_text' &&
     calls.at(-1).body.tool_choice.name === 'explain_text'
 )
+// Azure: yalnız kaynak adı yazılırsa adres ondan kurulur, API sürümü verilmezse varsayılan kullanılır
+reply = {
+  status: 200,
+  body: { choices: [{ message: { content: '{"suggestions":[],"note":""}' } }] }
+}
+await callProvider({
+  ...base,
+  provider: 'azure',
+  fields: { endpoint: 'sirket-openai', deployment: 'gpt-4o' }
+})
+check(
+  'azure: resource name becomes the endpoint, default API version',
+  calls.at(-1).url ===
+    'https://sirket-openai.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2024-10-21',
+  calls.at(-1).url
+)
+await callProvider({
+  ...base,
+  provider: 'azure',
+  fields: { endpoint: 'https://ozel.openai.azure.com/', deployment: 'd', apiVersion: '2025-01-01' }
+})
+check(
+  'azure: full endpoint and stored API version are kept',
+  calls.at(-1).url ===
+    'https://ozel.openai.azure.com/openai/deployments/d/chat/completions?api-version=2025-01-01',
+  calls.at(-1).url
+)
 process.exitCode = failed ? 1 : 0

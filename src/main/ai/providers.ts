@@ -1,5 +1,5 @@
 import { net } from 'electron'
-import type { AiProvider } from '@shared/ai'
+import { azureEndpoint, type AiProvider } from '@shared/ai'
 import { mt } from '../i18n'
 
 const TIMEOUT_MS = 45_000
@@ -198,9 +198,9 @@ async function openai(input: CallInput): Promise<unknown> {
 }
 
 async function azure(input: CallInput): Promise<unknown> {
-  const url = `${trimSlash(input.fields['endpoint'] ?? '')}/openai/deployments/${encodeURIComponent(
+  const url = `${azureEndpoint(input.fields['endpoint'] ?? '')}/openai/deployments/${encodeURIComponent(
     input.fields['deployment'] ?? ''
-  )}/chat/completions?api-version=${encodeURIComponent(input.fields['apiVersion'] ?? '')}`
+  )}/chat/completions?api-version=${encodeURIComponent(input.fields['apiVersion'] || '2024-10-21')}`
   return chatContent(
     await post(
       url,
