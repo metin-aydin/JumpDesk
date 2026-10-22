@@ -23,14 +23,17 @@ export function startUpdate(state: UpdateState): void {
 }
 
 let announcedVersion: string | null = null
+/** Pencere tepsiye gizli; bu sırada bulunan sürüm pencere yeniden açılınca duyurulur. */
+let windowHidden = false
 const loggedIn = (): boolean => useAuth.getState().state?.status === 'logged-in'
 
 /**
  * Ayarlar ekranı kapalıyken bulunan yeni sürüm ve tamamlanan indirme bildirimle duyurulur. Giriş ekranında bulunan
- * sürüm girişten sonra duyurulur.
+ * sürüm girişten sonra, pencere tepsideyken bulunan sürüm pencere yeniden açılınca duyurulur; kurulmamış sürüm her
+ * yeniden açılışta yeniden hatırlatılır.
  */
 function announce(prev: UpdateState | null, next: UpdateState): void {
-  if (!loggedIn()) return
+  if (!loggedIn() || windowHidden) return
   const settingsOpen = useDialogs.getState().settings
   if (next.status === 'available' && next.version && next.version !== announcedVersion) {
     announcedVersion = next.version
@@ -64,6 +67,15 @@ export async function initUpdate(): Promise<void> {
   const state = await jumpdesk.update.getState()
   useUpdate.setState({ state })
   announce(null, state)
+  jumpdesk.app.onHidden(() => {
+    windowHidden = true
+    announcedVersion = null
+  })
+  jumpdesk.app.onShown(() => {
+    windowHidden = false
+    const current = useUpdate.getState().state
+    if (current) announce(null, current)
+  })
   useAuth.subscribe((auth, prevAuth) => {
     const current = useUpdate.getState().state
     if (current && auth.state?.status === 'logged-in' && prevAuth.state?.status !== 'logged-in')

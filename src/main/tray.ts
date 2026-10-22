@@ -17,6 +17,7 @@ import { TRAY_POPUP_IPC, type TrayPopupState } from '@shared/tray-popup'
 import { currentLanguage, mt } from './i18n'
 import { isQuitting, markQuitting } from './quitting'
 import { popupPosition, type Rect } from './tray-position'
+import { checkOnReopen } from './updater'
 import lightIcon from '../../resources/tray/tray-light.png?asset'
 import lightIcon2x from '../../resources/tray/tray-light@2x.png?asset'
 import templateIcon from '../../resources/tray/trayTemplate.png?asset'
@@ -55,12 +56,17 @@ function trayImage(): NativeImage {
   return pair(lightIcon, lightIcon2x)
 }
 
+/** Pencereyi öne getirir; tepsiye gizlenmişse arayüze bildirilir ve güncelleme denetlenir. */
 function showWindow(): void {
   const win = mainWindow
   if (!win || win.isDestroyed()) return
+  const wasHidden = !win.isVisible()
   if (win.isMinimized()) win.restore()
   win.show()
   win.focus()
+  if (!wasHidden) return
+  win.webContents.send(IPC.appShown)
+  checkOnReopen()
 }
 
 /** Düzen ana pencerede yeni sekmede açılır; pencere kapalıysa (gizli) önce gösterilir. */
