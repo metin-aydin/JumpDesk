@@ -27,7 +27,7 @@ import { useTheme } from '@/stores/theme'
 import { AutocompletePopup, type AutocompleteState } from './AutocompletePopup'
 import { GhostText, type GhostAnchor } from './GhostText'
 import type { CursorAnchor } from './CursorPopup'
-import { computeSuggestions } from './autocomplete'
+import { computePathSuggestions, computeSuggestions, pathAt } from './autocomplete'
 import { paintInputLine } from './command-highlight'
 import { readInputLine } from './input-line'
 import { KokoConnection, type KokoMessage, type KokoState } from './koko-connection'
@@ -37,7 +37,12 @@ import { observeSize, onTabHostMoved } from '@/features/windows/tab-hosts'
 import { AlarmDetector } from '@/features/alarms/alarm-detector'
 import { reportAlarm } from '@/features/alarms/report'
 import { terminalRegistry, type TerminalHandle } from './registry'
-import { SetupEchoGate, attachIntegration, buildSetupCommand } from './shell-integration'
+import {
+  DIR_LISTING_KEY,
+  SetupEchoGate,
+  attachIntegration,
+  buildSetupCommand
+} from './shell-integration'
 import { TerminalSearchBar } from './TerminalSearchBar'
 import { raiseActiveMatch } from './search-decorations'
 import { terminalTheme } from './themes'
@@ -61,6 +66,11 @@ const MAX_WAIT_FOR_PROMPT_MS = 6000
 const LINE_HEIGHT = 1.15
 /** Kurulum yanıtı bekleme süresi dolduktan sonra entegrasyonun kurulamadı sayılmasına kadar geçen süre. */
 const INTEGRATION_GRACE_MS = 10_000
+/** İki Tab bu süre içindeyse dosya kipi açılır. */
+const DOUBLE_TAB_MS = 450
+/** Klasör listesi bu süreden eskiyse yeniden istenir; yanıt gelmeyen istek bu süre sonra tekrarlanır. */
+const DIR_LISTING_TTL_MS = 15_000
+const DIR_LISTING_RETRY_MS = 3000
 const APP_KEYS = ['T', 'W', 'B', 'F', 'A', 'E', 'P', 'S', 'K', 'Tab', 'Enter']
 
 export interface TerminalPaneProps {
@@ -177,7 +187,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   const [popup, setPopup] = useState<AutocompleteState | null>(null)
   const popupRef = useRef<AutocompleteState | null>(null)
   popupRef.current = popup
-  const acceptRef = useRef<(index: number) => void>(() => undefined)
+  const acceptRef = useRef<(index: number, untilSlash?: boolean) => void>(() => undefined)
   const termRef = useRef<Terminal | null>(null)
   const connRef = useRef<KokoConnection | null>(null)
   const visibleRef = useRef(visible)
@@ -315,6 +325,17 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     let autoSuggest = true
     /** Ctrl+Space ile elle açıldı; veri olmasa da boş liste gösterilir. */
     let manualOpen = false
+    /** Bir kısmı kabul edilen öneri; liste yenilenince yine o seçili kalır. */
+    let keptLabel: string | null = null
+    /**
+     * Çift Tab ile açılan dosya kipi: öneriler imleçteki yolun klasöründeki girdilerdir, klasör kabul edildikçe içi
+     * listelenir. Enter, Esc, Ctrl+C ya da geçmişte gezinme kapatır.
+     */
+    let fileMode = false
+    let lastTabAt = 0
+    /** Kabuktan alınan klasör listeleri (anahtar komut satırında yazıldığı gibi klasör) ve bekleyen istekler. */
+    const dirListings = new Map<string, { entries: string[]; at: number }>()
+    const dirRequests = new Map<string, number>()
     let outstanding = 0
     let refreshQueued = false
     let submittedFrom: { x: number; y: number } | null = null
@@ -338,12 +359,19 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const integration = attachIntegration(term, {
       onCwd: (cwd) => {
         integrationAlive()
+        // Göreli klasör listeleri yeni çalışma dizininde geçersizdir.
+        if (cwd !== live.cwd) dirListings.clear()
         live.cwd = cwd
         info.patch(tabId, { cwd })
       },
       onListing: (entries) => {
         live.entries = entries
         entrySet = new Set(entries)
+      },
+      onDirListing: (dir, entries) => {
+        dirListings.set(dir, { entries, at: Date.now() })
+        dirRequests.delete(dir)
+        if (fileMode) scheduleRefresh()
       },
       onCommand: (num, command) => info.appendCommand(tabId, num, command),
       onHistory: (history) => info.patch(tabId, { history }),
@@ -386,9 +414,32 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       return !integrated || live.atPrompt
     }
 
+    const integrationReady = (): boolean =>
+      useSessionInfo.getState().byTab[tabId]?.integration === 'ready'
+
+    /**
+     * Dosya kipinde klasörün girdileri: çalışma dizini kabuk entegrasyonunun her istemde gönderdiği listeden, diğer
+     * klasörler kabuktan istenir (yanıt gelince öneriler yenilenir). Eski liste yenisi gelene kadar gösterilir.
+     */
+    const dirEntries = (dir: string): string[] | null => {
+      if (!dir) return live.entries
+      const cached = dirListings.get(dir)
+      const now = Date.now()
+      if (
+        (!cached || now - cached.at > DIR_LISTING_TTL_MS) &&
+        now - (dirRequests.get(dir) ?? 0) > DIR_LISTING_RETRY_MS
+      ) {
+        dirRequests.set(dir, now)
+        connRef.current?.input(DIR_LISTING_KEY)
+      }
+      return cached?.entries ?? null
+    }
+
     /** Henüz çizilmemiş bir açılışı da iptal eder (aynı değerde React yeniden çizmez). */
     const closePopup = (): void => {
       manualOpen = false
+      keptLabel = null
+      fileMode = false
       popupRef.current = null
       setPopup(null)
     }
@@ -427,17 +478,45 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         refreshInput()
         return false
       }
+      // Çift Tab dosya kipini açar; ilk Tab kabuğa gider (kabuğun kendi tamamlaması), ikincisi gönderilmez.
+      if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        const now = Date.now()
+        const double = now - lastTabAt < DOUBLE_TAB_MS
+        lastTabAt = double ? 0 : now
+        if (double && commandLineOpen() && integrationReady()) {
+          e.preventDefault()
+          fileMode = true
+          manualOpen = true
+          keptLabel = null
+          dismissedText = null
+          refreshInput()
+          return false
+        }
+      }
       const open = popupRef.current
-      if (open && open.items.length === 0 && e.key !== 'Escape') {
+      if (open && open.items.length === 0 && e.key !== 'Escape' && !fileMode) {
         closePopup()
+      } else if (
+        open &&
+        e.key === 'ArrowRight' &&
+        !e.shiftKey &&
+        !e.metaKey &&
+        (isMac ? e.altKey && !e.ctrlKey : e.ctrlKey && !e.altKey)
+      ) {
+        // Ctrl+→ (macOS'ta ⌥→) önerinin bir sonraki / işaretine kadarki kısmını yazar.
+        e.preventDefault()
+        acceptRef.current(open.index, true)
+        return false
       } else if (open && !e.ctrlKey && !e.altKey && !e.metaKey) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
           e.preventDefault()
+          keptLabel = null
           const delta = e.key === 'ArrowDown' ? 1 : -1
           setPopup({ ...open, index: (open.index + delta + open.items.length) % open.items.length })
           return false
         }
-        if (e.key === 'Tab' || e.key === 'ArrowRight') {
+        // Tab kabuğa gider (kabuğun kendi tamamlaması); öneri yalnız → ile kabul edilir.
+        if (e.key === 'ArrowRight') {
           e.preventDefault()
           acceptRef.current(open.index)
           return false
@@ -595,16 +674,23 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         closePopup()
         return
       }
-      const items = computeSuggestions(
-        text,
-        {
-          history: useSessionInfo.getState().byTab[tabId]?.history ?? [],
-          snippets: useSnippets.getState().snippets,
-          commandNames: live.commandNames,
-          entries: live.entries
-        },
-        manualOpen
-      )
+      const beforeCursor = line ? line.text.slice(0, line.cursor) : ''
+      const folder = fileMode ? pathAt(beforeCursor).dir : ''
+      const listing = fileMode ? dirEntries(folder) : null
+      const items = fileMode
+        ? listing
+          ? computePathSuggestions(beforeCursor, listing)
+          : []
+        : computeSuggestions(
+            text,
+            {
+              history: useSessionInfo.getState().byTab[tabId]?.history ?? [],
+              snippets: useSnippets.getState().snippets,
+              commandNames: live.commandNames,
+              entries: live.entries
+            },
+            manualOpen
+          )
       const screen = term.element?.querySelector('.xterm-screen')
       const wrap = wrapRef.current
       if ((!items.length && !manualOpen) || !screen || !wrap) {
@@ -615,9 +701,12 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       const sameItems =
         previous &&
         previous.items.map((i) => i.label).join('\n') === items.map((i) => i.label).join('\n')
+      const kept = keptLabel ? items.findIndex((i) => i.label === keptLabel) : -1
       setPopup({
         items,
-        index: sameItems ? previous.index : 0,
+        index: kept >= 0 ? kept : sameItems ? previous.index : 0,
+        folder: fileMode ? folder || './' : undefined,
+        loading: fileMode && !listing,
         anchor: cursorAnchor(screen),
         ghost: line && atEnd ? ghostAnchor(screen, wrap) : undefined
       })
@@ -841,12 +930,17 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         for (const id of broadcastPeers(tabId)) terminalRegistry.get(id)?.send(data)
       })
       term.onBinary((data) => conn.input(data))
-      acceptRef.current = (index) => {
+      acceptRef.current = (index, untilSlash = false) => {
         const item = popupRef.current?.items[index]
         if (!item) return
-        closePopup()
-        sendTracked(item.insert)
-        for (const id of broadcastPeers(tabId)) terminalRegistry.get(id)?.send(item.insert)
+        // Baştaki / atlanır: "/abc/123" önerisinde ilk adım "/abc/" olur.
+        const slash = untilSlash ? item.insert.indexOf('/', 1) : -1
+        const text = slash >= 0 ? item.insert.slice(0, slash + 1) : item.insert
+        // Dosya kipinde kabul edilen klasörün içi listelenir; kip açık kalır.
+        if (text.length < item.insert.length) keptLabel = item.label
+        else if (!fileMode) closePopup()
+        sendTracked(text)
+        for (const id of broadcastPeers(tabId)) terminalRegistry.get(id)?.send(text)
         term.focus()
       }
       // Yapay zekanın önerdiği komut satırdaki metnin yerine yazılır (Ctrl+E, Ctrl+U satırı temizler); satır sonu

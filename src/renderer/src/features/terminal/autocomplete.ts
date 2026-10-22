@@ -108,3 +108,34 @@ export function computeSuggestions(
   }
   return out.slice(0, MAX)
 }
+
+/** Dosya kipinde listelenen en çok girdi. */
+const MAX_PATH = 300
+
+/** İmleçten önceki sözcüğün klasör kısmı (`logs/a` → `logs/`, `app` → boş) ve adı. */
+export function pathAt(input: string): { dir: string; base: string } {
+  const { word } = currentWord(input)
+  const slash = word.lastIndexOf('/')
+  return { dir: word.slice(0, slash + 1), base: word.slice(slash + 1) }
+}
+
+/**
+ * Dosya kipi önerileri: imleçteki yolun klasöründeki girdiler (önce klasörler), yazılan adla başlayanlar. Gizli
+ * girdiler yalnız ad noktayla başlıyorsa gösterilir. Klasör kabul edilince sonuna boşluk eklenmez, içi listelenir.
+ */
+export function computePathSuggestions(input: string, listing: string[]): Suggestion[] {
+  const { dir, base } = pathAt(input)
+  return listing
+    .filter((e) => e !== './' && e !== '../' && e.startsWith(base) && e.length > base.length)
+    .filter((e) => base.startsWith('.') || !e.startsWith('.'))
+    .sort((a, b) => Number(b.endsWith('/')) - Number(a.endsWith('/')))
+    .slice(0, MAX_PATH)
+    .map((entry) => {
+      const isDir = entry.endsWith('/')
+      return {
+        kind: isDir ? ('directory' as const) : ('file' as const),
+        label: dir + entry,
+        insert: entry.slice(base.length) + (isDir ? '' : ' ')
+      }
+    })
+}

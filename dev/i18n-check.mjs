@@ -61,7 +61,7 @@ const TEXT_PROPS = new Set([
   'detail'
 ])
 /** Değeri veri olan alanlar (alarm deseni, komut, kimlik); çevrilmez. */
-const DATA_PROPS = new Set(['pattern', 'command', 'id', 'value', 'protocol', 'platform'])
+const DATA_PROPS = new Set(['pattern', 'command', 'id', 'value', 'protocol', 'platform', 'keys'])
 /** Çevrilmeyen, her dilde aynı kalan metinler. */
 const ALLOW = new Set([
   'JumpDesk',
