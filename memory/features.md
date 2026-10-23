@@ -1426,3 +1426,4 @@ PR #10 birleşti (0.2.7); yeni `development` açıldı.
   pencereye sığmıyordu. Artık `computePathSuggestions` etiketi yalnız girdinin adı (klasör yolu pencere başlığında);
   başlıktaki yol 64 karakterden uzunsa başı "…" ile kısaltılır (`shortPath`), tam yol `title` ipucunda.
 - Test: autocomplete 17/17 ("folder entries show only their names").
+- Gönderim: PR #11 "JumpDesk 0.2.8: shorter folder suggestions" (birleştirme kullanıcıda).
