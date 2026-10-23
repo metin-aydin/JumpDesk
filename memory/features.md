@@ -1436,3 +1436,4 @@ PR #10 birleşti (0.2.7); yeni `development` açıldı.
   `visible` düşünce `closePopupRef`, yapay zeka penceresi (`setAiAnchor(null)`) ve "Açıkla" düğmesi kapanır.
 - Test: autocomplete 18/18 ("suggestions do not come back after switching tabs"); windows 47, ai 44, panels 13,
   tab-keys 8, popups 4, multiwindow 21.
+- PR #11 başlığı "JumpDesk 0.2.8: shorter folder suggestions, suggestion list fix", notu güncellendi.
