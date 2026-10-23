@@ -190,7 +190,7 @@ try {
   }
   await page.keyboard.press('ArrowRight')
   let inside = await state()
-  for (let i = 0; i < 20 && !inside.options.includes('logs/app.log'); i++) {
+  for (let i = 0; i < 20 && !inside.options.includes('app.log'); i++) {
     await page.waitForTimeout(200)
     inside = await state()
   }
@@ -198,7 +198,7 @@ try {
     'accepting a folder lists what is inside',
     (await promptLine()).endsWith('cat logs/') &&
       inside.folder === 'logs/' &&
-      inside.options.includes('logs/app.log'),
+      inside.options.includes('app.log'),
     JSON.stringify(inside)
   )
   await shot('autocomplete-04-subfolder')
@@ -206,8 +206,13 @@ try {
   await page.waitForTimeout(600)
   const filtered = await state()
   check(
+    'folder entries show only their names',
+    inside.options.every((o) => !o.includes('logs/')),
+    JSON.stringify(inside.options)
+  )
+  check(
     'typing filters the folder entries',
-    filtered.options.length > 0 && filtered.options.every((o) => o.startsWith('logs/a')),
+    filtered.options.length > 0 && filtered.options.every((o) => o.startsWith('a')),
     JSON.stringify(filtered.options)
   )
   await page.keyboard.press('Escape')
