@@ -1419,3 +1419,21 @@ PR #9 birleşti, 0.2.6 yayımlandı; yeni `development` açıldı.
 5. Gönderim: commit `dbb8285` + `718b8ce`; PR #10 başlığı "JumpDesk 0.2.7: folder suggestions with Tab Tab, tray
    update checks, .deb installs after restarts", notları güncellendi. Regresyon: windows 47, tab-keys 8, popups 4,
    ai 44, tools 69, server-status 37, right-click 9, multiwindow 21, panels 13 (hepsi geçti).
+
+## Kullanıcı istekleri — 53. tur (2026-10-23): dosya kipinde yalnız adlar
+PR #10 birleşti (0.2.7); yeni `development` açıldı.
+- Çift Tab dosya kipinde öneriler tam yolla geliyordu, uzun yollarda (ör. /u01/oracle/Middleware/…/base_domain/)
+  pencereye sığmıyordu. Artık `computePathSuggestions` etiketi yalnız girdinin adı (klasör yolu pencere başlığında);
+  başlıktaki yol 64 karakterden uzunsa başı "…" ile kısaltılır (`shortPath`), tam yol `title` ipucunda.
+- Test: autocomplete 17/17 ("folder entries show only their names").
+- Gönderim: PR #11 "JumpDesk 0.2.8: shorter folder suggestions" (birleştirme kullanıcıda).
+
+## Kullanıcı isteği — 54. tur (2026-10-23): sekme kapatınca öneri penceresi kalıyordu
+- Neden: öneri penceresi yalnız `active` ile gizleniyordu, durumu kapanmıyordu; sekmeden ayrılınca açık kalan
+  pencere, o sekmeye dönülünce (ör. diğer sekme kapatılınca) geri geliyordu. Arka plandaki terminale çıktı gelince
+  konum görünmeyen ekrana göre (0,0) hesaplandığı için sol üste kayıyordu.
+- Çözüm (`TerminalPane.tsx`): `refreshInput` terminal görünür ve etkin değilse pencereyi kapatıp çıkar; `active` ya da
+  `visible` düşünce `closePopupRef`, yapay zeka penceresi (`setAiAnchor(null)`) ve "Açıkla" düğmesi kapanır.
+- Test: autocomplete 18/18 ("suggestions do not come back after switching tabs"); windows 47, ai 44, panels 13,
+  tab-keys 8, popups 4, multiwindow 21.
+- PR #11 başlığı "JumpDesk 0.2.8: shorter folder suggestions, suggestion list fix", notu güncellendi.

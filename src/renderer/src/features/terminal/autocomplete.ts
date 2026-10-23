@@ -122,9 +122,10 @@ export function pathAt(input: string): { dir: string; base: string } {
 /**
  * Dosya kipi önerileri: imleçteki yolun klasöründeki girdiler (önce klasörler), yazılan adla başlayanlar. Gizli
  * girdiler yalnız ad noktayla başlıyorsa gösterilir. Klasör kabul edilince sonuna boşluk eklenmez, içi listelenir.
+ * Listede yalnız girdinin adı gösterilir; klasörün yolu pencerenin başlığındadır.
  */
 export function computePathSuggestions(input: string, listing: string[]): Suggestion[] {
-  const { dir, base } = pathAt(input)
+  const { base } = pathAt(input)
   return listing
     .filter((e) => e !== './' && e !== '../' && e.startsWith(base) && e.length > base.length)
     .filter((e) => base.startsWith('.') || !e.startsWith('.'))
@@ -134,7 +135,7 @@ export function computePathSuggestions(input: string, listing: string[]): Sugges
       const isDir = entry.endsWith('/')
       return {
         kind: isDir ? ('directory' as const) : ('file' as const),
-        label: dir + entry,
+        label: entry,
         insert: entry.slice(base.length) + (isDir ? '' : ' ')
       }
     })

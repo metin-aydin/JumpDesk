@@ -190,7 +190,7 @@ try {
   }
   await page.keyboard.press('ArrowRight')
   let inside = await state()
-  for (let i = 0; i < 20 && !inside.options.includes('logs/app.log'); i++) {
+  for (let i = 0; i < 20 && !inside.options.includes('app.log'); i++) {
     await page.waitForTimeout(200)
     inside = await state()
   }
@@ -198,7 +198,7 @@ try {
     'accepting a folder lists what is inside',
     (await promptLine()).endsWith('cat logs/') &&
       inside.folder === 'logs/' &&
-      inside.options.includes('logs/app.log'),
+      inside.options.includes('app.log'),
     JSON.stringify(inside)
   )
   await shot('autocomplete-04-subfolder')
@@ -206,14 +206,37 @@ try {
   await page.waitForTimeout(600)
   const filtered = await state()
   check(
+    'folder entries show only their names',
+    inside.options.every((o) => !o.includes('logs/')),
+    JSON.stringify(inside.options)
+  )
+  check(
     'typing filters the folder entries',
-    filtered.options.length > 0 && filtered.options.every((o) => o.startsWith('logs/a')),
+    filtered.options.length > 0 && filtered.options.every((o) => o.startsWith('a')),
     JSON.stringify(filtered.options)
   )
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
   check('Escape leaves the file mode', (await state()).folder === null)
   await page.keyboard.press('Control+U')
+  await page.waitForTimeout(400)
+
+  // 8. Öneri penceresi açıkken başka sekmeye geçilip o sekme kapatılınca pencere geri gelmez
+  await page.keyboard.type('sys')
+  await page.waitForTimeout(900)
+  const footer = () => page.getByText('→ kabul ·').count()
+  const openBefore = await footer()
+  await page.keyboard.press('Control+Shift+T')
+  await page.waitForTimeout(300)
+  await page.getByRole('tree').getByText('jump-ops', { exact: true }).dblclick()
+  await page.waitForTimeout(3000)
+  await page.keyboard.press('Control+Shift+W')
+  await page.waitForTimeout(1200)
+  check(
+    'suggestions do not come back after switching tabs',
+    openBefore === 1 && (await footer()) === 0 && (await state()).ghost === null,
+    `${openBefore} → ${await footer()}`
+  )
 } catch (err) {
   failed = true
   console.log(`FAIL ${err.message.split('\n')[0]}`)

@@ -194,6 +194,8 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   /** Yazı boyutunu terminale uygular (ana etkide kurulur; görünür olunca da çağrılır). */
   const syncFontRef = useRef<() => void>(() => undefined)
   const sizeChangedRef = useRef<() => void>(() => undefined)
+  /** Öneri penceresini kapatır (ana etkide kurulur). */
+  const closePopupRef = useRef<() => void>(() => undefined)
   const decoratorRef = useRef<HighlightDecorator | null>(null)
   const propsRef = useRef(props)
   propsRef.current = props
@@ -619,6 +621,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
       }
     }
     sizeChangedRef.current = sizeChanged
+    closePopupRef.current = closePopup
 
     /**
      * Yazı boyutu değişince terminal yeniden ölçülür ve glifleri yeniden çizilir; çok sayıda oturumda bunu hepsine aynı
@@ -652,6 +655,11 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     const decoder = new TextDecoder('utf-8')
     const refreshInput = (): void => {
       refreshQueued = false
+      // Öneriler yalnız ekrandaki etkin terminalde açılır; arka plandaki terminalin konumu da hesaplanamaz.
+      if (!visibleRef.current || !propsRef.current.active) {
+        closePopup()
+        return
+      }
       const prefs = usePreferences.getState()
       const buf = term.buffer.active
       const promptReady =
@@ -1052,6 +1060,15 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
 
   useEffect(() => {
     if (active && visible) termRef.current?.focus()
+  }, [active, visible])
+
+  // Başka sekmeye ya da panele geçilince öneri ve yapay zeka pencereleri kapanır; geri dönülünce eski konumlarında
+  // yeniden belirmezler.
+  useEffect(() => {
+    if (active && visible) return
+    closePopupRef.current()
+    setAiAnchor(null)
+    setSelectionChip(null)
   }, [active, visible])
 
   useEffect(() => {

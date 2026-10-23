@@ -24,6 +24,11 @@ const ICONS: Record<SuggestionKind, typeof History> = {
   file: FileText
 }
 
+/** Uzun klasör yolunun sonu gösterilir (başı "…" ile kısaltılır); en derindeki klasör her zaman görünür. */
+const MAX_FOLDER_CHARS = 64
+const shortPath = (path: string): string =>
+  path.length > MAX_FOLDER_CHARS ? `…${path.slice(-(MAX_FOLDER_CHARS - 1))}` : path
+
 export interface AutocompleteState {
   items: Suggestion[]
   index: number
@@ -62,7 +67,9 @@ export function AutocompletePopup({
       {state.folder && (
         <div className="flex items-center gap-1.5 border-b px-2.5 py-1 text-[11px] text-muted-foreground">
           <FolderOpen className="size-3.5 shrink-0" />
-          <span className="min-w-0 truncate font-mono">{state.folder}</span>
+          <span title={state.folder} className="min-w-0 truncate font-mono">
+            {shortPath(state.folder)}
+          </span>
         </div>
       )}
       {onAi && !state.folder && (
