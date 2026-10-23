@@ -1427,3 +1427,12 @@ PR #10 birleşti (0.2.7); yeni `development` açıldı.
   başlıktaki yol 64 karakterden uzunsa başı "…" ile kısaltılır (`shortPath`), tam yol `title` ipucunda.
 - Test: autocomplete 17/17 ("folder entries show only their names").
 - Gönderim: PR #11 "JumpDesk 0.2.8: shorter folder suggestions" (birleştirme kullanıcıda).
+
+## Kullanıcı isteği — 54. tur (2026-10-23): sekme kapatınca öneri penceresi kalıyordu
+- Neden: öneri penceresi yalnız `active` ile gizleniyordu, durumu kapanmıyordu; sekmeden ayrılınca açık kalan
+  pencere, o sekmeye dönülünce (ör. diğer sekme kapatılınca) geri geliyordu. Arka plandaki terminale çıktı gelince
+  konum görünmeyen ekrana göre (0,0) hesaplandığı için sol üste kayıyordu.
+- Çözüm (`TerminalPane.tsx`): `refreshInput` terminal görünür ve etkin değilse pencereyi kapatıp çıkar; `active` ya da
+  `visible` düşünce `closePopupRef`, yapay zeka penceresi (`setAiAnchor(null)`) ve "Açıkla" düğmesi kapanır.
+- Test: autocomplete 18/18 ("suggestions do not come back after switching tabs"); windows 47, ai 44, panels 13,
+  tab-keys 8, popups 4, multiwindow 21.

@@ -219,6 +219,24 @@ try {
   await page.waitForTimeout(300)
   check('Escape leaves the file mode', (await state()).folder === null)
   await page.keyboard.press('Control+U')
+  await page.waitForTimeout(400)
+
+  // 8. Öneri penceresi açıkken başka sekmeye geçilip o sekme kapatılınca pencere geri gelmez
+  await page.keyboard.type('sys')
+  await page.waitForTimeout(900)
+  const footer = () => page.getByText('→ kabul ·').count()
+  const openBefore = await footer()
+  await page.keyboard.press('Control+Shift+T')
+  await page.waitForTimeout(300)
+  await page.getByRole('tree').getByText('jump-ops', { exact: true }).dblclick()
+  await page.waitForTimeout(3000)
+  await page.keyboard.press('Control+Shift+W')
+  await page.waitForTimeout(1200)
+  check(
+    'suggestions do not come back after switching tabs',
+    openBefore === 1 && (await footer()) === 0 && (await state()).ghost === null,
+    `${openBefore} → ${await footer()}`
+  )
 } catch (err) {
   failed = true
   console.log(`FAIL ${err.message.split('\n')[0]}`)
