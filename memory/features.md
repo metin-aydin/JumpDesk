@@ -1449,3 +1449,10 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
 - Gönderim: commit `c8ebd95`; PR #13 "JumpDesk 0.2.9: Ctrl+R reverse search works in the terminal" (notta
   "fixes #12", birleşince issue kapanır; birleştirme kullanıcıda). Push'ta önbellekteki git kimliği süresi dolmuştu;
   kalıcı ayar değiştirmeden `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` kullanıldı.
+
+## Kullanıcı isteği — 56. tur (2026-10-26): issue yorumu ve 0.2.9 yayını
+- Issue #12'ye İngilizce yorum yazıldı (neden, düzeltme #13, 0.2.9 ile gelir, uygulama içi güncelleme / Releases).
+- PR #13 kullanıcının isteğiyle birleştirildi (CI üç platformda yeşildi); issue #12 "fixes #12" ile kapandı, Release
+  iş akışı (run 40279275879) yaklaşık 9 dakikada başarıyla bitti: v0.2.9 "Latest" olarak yayımlandı (Linux
+  AppImage + deb, Windows Setup + Portable, macOS arm64/x64 dmg + zip, latest*.yml). Yeni `development` `main`'den
+  açıldı.
