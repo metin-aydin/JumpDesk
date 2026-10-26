@@ -60,6 +60,7 @@ boşluk eklenmez.
   fixture yazma/çözme, dosya penceresi taklidi, snippet fixture'ı içe aktarma (uygulamada yerleşik snippet yok).
 - Paketleme: `npm run build && npx electron-builder --linux` (AppImage + deb), `npx electron-builder --win portable
   --x64` (Windows tek dosya); paketlenmiş uygulama testi `node dev/e2e/packaged.mjs <AppImage> <klasör>`
+  (kabuk kısayollarının ana süreçte yutulmadığını da sınar; hızlısı `--linux dir` → `linux-unpacked/jumpdesk`)
 - Alarm algılayıcı birim testi: `node dev/alarm-detector.test.mjs` (mock gerekmez). Yapay zeka komut güvenliği:
   `node dev/ai-safety.test.mjs`, sağlayıcı istekleri `node dev/ai-providers.test.mjs`.
 - Dil: kaynak metinler Türkçe, `t()`/`useT()` (`lib/i18n.ts`), İngilizce sözlük `src/renderer/src/i18n/en/*.ts`

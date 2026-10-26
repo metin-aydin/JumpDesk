@@ -120,6 +120,15 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
   Portable hedef `wine32` istemez. NSIS için Docker `electronuserland/builder:wine` + `--prepackaged dist/win-unpacked`.
   Wine'ı kullanıcının `~/.wine`'ına dokunmadan çalıştırmak: `WINEPREFIX=<geçici> WINEDLLOVERRIDES="mscoree,mshtml="`.
 - `.gitignore`'daki `*.png` ikonları da dışlıyordu; `!build/**/*.png` ve `!resources/*.png` istisnaları eklendi.
+- **`@electron-toolkit/utils` `optimizer.watchWindowShortcuts` kullanılmaz:** paketli sürümde (`app.isPackaged`)
+  `before-input-event`'te Ctrl/⌘+R, Ctrl+Shift+I, Ctrl+Minus (Ctrl+_ dahil), Ctrl+Shift+Equal'ı
+  `preventDefault` ile yutar; tuş sayfaya hiç ulaşmaz (issue #12: terminalde Ctrl+R geriye arama çalışmıyordu,
+  yalnız paketli sürümde). Yerine `src/main/index.ts`'de yalnız geliştirmede F12 → DevTools işleyicisi var.
+  Menüde reload/zoom/toggleDevTools rolü olmadığından bu tuşların sayfada başka etkisi yok.
+- **Playwright `page.keyboard` `before-input-event`'i atlar** (CDP `Input.dispatchKeyEvent`); ana süreçteki tuş
+  süzmesini sınamak için `webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers })` kullanılır
+  (`dev/e2e/packaged.mjs` Ctrl+R / Ctrl+_ böyle basar). Paketli test hızlı derleme: `npx electron-builder --linux dir
+  -c.directories.output=<scratch>` → `<scratch>/linux-unpacked/jumpdesk`.
 
 ## Ayrı pencere, yakınlaştırma, vurgular (26. tur)
 - **Ayrı sekme penceresi** = ana renderer'dan `window.open('', 'jumpdesk-tab-<id>', features)`; ana süreç

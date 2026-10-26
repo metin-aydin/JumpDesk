@@ -1437,3 +1437,15 @@ PR #10 birleşti (0.2.7); yeni `development` açıldı.
 - Test: autocomplete 18/18 ("suggestions do not come back after switching tabs"); windows 47, ai 44, panels 13,
   tab-keys 8, popups 4, multiwindow 21.
 - PR #11 başlığı "JumpDesk 0.2.8: shorter folder suggestions, suggestion list fix", notu güncellendi.
+
+## Kullanıcı isteği — 55. tur (2026-10-26): issue #12, Ctrl+R geriye arama çalışmıyor
+PR #11 birleşti (0.2.8); yeni `development` açıldı.
+- Issue #12 (Ubuntu 26.04): terminalde Ctrl+R (reverse-i-search) tetiklenmiyor.
+- Neden: `src/main/index.ts` her pencereye `optimizer.watchWindowShortcuts` bağlıyordu; paketli sürümde Ctrl+R,
+  Ctrl+_, Ctrl+Shift+= ve Ctrl+Shift+I'yı ana süreçte yutuyordu. Geliştirme sürümünde ve e2e'de görünmüyordu.
+- Çözüm: `watchWindowShortcuts` kaldırıldı; yalnız geliştirmede F12 → DevTools işleyicisi.
+- Test: `dev/e2e/packaged.mjs` Ctrl+R ve Ctrl+_'ı `sendInputEvent` ile basar (düzeltmesiz pakette FAIL, düzeltilmişte
+  ok; DOM çizici açık). Geliştirmede F12 DevTools'u açıyor; smoke, tab-keys 8 geçti.
+- Gönderim: commit `c8ebd95`; PR #13 "JumpDesk 0.2.9: Ctrl+R reverse search works in the terminal" (notta
+  "fixes #12", birleşince issue kapanır; birleştirme kullanıcıda). Push'ta önbellekteki git kimliği süresi dolmuştu;
+  kalıcı ayar değiştirmeden `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` kullanıldı.
