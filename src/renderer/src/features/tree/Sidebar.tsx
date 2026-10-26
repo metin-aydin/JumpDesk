@@ -28,7 +28,7 @@ import { usePanelWidth } from '@/hooks/use-panel-width'
 import { connectToAsset } from '@/features/workspace/connect'
 import { AssetResultList } from './AssetResultList'
 import { ServerTree } from './ServerTree'
-import { useAssetSearch } from './use-asset-search'
+import { useAssetSearch, useResultKeys } from './use-asset-search'
 
 const MIN_WIDTH = 200
 const MAX_WIDTH = 460
@@ -195,11 +195,9 @@ export function Sidebar(): React.JSX.Element {
   )
   const open = useWorkspace((s) => s.leftPanelOpen)
   const [query, setQuery] = useState('')
-  const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const search = useAssetSearch(query)
-
-  useEffect(() => setActive(0), [query])
+  const keys = useResultKeys(query, search, connectToAsset)
 
   const revealNonce = useTreeCommands((s) => s.revealNonce)
   useEffect(() => {
@@ -254,12 +252,12 @@ export function Sidebar(): React.JSX.Element {
                 if (!searching) return
                 if (e.key === 'ArrowDown') {
                   e.preventDefault()
-                  setActive((i) => Math.min(i + 1, search.results.length - 1))
+                  keys.move(1)
                 } else if (e.key === 'ArrowUp') {
                   e.preventDefault()
-                  setActive((i) => Math.max(i - 1, 0))
-                } else if (e.key === 'Enter' && search.results[active]) {
-                  connectToAsset(search.results[active])
+                  keys.move(-1)
+                } else if (e.key === 'Enter') {
+                  keys.enter()
                 }
               }}
               placeholder={t('Sunucu, IP, etiket ara')}
@@ -288,8 +286,8 @@ export function Sidebar(): React.JSX.Element {
               results={search.results}
               loading={search.loading}
               error={search.error}
-              activeIndex={active}
-              onActiveChange={setActive}
+              activeIndex={keys.active}
+              onActiveChange={keys.setActive}
               onPick={(item) => connectToAsset(item)}
               onPickMany={(items) => items.forEach((item) => connectToAsset(item))}
             />

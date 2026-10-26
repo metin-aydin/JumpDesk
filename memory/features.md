@@ -1467,3 +1467,22 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
   right-click 9, ai 44, windows 47, tools 69, multiwindow 21, smoke, server-stats, i18n 0 sorun.
 - Gönderim: commit `19b6171` (+ `29a44ef` 0.2.9 kaydı); PR #14 "JumpDesk 0.2.10: zsh-style Ctrl+R history search"
   (birleştirme/yayın kullanıcıda).
+
+## Kullanıcı isteği — 58. tur (2026-10-26): 0.2.10 yayını
+- PR #14 kullanıcının isteğiyle birleştirildi (CI üç platformda yeşildi); Release iş akışı (run 40284999372)
+  yaklaşık 8 dakikada başarıyla bitti: v0.2.10 "Latest" (16 dosya: Linux AppImage + deb, Windows Setup + Portable,
+  macOS arm64/x64 dmg + zip, latest*.yml). Yeni `development` `main`'den açıldı.
+- Issue #12'ye 0.2.10 yorumu yazıldı (zsh tarzı arama: arama satırı altta, geri silme adım adım, Ctrl+R/S/G, Enter;
+  zsh ve özel bağlamalar dokunulmaz). Issue kapalı kaldı.
+
+## Kullanıcı isteği — 59. tur (2026-10-26): issue #15, aramada hızlı Enter yanlış sunucuyu seçiyor
+- Issue #15 (Mert18): hızlı yazıp Enter'a basınca (`10.123.123.14`) son metnin sonuçları gelmeden eski metnin
+  (`10.123.123.1`) ilk sonucu seçiliyor. İstenen: arama sürüyorsa Enter bitmesini bekleyip ilk sonucu seçsin.
+- Neden: `useAssetSearch` 180 ms gecikmeli arar; Enter o anda ekrandaki (eski metnin) `results[active]`'ını seçiyordu.
+- Çözüm: `useAssetSearch` sonuçların ait olduğu metni tutar, `loading` = sonuçlar yazılan metne ait değil.
+  Yeni `useResultKeys` (aynı dosya) oklar/Enter'ı yönetir: güncel sonuçta etkin sonuç; arama sürerken Enter o metni
+  bekler, bitince ilk sonuca bağlanır; metin bu arada değişirse (yazmaya devam, Esc) bağlanmaz. Yeni sonuçlar gelince
+  ilk sonuç etkin olur. Kenar çubuğu (`Sidebar.tsx`) ve "Yeni Bağlantı" (`QuickConnect.tsx`) aynı kancayı kullanır.
+- Test: yeni `dev/e2e/search-enter.mjs` 5/5 (eski kodla 4 FAIL: `db-01` seçiliyordu); home 17, panels 13, smoke.
+- Gönderim: commit `0a0a136`; PR #16 "JumpDesk 0.2.11: Enter in server search waits for the latest results" (notta
+  "Fixes #15", birleşince issue kapanır; birleştirme/yayın kullanıcıda).
