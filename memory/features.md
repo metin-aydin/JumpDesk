@@ -1474,3 +1474,13 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
   macOS arm64/x64 dmg + zip, latest*.yml). Yeni `development` `main`'den açıldı.
 - Issue #12'ye 0.2.10 yorumu yazıldı (zsh tarzı arama: arama satırı altta, geri silme adım adım, Ctrl+R/S/G, Enter;
   zsh ve özel bağlamalar dokunulmaz). Issue kapalı kaldı.
+
+## Kullanıcı isteği — 59. tur (2026-10-26): issue #15, aramada hızlı Enter yanlış sunucuyu seçiyor
+- Issue #15 (Mert18): hızlı yazıp Enter'a basınca (`10.123.123.14`) son metnin sonuçları gelmeden eski metnin
+  (`10.123.123.1`) ilk sonucu seçiliyor. İstenen: arama sürüyorsa Enter bitmesini bekleyip ilk sonucu seçsin.
+- Neden: `useAssetSearch` 180 ms gecikmeli arar; Enter o anda ekrandaki (eski metnin) `results[active]`'ını seçiyordu.
+- Çözüm: `useAssetSearch` sonuçların ait olduğu metni tutar, `loading` = sonuçlar yazılan metne ait değil.
+  Yeni `useResultKeys` (aynı dosya) oklar/Enter'ı yönetir: güncel sonuçta etkin sonuç; arama sürerken Enter o metni
+  bekler, bitince ilk sonuca bağlanır; metin bu arada değişirse (yazmaya devam, Esc) bağlanmaz. Yeni sonuçlar gelince
+  ilk sonuç etkin olur. Kenar çubuğu (`Sidebar.tsx`) ve "Yeni Bağlantı" (`QuickConnect.tsx`) aynı kancayı kullanır.
+- Test: yeni `dev/e2e/search-enter.mjs` 5/5 (eski kodla 4 FAIL: `db-01` seçiliyordu); home 17, panels 13, smoke.

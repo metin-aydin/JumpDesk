@@ -175,8 +175,13 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
   Tailwind katmanını ezer). Playwright CDP tıklamaları sürükleme bölgesini atlar; test hesaplanan `-webkit-app-region`
   değerini denetler.
 - `npx prettier --write src/...` önceden biçimlenmemiş dosyaları da (ör. `main/index.ts`) biçimler; yalnız biçim farkı.
-- Lint: `components/ui/*` (shadcn) ve bazı eski dosyalarda (TerminalPane ref, Sidebar setState) önceden kalan
-  hatalar var; yeni kod bunlara eklenmez.
+- Lint: `components/ui/*` (shadcn) ve bazı eski dosyalarda (TerminalPane ref, Sidebar `revealNonce` setState)
+  önceden kalan hatalar var; yeni kod bunlara eklenmez. `set-state-in-effect` yerine türetilmiş durum ya da koşullu
+  render içi `setState` kullanılır (ör. `use-asset-search.ts`).
+- Sunucu araması (`features/tree/use-asset-search.ts`): `useAssetSearch` son tamamlanan aramanın metnini tutar,
+  `loading` sonuçların yazılan metne ait olmadığını söyler (gecikme + istek süresi). Klavye `useResultKeys`: Enter
+  arama sürerken o metni bekler, bitince ilk sonuca bağlanır; metin değişirse bırakılır. Arama kutusu eklenirse aynı
+  kanca kullanılır; Enter'ı `results[active]` ile doğrudan seçmek eski sonuçtan seçer (issue #15).
 
 ## Ayrı pencerede grup (27. tur)
 - Pencere kimliği `windowIdOf(tab) = tab.windowId ?? tab.id`; tek sekmede sekmenin, taşınan grupta grubun kimliği.

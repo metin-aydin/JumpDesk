@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import { AssetResultList } from '@/features/tree/AssetResultList'
-import { useAssetSearch } from '@/features/tree/use-asset-search'
+import { useAssetSearch, useResultKeys } from '@/features/tree/use-asset-search'
 import type { TreeItemData } from '@/features/tree/tree-data'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -19,11 +19,10 @@ export function QuickConnect({
 }): React.JSX.Element {
   const t = useT()
   const [query, setQuery] = useState('')
-  const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const search = useAssetSearch(query)
+  const keys = useResultKeys(query, search, onPick)
 
-  useEffect(() => setActive(0), [query])
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus()
   }, [autoFocus])
@@ -40,12 +39,12 @@ export function QuickConnect({
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
               e.preventDefault()
-              setActive((i) => Math.min(i + 1, search.results.length - 1))
+              keys.move(1)
             } else if (e.key === 'ArrowUp') {
               e.preventDefault()
-              setActive((i) => Math.max(i - 1, 0))
-            } else if (e.key === 'Enter' && search.results[active]) {
-              onPick(search.results[active])
+              keys.move(-1)
+            } else if (e.key === 'Enter') {
+              keys.enter()
             } else if (e.key === 'Escape') {
               setQuery('')
             }
@@ -61,8 +60,8 @@ export function QuickConnect({
             results={search.results}
             loading={search.loading}
             error={search.error}
-            activeIndex={active}
-            onActiveChange={setActive}
+            activeIndex={keys.active}
+            onActiveChange={keys.setActive}
             onPick={onPick}
             onPickMany={onPickMany}
           />

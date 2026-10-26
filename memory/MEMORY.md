@@ -15,6 +15,6 @@ Her oturumda önce bu dosya okunur. Kural: [CLAUDE.md](../CLAUDE.md).
 - [UI yığını araştırması](ui-stack-research.md) — antd yerine shadcn/ui (Base UI) + electron-vite + headless-tree; dockview önerildi ama kullanılmadı; tuzaklar
 - [Terminal performansı](terminal-performance.md) — xterm.js WebGL havuzu (16 bağlam sınırı), binary yazma, WebSocketStream backpressure, 11 maddelik kontrol listesi
 - [Masaüstü tasarımı](desktop-design.md) — Termius benzeri görsel dil + gerçek masaüstü hissi için 9 kural (çerçevesiz pencere, sistem fontu, seçim/zoom kapalı...)
-- [Özellikler](features.md) — kullanıcının 10 öncelikli özelliği (snippet, autocomplete, otomatik komut, history, arama, arrange, yerel IP, hızlı bağlan) + tur tur istekler (49. tur: düzen klasörleri, satır içi öneri, düğme hizası, Ctrl+C)
+- [Özellikler](features.md) — kullanıcının 10 öncelikli özelliği (snippet, autocomplete, otomatik komut, history, arama, arrange, yerel IP, hızlı bağlan) + tur tur istekler (49. tur: düzen klasörleri, satır içi öneri, düğme hizası, Ctrl+C; 59. tur: aramada hızlı Enter, issue #15)
 - [Luna v4 referansı](luna-v4-reference.md) — ağaç arama API'si (assets/tree/?search=), CSRF/org header kuralları, token gövdesi
 - [Uygulama notları](implementation-notes.md) — kod yapısı, mock/dev/e2e komutları, öğrenilen tuzaklar (ws filtresi, CSRF, shadcn cn hatası)
