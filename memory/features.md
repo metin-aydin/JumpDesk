@@ -1484,3 +1484,5 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
   bekler, bitince ilk sonuca bağlanır; metin bu arada değişirse (yazmaya devam, Esc) bağlanmaz. Yeni sonuçlar gelince
   ilk sonuç etkin olur. Kenar çubuğu (`Sidebar.tsx`) ve "Yeni Bağlantı" (`QuickConnect.tsx`) aynı kancayı kullanır.
 - Test: yeni `dev/e2e/search-enter.mjs` 5/5 (eski kodla 4 FAIL: `db-01` seçiliyordu); home 17, panels 13, smoke.
+- Gönderim: commit `0a0a136`; PR #16 "JumpDesk 0.2.11: Enter in server search waits for the latest results" (notta
+  "Fixes #15", birleşince issue kapanır; birleştirme/yayın kullanıcıda).
