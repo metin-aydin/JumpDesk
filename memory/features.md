@@ -1486,3 +1486,12 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
 - Test: yeni `dev/e2e/search-enter.mjs` 5/5 (eski kodla 4 FAIL: `db-01` seçiliyordu); home 17, panels 13, smoke.
 - Gönderim: commit `0a0a136`; PR #16 "JumpDesk 0.2.11: Enter in server search waits for the latest results" (notta
   "Fixes #15", birleşince issue kapanır; birleştirme/yayın kullanıcıda).
+
+## Kullanıcı isteği — 60. tur (2026-10-26): PR #16 birleştirme, issue #15 yorumu, 0.2.11 yayını
+- PR #16 kullanıcının isteğiyle birleştirildi (CI yeşil: 5 geçti, 1 atlandı; birleştirme commit'i `e9fd75d`);
+  issue #15 "Fixes #15" ile kapandı. Issue'ya İngilizce yorum yazıldı (neden, yeni davranış, 0.2.11, uygulama içi
+  güncelleme / Releases).
+- Release iş akışı (run 40289266211) yaklaşık 7 dakikada başarıyla bitti: v0.2.11 "Latest" (16 dosya). Yeni
+  `development` `main`'den açıldı.
+- Not: arka planda `gh run watch --exit-status` TTY olmadan hemen 1 ile çıktı; yayın izleme `gh run view --json
+  status` ile 30 sn arayla sorulan bir döngüyle yapıldı.
