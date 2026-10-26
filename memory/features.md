@@ -1465,3 +1465,5 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
   `TerminalPane.tsx`, `shell-integration.ts` (OSC R).
 - Testler: birim 27/27, history-search 18/18, paketli 5/5; regresyon autocomplete 18, tab-keys 8, popups 4,
   right-click 9, ai 44, windows 47, tools 69, multiwindow 21, smoke, server-stats, i18n 0 sorun.
+- Gönderim: commit `19b6171` (+ `29a44ef` 0.2.9 kaydı); PR #14 "JumpDesk 0.2.10: zsh-style Ctrl+R history search"
+  (birleştirme/yayın kullanıcıda).
