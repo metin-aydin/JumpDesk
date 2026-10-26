@@ -24,6 +24,7 @@ const app = await electron.launch({
     JUMPDESK_SERVER: 'http://127.0.0.1:18080',
     JUMPDESK_HIDE_WINDOW: '1',
     JUMPDESK_OFFSCREEN: '1',
+    JUMPDESK_DISABLE_WEBGL: '1',
     JUMPDESK_USER_DATA: fs.mkdtempSync(path.join(os.tmpdir(), 'jumpdesk-packaged-'))
   }
 })
@@ -47,6 +48,28 @@ try {
   )
   check('terminal connects', true)
   await page.waitForTimeout(1500)
+  // Kabuk kısayolları (Ctrl+R geriye arama, Ctrl+_ geri alma) pencere düzeyinde yutulmadan kabuğa ulaşır.
+  // Tuşlar sendInputEvent ile gerçek klavye yolundan (before-input-event) basılır; Playwright'ın tuşları o yolu atlar.
+  const sendKey = (keyCode, modifiers) =>
+    app.evaluate(
+      ({ BrowserWindow }, [keyCode, modifiers]) => {
+        const wc = BrowserWindow.getAllWindows()[0].webContents
+        wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+        wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+      },
+      [keyCode, modifiers]
+    )
+  const rows = () => page.locator('.xterm-rows').first().innerText()
+  await page.locator('.xterm-helper-textarea').first().focus()
+  await sendKey('R', ['control'])
+  await page.waitForTimeout(800)
+  check('Ctrl+R reaches the shell', (await rows()).includes('reverse-i-search'))
+  await page.keyboard.press('Control+g')
+  await page.keyboard.type('echo undo-check')
+  await sendKey('-', ['control', 'shift'])
+  await page.waitForTimeout(800)
+  check('Ctrl+_ reaches the shell', !(await rows()).includes('echo undo-check'))
+  await page.keyboard.press('Control+c')
   const b64 = await app.evaluate(async ({ BrowserWindow }) =>
     (await BrowserWindow.getAllWindows()[0].capturePage()).toPNG().toString('base64')
   )

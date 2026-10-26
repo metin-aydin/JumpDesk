@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, nativeTheme } from 'electron'
-import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { electronApp, is } from '@electron-toolkit/utils'
 import { PARTITION } from './config'
 import { attachAuthWindow, checkSession } from './auth'
 import { registerIpc } from './ipc'
@@ -59,7 +59,17 @@ if (!app.requestSingleInstanceLock()) {
     buildMenu()
     initSystemTrust([PARTITION])
 
-    app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
+    // Tuşlar pencere düzeyinde süzülmez: Ctrl+R (geriye arama), Ctrl+_ (geri alma) gibi kabuk kısayolları terminale
+    // ulaşır. Uygulama menüsünde yenileme, yakınlaştırma ve DevTools öğesi olmadığından bu tuşlar sayfayı etkilemez.
+    // Geliştirmede F12 DevTools'u açar.
+    if (is.dev)
+      app.on('browser-window-created', (_, window) =>
+        window.webContents.on('before-input-event', (_e, input) => {
+          if (input.type !== 'keyDown' || input.code !== 'F12') return
+          if (window.webContents.isDevToolsOpened()) window.webContents.closeDevTools()
+          else window.webContents.openDevTools({ mode: 'undocked' })
+        })
+      )
 
     mainWindow = createMainWindow()
     const appContentsId = mainWindow.webContents.id
