@@ -1446,3 +1446,6 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
 - Çözüm: `watchWindowShortcuts` kaldırıldı; yalnız geliştirmede F12 → DevTools işleyicisi.
 - Test: `dev/e2e/packaged.mjs` Ctrl+R ve Ctrl+_'ı `sendInputEvent` ile basar (düzeltmesiz pakette FAIL, düzeltilmişte
   ok; DOM çizici açık). Geliştirmede F12 DevTools'u açıyor; smoke, tab-keys 8 geçti.
+- Gönderim: commit `c8ebd95`; PR #13 "JumpDesk 0.2.9: Ctrl+R reverse search works in the terminal" (notta
+  "fixes #12", birleşince issue kapanır; birleştirme kullanıcıda). Push'ta önbellekteki git kimliği süresi dolmuştu;
+  kalıcı ayar değiştirmeden `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` kullanıldı.
