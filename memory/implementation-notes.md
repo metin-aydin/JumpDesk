@@ -484,3 +484,29 @@ Kararlar: [[architecture-decisions]]. Protokoller: [[ssh-koko-protocol]], [[rdp-
   `pageTop` önceki sayfa başını; geçmişe kayan sayfa satırları metin karşılaştırmasıyla korunur.
 - Ölçüm tuzağı: `npm run build` `out/`'u değiştirir; arka planda e2e koşarken derlenecekse
   `npx electron-vite build --outDir <klasör>` ve `PERF_APP=<klasör>/main/index.js` kullanılır.
+
+## Ctrl+R geçmiş araması: zsh tarzı (2026-10-26)
+- Kullanıcı, Ubuntu terminalindeki (yerel kabuk **zsh**) aramayı istiyor: arama satırı altta (`bck-i-search: …_`),
+  imleç komut satırında. Sunucular bash; bash'in `(reverse-i-search)` satırı istemin yerine çizilir ve aramayı tümüyle
+  silince kendisi `(failed reverse-i-search)` der (JumpDesk'siz bash 5.2'de pty ile doğrulandı). Kabuk davranışı
+  olduğundan arama JumpDesk'te yapılır.
+- zsh 5.9 davranışı (pty ile ölçüldü, `history-search.ts` bunu taklit eder): ilk eşleşme başlangıçtaki satırın
+  kendisinde de aranır; girdide en sağdaki geçiş önce, Ctrl+R aynı satırda sola sonra eski komutlara; imleç
+  eşleşmenin başında; eşleşme altı çizili (`\e[4m`); geri silme bir önceki **adıma** döner (karakter ya da Ctrl+R),
+  tümü silinince başlangıç satırı ve `bck-i-search: _` (failing değil); eşleşme yoksa `failing bck-i-search:`, satır
+  son eşleşmede kalır, failing'de Ctrl+R bir şey yapmaz; Ctrl+G satırı geri yükler; Enter çalıştırır; başka her tuş
+  aramayı bitirir ve satırda kendi işini yapar (ör. ← imleci eşleşmenin bir solu). Boş aramada Ctrl+R son aramayı
+  yineler; Ctrl+S ileri (`fwd-i-search`). Farkımız: geçmiş tekilleştirilir (her komut en yeni hâliyle bir kez;
+  zsh varsayılanı yalnız art arda aynısını atlar) ve başlangıç satırıyla aynı komut atlanır — böylece Ctrl+S de geri
+  dönebilir.
+- Yapı: bash betiği kurulumda Ctrl+R `reverse-search-history`'ye bağlıysa (emacs kipi; `bind -p | grep -F`) OSC `R`
+  yayar → `searchBinding`. zsh'de ve tuşu başka işe bağlı kabuklarda (fzf vb.) tuş kabuğa gider. Arama yalnız
+  istemde, entegrasyon hazırken, çoklu yazma (broadcast) kapalıyken başlar. Tuşlar `term.onData` düzeyinde yakalanır
+  (IME, AltGr, yapıştırma kendiliğinden doğru); özel tuş işleyicisi aramada yalnız kopyala/yapıştırı işler.
+- Satır güncelleme: `\x05\x15<metin><Ctrl+B × imleçten sona>` (denetim karakterleri boşluk); aynı sonuç yeniden
+  gönderilmez. Arama satırı ve alt çizgi `HistorySearchLine` kaplaması (tampona yazılmaz; kabuk satırı yeniden
+  çizince çöp kalmaz). Komut satırı ekranın son satırındaysa yerel `\n×n` + `\e[nA` ile ekran kaydırılır (zsh de
+  böyle); readline göreli izlediği için bozulmaz. `refreshInput` aramada öneri penceresini kapatıp `layoutSearch`
+  çağırır; yeni istem, alternatif ekran, sekme gizlenmesi aramayı bitirir.
+- Test: `node dev/history-search.test.mjs` (27), `dev/e2e/history-search.mjs` (18; ekran görüntüsü 01-search,
+  02-bottom), paketli testte Ctrl+R artık `[data-history-search]` kaplamasını bekler. Kurulum satırı 2716 bayt.

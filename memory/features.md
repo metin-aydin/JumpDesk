@@ -1456,3 +1456,12 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
   iş akışı (run 40279275879) yaklaşık 9 dakikada başarıyla bitti: v0.2.9 "Latest" olarak yayımlandı (Linux
   AppImage + deb, Windows Setup + Portable, macOS arm64/x64 dmg + zip, latest*.yml). Yeni `development` `main`'den
   açıldı.
+
+## Kullanıcı isteği — 57. tur (2026-10-26): Ctrl+R Ubuntu terminalindeki (zsh) gibi olsun
+- İstek: Ctrl+R'de "yazıp silince failed oluyor"; Ubuntu terminalindeki gibi arama altta, imleç üstte olmalı.
+- Neden: Ubuntu'daki yerel kabuk zsh (`bck-i-search`), sunucular bash (`reverse-i-search`); "failed" bash'in kendi
+  davranışı. Çözüm: bash istemlerinde arama JumpDesk'te zsh gibi yapılır (ayrıntı: implementation-notes "Ctrl+R
+  geçmiş araması"). Yeni dosyalar: `features/terminal/history-search.ts`, `HistorySearchLine.tsx`; değişen:
+  `TerminalPane.tsx`, `shell-integration.ts` (OSC R).
+- Testler: birim 27/27, history-search 18/18, paketli 5/5; regresyon autocomplete 18, tab-keys 8, popups 4,
+  right-click 9, ai 44, windows 47, tools 69, multiwindow 21, smoke, server-stats, i18n 0 sorun.

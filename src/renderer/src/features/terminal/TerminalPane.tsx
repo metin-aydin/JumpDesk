@@ -26,6 +26,8 @@ import { useStatusBarVisible } from '@/features/server-status/use-status-bar'
 import { useTheme } from '@/stores/theme'
 import { AutocompletePopup, type AutocompleteState } from './AutocompletePopup'
 import { GhostText, type GhostAnchor } from './GhostText'
+import { HistorySearchLine, type HistorySearchView } from './HistorySearchLine'
+import { HistorySearch } from './history-search'
 import type { CursorAnchor } from './CursorPopup'
 import { computePathSuggestions, computeSuggestions, pathAt } from './autocomplete'
 import { paintInputLine } from './command-highlight'
@@ -93,6 +95,10 @@ export interface TerminalPaneProps {
 // eslint-disable-next-line no-control-regex -- denetim karakterleri (C0 ve DEL) dışarıda bırakılır
 const PRINTABLE = /^[^\x00-\x1f\x7f]+$/
 const isPrintable = (data: string): boolean => PRINTABLE.test(data)
+// eslint-disable-next-line no-control-regex -- komut satırına yazılırken denetim karakterleri boşluk olur
+const CONTROL_CHARS = /[\x00-\x1f\x7f]/g
+// eslint-disable-next-line no-control-regex -- köşeli ayraçlı yapıştırma (bracketed paste) işaretleri
+const BRACKETED_PASTE = /^\x1b\[200~([\s\S]*)\x1b\[201~$/
 
 /** Ekranı ya da geri kaydırma arabelleğini silen diziler: ED 2/3 ve RIS. */
 const CLEAR_SEQUENCES = ['\x1b[2J', '\x1b[3J', '\x1bc']
@@ -196,6 +202,10 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   const sizeChangedRef = useRef<() => void>(() => undefined)
   /** Öneri penceresini kapatır (ana etkide kurulur). */
   const closePopupRef = useRef<() => void>(() => undefined)
+  /** Ctrl+R geçmiş aramasının satırı (komut satırının altında); arama yokken null. */
+  const [searchLine, setSearchLine] = useState<HistorySearchView | null>(null)
+  /** Geçmiş aramasını satırı olduğu gibi bırakarak bitirir (ana etkide kurulur). */
+  const endSearchRef = useRef<() => void>(() => undefined)
   const decoratorRef = useRef<HighlightDecorator | null>(null)
   const propsRef = useRef(props)
   propsRef.current = props
@@ -335,6 +345,22 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
      */
     let fileMode = false
     let lastTabAt = 0
+    /**
+     * Uzak bash'te Ctrl+R varsayılan geçmiş aramasına bağlı: arama zsh'deki gibi JumpDesk'te yapılır (eşleşme komut
+     * satırına yazılır, arama satırı altında görünür). zsh'de ve tuşu başka işe bağlanmış kabuklarda tuş kabuğa gider.
+     */
+    let searchBinding = false
+    let isearch: HistorySearch | null = null
+    /** Komut satırına en son yazılan arama sonucu (imleç ve metin). */
+    let isearchSent = ''
+    let lastSearchQuery = ''
+    const endSearch = (): void => {
+      if (!isearch) return
+      lastSearchQuery = isearch.query || lastSearchQuery
+      isearch = null
+      setSearchLine(null)
+    }
+    endSearchRef.current = endSearch
     /** Kabuktan alınan klasör listeleri (anahtar komut satırında yazıldığı gibi klasör) ve bekleyen istekler. */
     const dirListings = new Map<string, { entries: string[]; at: number }>()
     const dirRequests = new Map<string, number>()
@@ -376,6 +402,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         if (fileMode) scheduleRefresh()
       },
       onCommand: (num, command) => info.appendCommand(tabId, num, command),
+      onSearchBinding: () => (searchBinding = true),
       onHistory: (history) => info.patch(tabId, { history }),
       onIps: (ips) => {
         integrationAlive()
@@ -394,6 +421,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         recordStats(tabId, payload)
       },
       onPromptEnd: (pos) => {
+        endSearch()
         submittedFrom = null
         autoSuggest = true
         live.promptEnd = pos
@@ -456,6 +484,15 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true
       if (APP_KEYS.some((k) => isAppShortcut(e, k))) return false
+      const copyCombo = isMac
+        ? e.metaKey && e.key === 'c'
+        : e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'C'
+      const pasteCombo = isMac
+        ? e.metaKey && e.key === 'v'
+        : e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'V'
+      // Geçmiş aramasında tuşlar kabuğa gider gibi aramaya ulaşır (Ctrl+F, Tab, Ctrl+Space dahil); kopyalama ve
+      // yapıştırma yine çalışır.
+      if (isearch && !copyCombo && !pasteCombo) return true
       // Ctrl+F (⌘F) kabukta terminal aramasını açar; less/vim gibi tam ekran programlarda (alternatif ekran) tuş
       // programa gider, orada sayfa ilerletme tuşudur.
       const findCombo = isMac
@@ -532,12 +569,6 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
           return false
         }
       }
-      const copyCombo = isMac
-        ? e.metaKey && e.key === 'c'
-        : e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'C'
-      const pasteCombo = isMac
-        ? e.metaKey && e.key === 'v'
-        : e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'V'
       if (copyCombo) {
         e.preventDefault()
         if (term.hasSelection()) void navigator.clipboard.writeText(term.getSelection())
@@ -660,6 +691,11 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         closePopup()
         return
       }
+      if (isearch) {
+        closePopup()
+        layoutSearch()
+        return
+      }
       const prefs = usePreferences.getState()
       const buf = term.buffer.active
       const promptReady =
@@ -718,6 +754,54 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         anchor: cursorAnchor(screen),
         ghost: line && atEnd ? ghostAnchor(screen, wrap) : undefined
       })
+    }
+
+    /**
+     * Geçmiş aramasının satırını komut satırının altına yerleştirir ve eşleşmenin hücrelerini işaretler. Komut satırı
+     * ekranın son satırındaysa ekran zsh'deki gibi yukarı kaydırılarak arama satırına yer açılır.
+     */
+    const layoutSearch = (): void => {
+      const buf = term.buffer.active
+      if (!isearch || buf.type !== 'normal' || !live.atPrompt || !live.promptEnd) {
+        endSearch()
+        return
+      }
+      const screen = term.element?.querySelector('.xterm-screen')
+      const wrap = wrapRef.current
+      const line = readInputLine(term, live.promptEnd)
+      if (!screen || !wrap || !line || buf.viewportY !== buf.baseY || term.rows < 2) {
+        setSearchLine(null)
+        return
+      }
+      if (usePreferences.getState().commandHighlight)
+        paintInputLine(term, line, { commandNames: commandSet, entries: entrySet })
+      const lastY = Math.max(line.cells.at(-1)?.y ?? live.promptEnd.y, buf.baseY + buf.cursorY)
+      const row = lastY + 1 - buf.baseY
+      if (row >= term.rows) {
+        // İmleç ekranın altına inip satır ekler, sonra aynı hücreye döner; kabuk satırın yerini göreli izler.
+        const n = row - buf.cursorY
+        term.write(`${'\n'.repeat(n)}\x1b[${n}A`, scheduleRefresh)
+        return
+      }
+      const mark = isearch.mark
+      const shown = isearch.line.text.replace(CONTROL_CHARS, ' ')
+      const underline: HistorySearchView['underline'] = []
+      if (
+        mark &&
+        line.text.length === line.cells.length &&
+        (line.text === shown || line.text === shown.trimEnd())
+      ) {
+        for (let i = mark.start; i < mark.end && line.cells[i]; i++) {
+          const cell = line.cells[i]
+          const next = line.cells[i + 1]
+          underline.push({
+            x: cell.x,
+            y: cell.y - buf.baseY,
+            w: next && next.y === cell.y ? next.x - cell.x : 1
+          })
+        }
+      }
+      setSearchLine({ anchor: ghostAnchor(screen, wrap), row, text: isearch.status, underline })
     }
 
     /** Soluk öneri metninin başlayacağı hücre: imleç (terminal kabına göre). */
@@ -933,7 +1017,74 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
         }
         conn.input(data)
       }
+      /**
+       * Arama sonucunu komut satırına yazar: Ctrl+E, Ctrl+U satırı temizler, imleç Ctrl+B ile eşleşmenin başına alınır.
+       * Aynı sonuç yeniden gönderilmez.
+       */
+      const showSearchResult = (): void => {
+        if (!isearch) return
+        const { text, cursor } = isearch.line
+        const plain = text.replace(CONTROL_CHARS, ' ')
+        const key = `${cursor}\n${plain}`
+        if (key === isearchSent) return
+        isearchSent = key
+        typedLine = plain
+        conn.input(`\x05\x15${plain}${'\x02'.repeat([...plain.slice(cursor)].length)}`)
+      }
+      /** Ctrl+R: kabuk istemdeyse arama başlar (çoklu yazmada başlamaz, tuş tüm terminallere gider). */
+      const startSearch = (): boolean => {
+        if (
+          !searchBinding ||
+          !integrationReady() ||
+          !live.atPrompt ||
+          !live.promptEnd ||
+          term.buffer.active.type !== 'normal' ||
+          term.rows < 2 ||
+          broadcastPeers(tabId).length > 0
+        )
+          return false
+        const line = readInputLine(term, live.promptEnd)
+        if (!line) return false
+        closePopup()
+        isearch = new HistorySearch(
+          useSessionInfo.getState().byTab[tabId]?.history ?? [],
+          { text: line.text, cursor: line.cursor },
+          lastSearchQuery
+        )
+        isearchSent = `${line.cursor}\n${line.text}`
+        scheduleRefresh()
+        return true
+      }
+      /**
+       * Arama sürerken gelen tuş: yazılanlar aramaya eklenir, geri silme bir adım döner, Ctrl+R/Ctrl+S sonraki eşleşme,
+       * Ctrl+G başlangıçtaki satırı geri yazar. Enter satırı çalıştırır; diğer tuşlar (oklar, Ctrl+A, Tab, Ctrl+C…)
+       * aramayı bitirip satırda kendi işini yapar, Esc yalnız aramayı bitirir.
+       */
+      const searchKey = (data: string): void => {
+        const search = isearch!
+        const pasted = BRACKETED_PASTE.exec(data)
+        if (pasted) search.type(pasted[1].replace(CONTROL_CHARS, ' '))
+        else if (isPrintable(data)) search.type(data)
+        else if (data === '\x7f' || data === '\b') search.back()
+        else if (data === '\x12') search.next('backward')
+        else if (data === '\x13') search.next('forward')
+        else if (data === '\x07') {
+          lastSearchQuery = search.query || lastSearchQuery
+          search.cancel()
+          showSearchResult()
+          endSearch()
+          return
+        } else {
+          endSearch()
+          if (data !== '\x1b') sendTracked(data)
+          return
+        }
+        showSearchResult()
+        scheduleRefresh()
+      }
       term.onData((data) => {
+        if (isearch) return searchKey(data)
+        if (data === '\x12' && startSearch()) return
         sendTracked(data)
         for (const id of broadcastPeers(tabId)) terminalRegistry.get(id)?.send(data)
       })
@@ -1067,6 +1218,7 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
   useEffect(() => {
     if (active && visible) return
     closePopupRef.current()
+    endSearchRef.current()
     setAiAnchor(null)
     setSelectionChip(null)
   }, [active, visible])
@@ -1116,6 +1268,13 @@ export function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
           text={popup.items[popup.index].insert.trimEnd()}
           anchor={popup.ghost}
           color={terminalTheme(resolvedTheme).foreground ?? 'currentColor'}
+        />
+      )}
+      {searchLine && active && (
+        <HistorySearchLine
+          view={searchLine}
+          color={terminalTheme(resolvedTheme).foreground ?? 'currentColor'}
+          background={terminalTheme(resolvedTheme).background ?? 'transparent'}
         />
       )}
       {popup && active && !aiAnchor && (
