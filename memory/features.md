@@ -1449,3 +1449,21 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
 - Gönderim: commit `c8ebd95`; PR #13 "JumpDesk 0.2.9: Ctrl+R reverse search works in the terminal" (notta
   "fixes #12", birleşince issue kapanır; birleştirme kullanıcıda). Push'ta önbellekteki git kimliği süresi dolmuştu;
   kalıcı ayar değiştirmeden `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push` kullanıldı.
+
+## Kullanıcı isteği — 56. tur (2026-10-26): issue yorumu ve 0.2.9 yayını
+- Issue #12'ye İngilizce yorum yazıldı (neden, düzeltme #13, 0.2.9 ile gelir, uygulama içi güncelleme / Releases).
+- PR #13 kullanıcının isteğiyle birleştirildi (CI üç platformda yeşildi); issue #12 "fixes #12" ile kapandı, Release
+  iş akışı (run 40279275879) yaklaşık 9 dakikada başarıyla bitti: v0.2.9 "Latest" olarak yayımlandı (Linux
+  AppImage + deb, Windows Setup + Portable, macOS arm64/x64 dmg + zip, latest*.yml). Yeni `development` `main`'den
+  açıldı.
+
+## Kullanıcı isteği — 57. tur (2026-10-26): Ctrl+R Ubuntu terminalindeki (zsh) gibi olsun
+- İstek: Ctrl+R'de "yazıp silince failed oluyor"; Ubuntu terminalindeki gibi arama altta, imleç üstte olmalı.
+- Neden: Ubuntu'daki yerel kabuk zsh (`bck-i-search`), sunucular bash (`reverse-i-search`); "failed" bash'in kendi
+  davranışı. Çözüm: bash istemlerinde arama JumpDesk'te zsh gibi yapılır (ayrıntı: implementation-notes "Ctrl+R
+  geçmiş araması"). Yeni dosyalar: `features/terminal/history-search.ts`, `HistorySearchLine.tsx`; değişen:
+  `TerminalPane.tsx`, `shell-integration.ts` (OSC R).
+- Testler: birim 27/27, history-search 18/18, paketli 5/5; regresyon autocomplete 18, tab-keys 8, popups 4,
+  right-click 9, ai 44, windows 47, tools 69, multiwindow 21, smoke, server-stats, i18n 0 sorun.
+- Gönderim: commit `19b6171` (+ `29a44ef` 0.2.9 kaydı); PR #14 "JumpDesk 0.2.10: zsh-style Ctrl+R history search"
+  (birleştirme/yayın kullanıcıda).

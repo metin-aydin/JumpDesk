@@ -48,7 +48,7 @@ try {
   )
   check('terminal connects', true)
   await page.waitForTimeout(1500)
-  // Kabuk kısayolları (Ctrl+R geriye arama, Ctrl+_ geri alma) pencere düzeyinde yutulmadan kabuğa ulaşır.
+  // Kabuk kısayolları (Ctrl+R geçmiş araması, Ctrl+_ geri alma) pencere düzeyinde yutulmadan terminale ulaşır.
   // Tuşlar sendInputEvent ile gerçek klavye yolundan (before-input-event) basılır; Playwright'ın tuşları o yolu atlar.
   const sendKey = (keyCode, modifiers) =>
     app.evaluate(
@@ -63,7 +63,11 @@ try {
   await page.locator('.xterm-helper-textarea').first().focus()
   await sendKey('R', ['control'])
   await page.waitForTimeout(800)
-  check('Ctrl+R reaches the shell', (await rows()).includes('reverse-i-search'))
+  check(
+    'Ctrl+R reaches the terminal',
+    (await page.locator('[data-history-search]').getAttribute('data-history-search')) ===
+      'bck-i-search: _'
+  )
   await page.keyboard.press('Control+g')
   await page.keyboard.type('echo undo-check')
   await sendKey('-', ['control', 'shift'])

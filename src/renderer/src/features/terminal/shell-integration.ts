@@ -6,7 +6,7 @@ import type { IDisposable, Terminal } from '@xterm/xterm'
  *   C = çalışma dizini, L = dizindeki girdiler (`ls -1Ap`), X = son komut (`history 1`, numarasıyla),
  *   H = geçmiş (kurulumda bir kez), I = sunucunun IP'leri, K = komut adları, B = istem sonu (girdi başlangıcı),
  *   M = sunucu durumu (arka plandaki ölçüm döngüsünden; bkz. STATS_SCRIPT), D = istenen klasörün girdileri (ilk satır
- *   klasör, sonra `ls -1Ap`).
+ *   klasör, sonra `ls -1Ap`), R = bash'te Ctrl+R varsayılan geçmiş aramasına bağlı (kurulumda bir kez; emacs kipi).
  * D, uygulama `DIR_LISTING_KEY` dizisini gönderince gelir: kabukta bu diziye bağlı işlev (bash `bind -x`, zsh widget)
  * komut satırındaki imleçten önceki sözcüğün klasörünü listeler; satır değişmez, komut geçmişine bir şey yazılmaz.
  * Küçük harfli h, k ve m; H, K ve M'nin gzip ile sıkıştırılmış hâlidir (büyük ya da sık gönderilen veri).
@@ -31,6 +31,7 @@ case "$PS1" in *'\['*|*$'\033'*|*'\e'*);;*)PS1="\[\e[1;32m\]$PS1\[\e[0m\]";;esac
 PS1="$PS1\[$(printf '\033]6973;B;\007')\]"
 __jd_hist(){ HISTTIMEFORMAT= history|tail -n 1000|sed 's/^ *[0-9]* *//';};__jd_cmds(){ compgen -c 2>/dev/null|sort -u;}
 __jd_dlb(){ __jd_dls "${'$'}{READLINE_LINE:0:READLINE_POINT}";};bind -x '"\e[6973~": __jd_dlb' 2>/dev/null;bind -m vi-insert -x '"\e[6973~": __jd_dlb' 2>/dev/null
+case $SHELLOPTS in *emacs*)bind -p 2>/dev/null|grep -qF '"\C-r": reverse-search-history'&&__jd_osc R;;esac
 alias ls >/dev/null 2>&1||alias ls='ls --color=auto';alias grep >/dev/null 2>&1||alias grep='grep --color=auto';fi
 __jd_init(){ __jd_osc I "$(__jd_ip|__jd_b64)";__jd_osc h "$(__jd_hist|gzip -c|__jd_b64)";[ "$1" = 1 ]&&__jd_osc k "$(__jd_cmds|head -n 5000|gzip -c|__jd_b64)";__jd_last=$(__jd_last1);[ "$2" -gt 0 ] 2>/dev/null&&__jd_stat_start "$2";return 0;}`
 
@@ -118,6 +119,8 @@ export interface IntegrationHandlers {
   onStats?: (payload: string) => void
   /** İstenen klasörün girdileri (`klasör` komut satırında yazıldığı gibi, ör. `logs/`, `/var/log/`). */
   onDirListing?: (dir: string, entries: string[]) => void
+  /** Kabuk bash ve Ctrl+R varsayılan geçmiş aramasına bağlı. */
+  onSearchBinding?: () => void
 }
 
 const lines = (text: string): string[] =>
@@ -181,6 +184,9 @@ export function attachIntegration(term: Terminal, h: IntegrationHandlers): IDisp
         break
       case 'M':
         h.onStats?.(payload)
+        break
+      case 'R':
+        h.onSearchBinding?.()
         break
       case 'm':
         stats = stats.then(() => gunzipBase64(packed)).then((text) => h.onStats?.(text))
