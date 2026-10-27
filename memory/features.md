@@ -1495,3 +1495,20 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
   `development` `main`'den açıldı.
 - Not: arka planda `gh run watch --exit-status` TTY olmadan hemen 1 ile çıktı; yayın izleme `gh run view --json
   status` ile 30 sn arayla sorulan bir döngüyle yapıldı.
+
+## Kullanıcı isteği — 61. tur (2026-10-27): depoyu korumalı yap (UPaste ile aynı)
+UPaste oturumundan istendi: "master'ı protected yap ve bu actions sadece protected'da çalışsın… development da öyle
+olsun. aynı kontrolleri jumpdesk için de yap". GitHub ayarları (gh api):
+- `main`: PR zorunlu (onay 0), zorunlu kontroller check + package (ubuntu, windows, macos), dal güncel olmalı, yorumlar
+  çözülmeli, zorla gönderme/silme kapalı, yöneticiler dahil.
+- `development`: zorla gönderme/silme kapalı (yöneticiler dahil), doğrudan push serbest; dal artık kalıcı
+  (`delete_branch_on_merge` kapatıldı). Yeni akış: birleşince `git checkout development && git pull && git merge
+  --ff-only origin/main`.
+- `v*` etiketleri "Release tags" kural kümesiyle silinemez/güncellenemez.
+- Actions: yalnız GitHub'ın kendi action'ları; iş akışı anahtarı salt okunur (zaten öyleydi); dış katkı PR'ları onayla
+  çalışır; CI `permissions: contents: read`.
+- `release` ortamı (yalnız korunan dallar); release.yml `build` işi bu ortamda. İmza gizli değerleri ortama taşınacak
+  (kullanıcı girer; JumpDesk'in eski .p12 parolası ve uygulamaya özel parolası hatırlanmadığı için UPaste'te oluşturulan
+  yeni `~/Documents/apple-signing/UPaste-DeveloperID.p12` ve yeni uygulamaya özel parola kullanılır — aynı sertifika ve
+  anahtar). Ortam gizli değerleri girildikten ve bu PR birleştikten sonra depo düzeyindeki 5 gizli değer silinir.
+- Gizli bilgi taraması ve itme koruması zaten açıktı.
