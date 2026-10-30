@@ -1486,3 +1486,35 @@ PR #11 birleşti (0.2.8); yeni `development` açıldı.
 - Test: yeni `dev/e2e/search-enter.mjs` 5/5 (eski kodla 4 FAIL: `db-01` seçiliyordu); home 17, panels 13, smoke.
 - Gönderim: commit `0a0a136`; PR #16 "JumpDesk 0.2.11: Enter in server search waits for the latest results" (notta
   "Fixes #15", birleşince issue kapanır; birleştirme/yayın kullanıcıda).
+
+## Kullanıcı isteği — 60. tur (2026-10-26): PR #16 birleştirme, issue #15 yorumu, 0.2.11 yayını
+- PR #16 kullanıcının isteğiyle birleştirildi (CI yeşil: 5 geçti, 1 atlandı; birleştirme commit'i `e9fd75d`);
+  issue #15 "Fixes #15" ile kapandı. Issue'ya İngilizce yorum yazıldı (neden, yeni davranış, 0.2.11, uygulama içi
+  güncelleme / Releases).
+- Release iş akışı (run 40289266211) yaklaşık 7 dakikada başarıyla bitti: v0.2.11 "Latest" (16 dosya). Yeni
+  `development` `main`'den açıldı.
+- Not: arka planda `gh run watch --exit-status` TTY olmadan hemen 1 ile çıktı; yayın izleme `gh run view --json
+  status` ile 30 sn arayla sorulan bir döngüyle yapıldı.
+
+## Kullanıcı isteği — 61. tur (2026-10-27): depoyu korumalı yap (UPaste ile aynı)
+UPaste oturumundan istendi: "master'ı protected yap ve bu actions sadece protected'da çalışsın… development da öyle
+olsun. aynı kontrolleri jumpdesk için de yap". GitHub ayarları (gh api):
+- `main`: PR zorunlu (onay 0), zorunlu kontroller check + package (ubuntu, windows, macos), dal güncel olmalı, yorumlar
+  çözülmeli, zorla gönderme/silme kapalı, yöneticiler dahil.
+- `development`: zorla gönderme/silme kapalı (yöneticiler dahil), doğrudan push serbest; dal artık kalıcı
+  (`delete_branch_on_merge` kapatıldı). Yeni akış: birleşince `git checkout development && git pull && git merge
+  --ff-only origin/main`.
+- `v*` etiketleri "Release tags" kural kümesiyle silinemez/güncellenemez.
+- Actions: yalnız GitHub'ın kendi action'ları; iş akışı anahtarı salt okunur (zaten öyleydi); dış katkı PR'ları onayla
+  çalışır; CI `permissions: contents: read`.
+- `release` ortamı (yalnız korunan dallar); release.yml `build` işi bu ortamda. İmza gizli değerleri ortama taşınacak
+  (kullanıcı girer; JumpDesk'in eski .p12 parolası ve uygulamaya özel parolası hatırlanmadığı için UPaste'te oluşturulan
+  yeni `~/Documents/apple-signing/UPaste-DeveloperID.p12` ve yeni uygulamaya özel parola kullanılır — aynı sertifika ve
+  anahtar). Ortam gizli değerleri girildikten ve bu PR birleştikten sonra depo düzeyindeki 5 gizli değer silinir.
+- Gizli bilgi taraması ve itme koruması zaten açıktı.
+
+## 61. tur (2026-10-30): kapanış
+- Kullanıcı issue #15 / 0.2.11 işini onayladı ("her şey tamam"); açık iş yok.
+- Dal kuralı kullanıcı tarafından değişti (2026-10-27, CLAUDE.md): `development` kalıcı, birleşince silinmez, turdan
+  önce `main` ile hızlı ileri eşitlenir; imza gizli değerleri korunan `release` ortamında. Yerel `development`
+  `origin/development` (`c68dd78`) ile aynıydı ve `main`'i zaten içeriyordu. `user-preferences.md` buna göre düzeltildi.
