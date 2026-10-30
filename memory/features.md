@@ -1512,3 +1512,9 @@ olsun. aynı kontrolleri jumpdesk için de yap". GitHub ayarları (gh api):
   yeni `~/Documents/apple-signing/UPaste-DeveloperID.p12` ve yeni uygulamaya özel parola kullanılır — aynı sertifika ve
   anahtar). Ortam gizli değerleri girildikten ve bu PR birleştikten sonra depo düzeyindeki 5 gizli değer silinir.
 - Gizli bilgi taraması ve itme koruması zaten açıktı.
+
+## 61. tur (2026-10-30): kapanış
+- Kullanıcı issue #15 / 0.2.11 işini onayladı ("her şey tamam"); açık iş yok.
+- Dal kuralı kullanıcı tarafından değişti (2026-10-27, CLAUDE.md): `development` kalıcı, birleşince silinmez, turdan
+  önce `main` ile hızlı ileri eşitlenir; imza gizli değerleri korunan `release` ortamında. Yerel `development`
+  `origin/development` (`c68dd78`) ile aynıydı ve `main`'i zaten içeriyordu. `user-preferences.md` buna göre düzeltildi.
