@@ -31,11 +31,12 @@ mesajlarına "Co-Authored-By: Claude …" satırı eklenmez; araç yönergesi ak
 
 ## ⛔ KURAL: `main` yalnız PR ile değişir; geliştirme `development` dalında
 
-`main` GitHub'da korumalıdır: doğrudan push, zorla push ve silme kapalı, yönetici dahil (`enforce_admins`); onay
-sayısı 0, CI zorunlu değil. Tüm geliştirme `main`'den açılan `development` dalında yapılır (bu dala doğrudan push
-serbest). `development` → `main` PR'ı birleşince yeni sürüm yayımlanır ve dal GitHub'da kendiliğinden silinir
-(`delete_branch_on_merge`). Sonraki tur: `git checkout main && git pull && git checkout -b development`
-(yereldeki eski `development` silinir).
+Depo korumalıdır (GitHub dal koruması, yöneticiler dahil; 2026-10-27): `main`'e yalnız PR ile ve CI'ın tüm
+kontrolleri (check, package ×3) geçince birleştirilir; onay sayısı 0; `main` ve `development` dallarına zorla
+gönderme ve silme kapalıdır; `v*` sürüm etiketleri silinemez ve taşınamaz. Geliştirme kalıcı `development` dalında
+yapılır (bu dala doğrudan push serbest). `development` → `main` PR'ı birleşince yeni sürüm yayımlanır; dal silinmez.
+Sonraki tur: `git checkout development && git pull && git merge --ff-only origin/main`. macOS imza gizli değerleri
+depo düzeyinde değil, yalnız korunan dallardan çalışan `release` ortamındadır.
 
 ## ⛔ KURAL: Arayüz metinlerinde her kelimenin baş harfi büyük
 
@@ -88,12 +89,12 @@ boşluk eklenmez.
 
 ## Dallar ve sürümler
 
-- Çalışma her turda `main`'den açılan `development` dalında yapılır; `main`'e birleştirme (PR)
-  `.github/workflows/release.yml` ile yeni sürüm yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir, macOS
-  arm64/x64 dmg + zip), ardından dal silinir. `main`'e doğrudan push yapılmaz.
-- macOS sürümü Developer ID ile imzalanır ve Apple onayından geçer; depo gizli değerleri `CSC_LINK` (base64 .p12),
-  `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Eksikse macOS adımı ve dolayısıyla
-  tüm yayın durur. Gizli değerleri kullanıcı kendisi girer (Claude girmez). PR'larda CI üç platformu imzasız paketler.
+- Çalışma kalıcı `development` dalında yapılır; `main`'e birleştirme (PR) `.github/workflows/release.yml` ile yeni
+  sürüm yayımlar (Linux AppImage + deb, Windows kurulum + taşınabilir, macOS arm64/x64 dmg + zip); dal silinmez,
+  sonraki turdan önce `main` ile eşitlenir. `main`'e doğrudan push yapılmaz.
+- macOS sürümü Developer ID ile imzalanır ve Apple onayından geçer; `release` ortamının gizli değerleri `CSC_LINK`
+  (base64 .p12), `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Eksikse macOS adımı ve
+  dolayısıyla tüm yayın durur. Gizli değerleri kullanıcı kendisi girer (Claude girmez). PR'larda CI üç platformu imzasız paketler.
 - Apple onayı ve damgalama `build/notarize.cjs` (afterSign) ile yapılır: `notarytool submit --wait`, sonra
   `stapler staple` 30 sn arayla 10 deneme (Apple'ın damga sunucusu onaydan hemen sonra 503 dönebiliyor).
 - Bir sürüm başarısız olursa taslak silinir ve etiket oluşmaz; sonraki birleştirme aynı numarayı alır. O sürümün notu

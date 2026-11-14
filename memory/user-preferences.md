@@ -14,8 +14,9 @@ metadata:
 - Proje public: kurum, sunucu ve kişi bilgisi kod, test ve dokümanlara yazılmaz (genel örnekler kullanılır).
 - PR açıklamalarına ve sürüm notlarına asla "Generated with Claude Code", commit mesajlarına asla
   "Co-Authored-By: Claude" satırı yazılmaz (2026-10-16). CLAUDE.md'de kural.
-- `main`'e doğrudan push yok, yalnız PR. Geliştirme `main`'den açılan `development` dalında; `main`'e birleşince dal
-  silinir, sonraki turda yeniden açılır (2026-10-16). CLAUDE.md'de kural.
+- `main`'e doğrudan push yok, yalnız PR ve CI'ın tüm kontrolleri geçince. Geliştirme kalıcı `development` dalında;
+  birleşince dal silinmez, sonraki turdan önce `git pull && git merge --ff-only origin/main` ile eşitlenir. `main` ve
+  `development`'a zorla gönderme/silme kapalı, `v*` etiketleri korumalı (2026-10-27). CLAUDE.md'de kural.
 - İlk tercih edilen teknoloji: Electron (tartışmaya açık). [[architecture-decisions]]
 - Arayüz metinleri: "Yeni Bağlantı", tüm sağ tık/açılır menü öğeleri ve **tüm araç ipuçları (tooltip, `title`)**
   her kelimenin baş harfi büyük (ör. "Yan Yana Yerleştir", "Adresi Kopyala", "Bölünmüş Görünümde"). CLAUDE.md'de
